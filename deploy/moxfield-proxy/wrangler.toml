@@ -1,0 +1,10 @@
+name = "mtg-moxfield-proxy"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Lock the proxy to your GitHub Pages origin once you know it, e.g.
+#   ALLOW_ORIGIN = "https://YOURNAME.github.io"
+# Leaving it "*" is low-risk here: the Worker only ever fetches public,
+# read-only Moxfield deck data and cannot be pointed at any other URL.
+[vars]
+ALLOW_ORIGIN = "*"

@@ -1,0 +1,53 @@
+name: Deploy deck map to GitHub Pages
+
+# Manual only — runs when you click "Run workflow" in the Actions tab.
+# Deliberately NOT triggered on push, so publishing is always an explicit choice.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build card database
+        run: npm run build-data
+
+      - name: Build static Pages site
+        env:
+          MOXFIELD_PROXY: ${{ vars.MOXFIELD_PROXY }}
+        run: npm run build-web
+
+      - name: Add SPA 404 fallback
+        run: cp docs/index.html docs/404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,93 @@
+1 Xantcha, Sleeper Agent
+1 Abrade
+1 Ancient Tomb
+1 Animate Dead
+1 Arcane Signet
+1 Arid Mesa
+1 Baeloth Barrityl, Entertainer
+1 Birgi, God of Storytelling
+1 Blackcleave Cliffs
+1 Blightstep Pathway
+1 Blood Crypt
+1 Bloodstained Mire
+1 Bolas's Citadel
+1 Braid of Fire
+1 Burning Inquiry
+1 Cabal Coffers
+1 Cabal Ritual
+1 Chaos Warp
+1 Chrome Mox
+1 City of Brass
+1 Command Tower
+1 Curse of Opulence
+1 Damnation
+1 Dance of the Dead
+1 Dark Deal
+1 Dark Ritual
+1 Dauthi Voidwalker
+1 Deadly Rollick
+1 Deflecting Swat
+1 Demonic Tutor
+1 Descent into Avernus
+1 Disrupt Decorum
+1 Dragonskull Summit
+1 Entomb
+1 Exotic Orchard
+1 Exsanguinate
+1 Feed the Swarm
+1 Fellwar Stone
+1 Fire Covenant
+1 Gamble
+1 Gemstone Mine
+1 Graven Cairns
+1 Haunted Ridge
+1 Heartless Hidetsugu
+1 Heartstone
+1 Humble Defector
+1 Imp's Mischief
+1 Jeska's Will
+1 Karazikar, the Eye Tyrant
+1 Kardur, Doomscourge
+1 Kokusho, the Evening Star
+1 Lotus Petal
+1 Luxury Suite
+1 Magus of the Wheel
+1 Mana Confluence
+1 Mana Vault
+1 Marsh Flats
+1 Memory Jar
+1 Mogis, God of Slaughter
+3 Mountain
+1 Necromancy
+1 Necropotence
+1 Night's Whisper
+1 Orcish Bowmasters
+1 Peer into the Abyss
+1 Polluted Delta
+1 Prismatic Vista
+1 Rakdos Signet
+1 Raucous Theater
+1 Razorkin Needlehead
+1 Reflecting Pool
+1 Scalding Tarn
+1 Scrawling Crawler
+1 Sensei's Divining Top
+1 Shadowblood Ridge
+1 Sheoldred, the Apocalypse
+1 Sign in Blood
+1 Sol Ring
+1 Strip Mine
+1 Sulfurous Springs
+6 Swamp
+1 Talisman of Indulgence
+1 Terminate
+1 Tibalt's Trickery
+1 Toxic Deluge
+1 Underworld Dreams
+1 Urborg, Tomb of Yawgmoth
+1 Valley of Gorgoroth
+1 Vampiric Tutor
+1 Verdant Catacombs
+1 Waste Not
+1 Wheel of Fortune
+1 Wheel of Misfortune

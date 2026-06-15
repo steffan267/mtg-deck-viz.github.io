@@ -1,0 +1,12 @@
+node_modules/
+data/out/*.json
+data/out/*.json.gz
+!data/out/.gitkeep
+
+# OS / build artifacts
+.DS_Store
+**/.DS_Store
+deck-viz.zip
+
+# generated GitHub Pages output (the deploy workflow rebuilds it from source)
+docs/
