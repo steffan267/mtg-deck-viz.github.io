@@ -96,7 +96,8 @@
   #score .band{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
   #score .metricgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:8px;font-size:12px}
   #score .metricgrid .k{color:var(--dim)} #score .metricgrid .v{color:var(--text);font-weight:600;text-align:right}
-  #score .combobadge{margin-top:8px;display:inline-block;font-size:11px;font-weight:600;color:#ff7a3d;background:rgba(255,122,61,.13);border:1px solid rgba(255,122,61,.35);border-radius:6px;padding:3px 8px}
+  #score .combobadge{margin-top:8px;display:inline-block;font-size:11px;font-weight:600;color:#ff7a3d;background:rgba(255,122,61,.13);border:1px solid rgba(255,122,61,.35);border-radius:6px;padding:3px 8px;cursor:help;transition:background .12s,border-color .12s,box-shadow .12s}
+  #score .combobadge:hover{background:rgba(255,122,61,.22);border-color:rgba(255,122,61,.75);box-shadow:0 0 0 2px rgba(255,122,61,.12)}
   #score .enginebadge{margin-top:6px;font-size:12px;color:var(--dim)} #score .enginebadge b{color:#54c98a}
   /* win-tuning: plain-English summary + Game Changers */
   #score .winsummary{margin:6px 0 2px;font-size:12px;line-height:1.4;color:var(--text)}
@@ -396,7 +397,7 @@ ingest();
 
 // ---------- state ----------
 const roleOn={}; Object.keys(ROLE_COLORS).forEach(r=>roleOn[r]=true);
-let hoverNode=null,selNode=null,searchTerm="",frozen=false,hideIso=false;
+let hoverNode=null,selNode=null,searchTerm="",frozen=false,hideIso=false,hoverCombo=false;
 
 // ---------- canvas ----------
 const cv=document.getElementById("cv"),ctx=cv.getContext("2d");
@@ -477,8 +478,14 @@ function nodeVisible(n){
 let neighbors=new Set(),selNeighbors=new Set();
 function computeNeighbors(node,set){set.clear();if(!node)return;
   for(const l of links){if(l.source===node)set.add(l.target.id);if(l.target===node)set.add(l.source.id);}}
+function isComboLink(l){return (l.interactions||[]).some(it=>it.strength==="combo-critical");}
+function computeComboNodes(){
+  const set=new Set();
+  for(const l of links){if(isComboLink(l)){set.add(l.source.id);set.add(l.target.id);}}
+  return set;
+}
 // ---- interaction-family selection (highlight a whole synergy family) ----
-let selFamily=null, famNodes=new Set();
+let selFamily=null, famNodes=new Set(), comboNodes=computeComboNodes();
 function edgeFamily(l){
   const its=l.interactions||[];
   if(!its.length)return (l.events&&l.events[0])||"misc";
@@ -487,6 +494,7 @@ function edgeFamily(l){
 function computeFamNodes(){famNodes.clear();if(!selFamily)return;
   for(const l of links){if(edgeFamily(l)===selFamily){famNodes.add(l.source.id);famNodes.add(l.target.id);}}}
 function isDimmed(n){
+  if(hoverCombo)return !comboNodes.has(n.id);
   if(hoverNode){if(n===hoverNode)return false;return !neighbors.has(n.id);}
   if(selNode){if(n===selNode)return false;return !selNeighbors.has(n.id);}
   if(selFamily)return !famNodes.has(n.id);
@@ -509,13 +517,17 @@ function draw(){
     if(!nodeVisible(l.source)||!nodeVisible(l.target))continue;
     const a=toScreen(l.source),b=toScreen(l.target);
     const famActive=selFamily&&edgeFamily(l)===selFamily;
-    const active=(hoverNode&&(l.source===hoverNode||l.target===hoverNode))||(selNode&&(l.source===selNode||l.target===selNode))||famActive;
+    const comboActive=hoverCombo&&isComboLink(l);
+    const active=comboActive||(!hoverCombo&&((hoverNode&&(l.source===hoverNode||l.target===hoverNode))||(selNode&&(l.source===selNode||l.target===selNode))||famActive));
     const str=edgeStrength(l);
     let col=STR_BASE[str]||STR_BASE[1];
-    if(active)col=str>=4?"rgba(255,140,80,0.95)":"rgba(217,67,79,0.85)";
-    else if(hoverNode||selNode||selFamily)col="rgba(120,110,140,0.04)";
-    ctx.strokeStyle=col; ctx.lineWidth=active?1.5+str*0.7:(0.6+str*0.4);
+    if(comboActive)col="rgba(255,170,75,1)";
+    else if(active)col=str>=4?"rgba(255,140,80,0.95)":"rgba(217,67,79,0.85)";
+    else if(hoverNode||selNode||selFamily||hoverCombo)col="rgba(120,110,140,0.04)";
+    ctx.strokeStyle=col; ctx.lineWidth=comboActive?4.5:active?1.5+str*0.7:(0.6+str*0.4);
+    if(comboActive){ctx.shadowColor="rgba(255,140,80,0.8)";ctx.shadowBlur=10;}
     ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    if(comboActive){ctx.shadowBlur=0;}
   }
   for(const n of nodes){
     if(!nodeVisible(n))continue;
@@ -526,7 +538,7 @@ function draw(){
       ctx.lineWidth=2.5;ctx.strokeStyle=dim?"rgba(224,200,90,0.4)":"#e0c85a";ctx.stroke();
     }
     if(n===selNode||n===hoverNode){ctx.lineWidth=2;ctx.strokeStyle="#fff";ctx.stroke();}
-    const showLabel=n===centerNode||cam.k>1.3||n===hoverNode||n===selNode||(selNode&&selNeighbors.has(n.id))||(n.degree||0)>=8;
+    const showLabel=n===centerNode||cam.k>1.3||n===hoverNode||n===selNode||(hoverCombo&&comboNodes.has(n.id))||(selNode&&selNeighbors.has(n.id))||(n.degree||0)>=8;
     if(showLabel&&!dim){ctx.globalAlpha=1;ctx.font=(n===centerNode?"600 12px":"11px")+" -apple-system,sans-serif";ctx.fillStyle=n===centerNode?"#f0e3b0":"#e8e4f0";ctx.textAlign="center";
       ctx.fillText(shortName(n),p.x,p.y-r-4);}
     ctx.globalAlpha=1;
@@ -749,6 +761,23 @@ function renderSidebar(){
       `</div>`+
     `</div>`+
     ssBlock;
+  const comboBadge=document.querySelector("#score .combobadge");
+  if(comboBadge){
+    comboBadge.title="Hover to spotlight combo-critical links in the deck";
+    comboBadge.onmouseenter=()=>{
+      hoverCombo=true;
+      hoverNode=null;
+      neighbors.clear();
+      hideTip();
+      hintEl&&(hintEl.textContent="Spotlighting combo-critical links — move off the combo marker to clear");
+    };
+    comboBadge.onmouseleave=()=>{
+      hoverCombo=false;
+      hintEl&&(hintEl.textContent=selFamily?("Highlighting “"+((DECK.eventLabels||{})[selFamily]||(DECK.eventLabels||{})["enable:"+selFamily]||selFamily)+"” — click the family again to clear"):"");
+    };
+  }else{
+    hoverCombo=false;
+  }
   // compare button visible when >1 deck
   document.getElementById("cmpbtn").style.display=PAYLOAD.decks.length>1?"inline":"none";
   // legend
@@ -1086,8 +1115,8 @@ const hintEl=document.getElementById("hint");
 function switchDeck(i){
   if(i<0||i>=PAYLOAD.decks.length)return;
   PAYLOAD.active=i; DECK=PAYLOAD.decks[i].graph; TITLE=PAYLOAD.decks[i].title;
-  ingest(); initPositions(); settleAndFit();
-  selNode=null; hoverNode=null; selNeighbors.clear(); selFamily=null; famNodes.clear(); searchTerm="";
+  ingest(); comboNodes=computeComboNodes(); initPositions(); settleAndFit();
+  selNode=null; hoverNode=null; hoverCombo=false; selNeighbors.clear(); selFamily=null; famNodes.clear(); searchTerm="";
   document.getElementById("search").value="";
   renderSidebar(); renderTabs();
   startRecommendations();
