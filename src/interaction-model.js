@@ -658,6 +658,20 @@
     if (/^\{0\}/.test(cost) || cost === "" ) return true;
     return !/\{[1-9wubrgc]/.test(cost);                  // no real mana in the cost
   }
+  const NON_ACCESS_EXILE_COUNTERS = new Set([
+    "age", "charge", "coin", "experience", "flying", "indestructible", "lifelink",
+    "loyalty", "oil", "poison", "shield", "stun", "time", "verse", "vigilance"
+  ]);
+  function exiledCardAccessMarkers(text) {
+    if (!/\bexil/.test(text || "")) return [];
+    const markers = new Set();
+    for (const m of String(text).matchAll(/\b([a-z][a-z-]*) counters?\b/g)) {
+      const marker = m[1];
+      if (!NON_ACCESS_EXILE_COUNTERS.has(marker)) markers.add(marker);
+    }
+    return [...markers];
+  }
+
   function capsOf(segments, classified, isLand) {
     const caps = new Set();
     // Lands tap for mana and some untap lands; counting them as combo pieces
@@ -668,6 +682,26 @@
       const effectAndRaw = e + " " + s.raw;
       const effectAndTrigger = e + " " + s.trigger;
       const triggerAndEffect = s.trigger + " " + e;
+      const exileAccessMarkers = exiledCardAccessMarkers(effectAndRaw);
+      if (exileAccessMarkers.length) {
+        const grantsMarkedExileAccess =
+          /(you may|may).{0,80}\b(play|cast)\b/.test(effectAndRaw)
+          || /\bplay lands and cast\b/.test(effectAndRaw)
+          || /\b(play|cast)\b.{0,80}\bfrom among cards? you exiled\b/.test(effectAndRaw)
+          || /\bexiled card\b.{0,120}\b(you may|may).{0,80}\b(play|cast)\b/.test(effectAndRaw);
+        const createsMarkedExileAccess =
+          /\bexile\b/.test(effectAndRaw)
+          && !grantsMarkedExileAccess
+          && exileAccessMarkers.some(marker => new RegExp(`\\b${marker} counters?\\b`).test(effectAndRaw));
+        if (createsMarkedExileAccess) {
+          caps.add("is-exile-access-source");
+          for (const marker of exileAccessMarkers) caps.add("exile-access-source:" + marker);
+        }
+        if (grantsMarkedExileAccess) {
+          caps.add("uses-exiled-card-access");
+          for (const marker of exileAccessMarkers) caps.add("uses-exiled-card-access:" + marker);
+        }
+      }
       if (!isLand) {
         // taps for mana: an activated ability that taps and adds mana. Tag the
         // PERMANENT TYPE that taps, so an untapper only combos with it if the
@@ -1021,6 +1055,9 @@
     { family: "goad→punisher",     from: "is-goad-source",    to: "is-attack-punisher", kind: "synergy", strength: "moderate" },
   ];
   const hasCap = (node, cap) => (node.caps || []).includes(cap);
+  const capSuffixes = (node, prefix) => (node.caps || [])
+    .filter(cap => cap.startsWith(prefix))
+    .map(cap => cap.slice(prefix.length));
 
   // Build the full set of classified Interactions between two cards (both ways).
   function interactionsBetween(a, b) {
@@ -1051,6 +1088,21 @@
     // 3) ramp ↔ sink: near-universal in EDH (most decks ramp into a payoff), so
     // keep it weak — it's a real link but not what makes a deck cohesive.
     for (const it of out) if (it.event === "mana") { it.kind = "synergy"; it.family = "ramp→sink"; it.strength = "weak"; }
+
+    // Marked-exile engines: one card exiles cards with a named marker counter,
+    // another card lets you play/cast cards exiled with that same marker. Keep
+    // the family generic while matching the marker type to avoid false links
+    // between unrelated exile counters.
+    const addExiledCardAccess = (src, dst, dir) => {
+      const sourceMarkers = new Set(capSuffixes(src, "exile-access-source:"));
+      const useMarkers = capSuffixes(dst, "uses-exiled-card-access:");
+      const markers = useMarkers.filter(marker => sourceMarkers.has(marker));
+      if (!markers.length) return;
+      out.push({ kind: "synergy", family: "exiled-card-access", event: "enable:exiled-card-access", direction: dir,
+        strength: "strong", loops: false, evidence: { markers: [...new Set(markers)].sort() } });
+    };
+    addExiledCardAccess(a, b, "A→B");
+    addExiledCardAccess(b, a, "B→A");
 
     // 4) enablement families (directed, capability-based)
     for (const f of ENABLEMENT) {
@@ -1178,8 +1230,10 @@
   EVENT_LABEL["enable:combat→payoff"] = "attackers → combat-trigger payoff";
   EVENT_LABEL["enable:combat-enabler"] = "evasion/extra-combat → combat payoff";
   EVENT_LABEL["enable:goad→punisher"] = "goad → punish forced attackers (political)";
+  EVENT_LABEL["enable:exiled-card-access"] = "exiled card access";
   EVENT_LABEL["copy→trigger"] = "copy → trigger";
   EVENT_LABEL["lord→tribe"] = "tribal (creature-type synergy)";
+  EVENT_LABEL["exiled-card-access"] = "exiled card access";
   EVENT_LABEL["ramp→sink"] = "ramp ↔ mana sink";
 
   // strength → numeric weight for weighted cohesion

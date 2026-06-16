@@ -134,6 +134,18 @@ When Gilded Goose enters, create a Food token.
   assertHasCap(dauthi, 'is-theft-cast-source');
   assertNoCap(jeskasWill, 'is-theft-cast-source');
 
+  const markedExileAttacker = node('Marked Exile Attacker', 'Legendary Creature — Elemental Dog', 'Haste\nWhenever Marked Exile Attacker attacks, exile the top card of each player\'s library and put a fetch counter on each of them. Put a +1/+1 counter on Marked Exile Attacker for each noncreature card exiled this way.');
+  const markedExileCaster = node('Marked Exile Caster', 'Legendary Creature — Human Wizard', 'You may play lands and cast noncreature spells from among cards you exiled that have fetch counters on them, and you may spend mana as though it were mana of any color to cast those spells.');
+  const suspendRamp = node('Suspend Ramp', 'Sorcery', 'Search your library for a basic land card, put it onto the battlefield, then shuffle.\nSuspend 2—{G} (Rather than cast this card from your hand, you may pay {G} and exile it with two time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost.)');
+  assertHasCap(markedExileAttacker, 'is-exile-access-source');
+  assertHasCap(markedExileAttacker, 'exile-access-source:fetch');
+  assertHasCap(markedExileCaster, 'uses-exiled-card-access');
+  assertHasCap(markedExileCaster, 'uses-exiled-card-access:fetch');
+  assertHasFamily(markedExileAttacker, markedExileCaster, 'exiled-card-access');
+  assertHasEvent(markedExileAttacker, markedExileCaster, 'enable:exiled-card-access');
+  assertNoCap(suspendRamp, 'is-exile-access-source');
+  assertNoEvent(suspendRamp, markedExileCaster, 'enable:exiled-card-access');
+
   const zirda = node('Zirda-like Reducer', 'Creature — Elemental Fox', 'Abilities you activate that aren\'t mana abilities cost {2} less to activate. This effect can\'t reduce the mana in that cost to less than one mana.');
   const walkingBallista = node('Walking Ballista', 'Artifact Creature — Construct', 'Walking Ballista enters the battlefield with X +1/+1 counters on it.\n{4}: Put a +1/+1 counter on Walking Ballista.\nRemove a +1/+1 counter from Walking Ballista: It deals 1 damage to any target.');
   assertHasCap(zirda, 'is-cost-reducer');
