@@ -69,6 +69,31 @@ When you open a new prompt one day, say something like:
 
 > This repo is my local MTG deckbuilding data. First read `README.md`. Refresh with `npm run build-data -- --force-download` if I ask for current cards. Then use `node ./bin/mtg-deck-context.js --commander "COMMANDER NAME" --theme "THEME" --limit 120` to gather local card context before suggesting a Commander deck.
 
+## Moxfield public bracket evidence corpus
+
+Use these commands to build a per-bracket likes-descending public Commander sample for empirical scoring checks:
+
+```bash
+npm run fetch-bracket-sample
+npm run analyze-bracket-sample
+npm run report-bracket-analysis
+```
+
+What this does:
+
+- `npm run fetch-bracket-sample` seeds each Moxfield bracket from its public likes-sorted page, keeps the inline bracket value when the page mixes bracket labels, then fills additional decks from the global likes leaderboard until each bracket bucket reaches 100 decks or the accessible source exhausts.
+- `npm run analyze-bracket-sample` runs the existing deck metrics / win-tuning analysis over the fetched sample and writes `data/moxfield-bracket-corpus.json`, including explicit failure metadata if some decks cannot be fetched or built from the accessible network path.
+- `npm run report-bracket-analysis` turns the analyzed corpus into reusable bracket-summary artifacts, including a centroid-based check of how well `{win, cohesion, self}` alone recover the source brackets.
+
+Artifacts:
+
+- `data/moxfield-bracket-sample-500.json` — fetched public sample plus counts/shortfalls metadata
+- `data/moxfield-bracket-corpus.json` — analyzed corpus with win/cohesion/self-sufficiency/Game Changer output per deck
+- `data/moxfield-bracket-report.md` — human-readable summary of source-bracket means plus exact / ±1 / coarse-bucket classifier accuracy
+- `data/moxfield-bracket-report.json` — machine-readable version of the same analysis
+
+Because Moxfield search and deck pages are Cloudflare-gated, these scripts rely on the same network-access path already used elsewhere in this repo and may still report source shortfalls when a bracket cannot be paged deeply enough from the accessible surfaces.
+
 ## Files
 
 - `bin/mtg-commander-search.js` — downloads Scryfall Oracle Cards and builds compact search data.

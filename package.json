@@ -10,8 +10,11 @@
   "scripts": {
     "build-data": "node ./bin/mtg-commander-search.js",
     "build-web": "node ./src/build-web.js",
-    "check": "node --check ./bin/mtg-commander-search.js && node --check ./bin/mtg-deck-context.js && node --check ./lib/build-commander-search.js && node --check ./lib/search-commander-cards.js && node --check ./src/metrics.js && node --check ./src/build-deck-viz.js && node --check ./src/build-web.js && node --check ./scripts/audit-interaction-coverage.js",
-    "test": "node ./test/build-commander-search.test.js && node ./test/search-commander-cards.test.js && node ./test/metrics.test.js && node ./test/interaction-model.test.js"
+    "check": "node --check ./bin/mtg-commander-search.js && node --check ./bin/mtg-deck-context.js && node --check ./lib/build-commander-search.js && node --check ./lib/search-commander-cards.js && node --check ./src/metrics.js && node --check ./src/build-deck-viz.js && node --check ./src/build-web.js && node --check ./scripts/audit-interaction-coverage.js && node --check ./lib/moxfield-bracket-sample.js && node --check ./lib/bracket-analysis.js && node --check ./data/fetch-moxfield-bracket-sample.js && node --check ./data/validate-wintuning.js && node --check ./data/report-bracket-analysis.js",
+    "test": "node ./test/build-commander-search.test.js && node ./test/search-commander-cards.test.js && node ./test/metrics.test.js && node ./test/interaction-model.test.js && node ./test/moxfield-bracket-sample.test.js && node ./test/validate-wintuning.test.js && node ./test/bracket-analysis.test.js",
+    "fetch-bracket-sample": "node ./data/fetch-moxfield-bracket-sample.js",
+    "analyze-bracket-sample": "node ./data/validate-wintuning.js --corpus ./data/moxfield-bracket-sample-500.json --out ./data/moxfield-bracket-corpus.json",
+    "report-bracket-analysis": "node ./data/report-bracket-analysis.js --corpus ./data/moxfield-bracket-corpus.json --out ./data/moxfield-bracket-report.md --json-out ./data/moxfield-bracket-report.json"
   },
   "engines": {
     "node": ">=18"

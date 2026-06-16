@@ -426,6 +426,125 @@
     return path + tail + ".";
   }
 
+  function classifyCommanderBracket(real, allNodes, combos, wt) {
+    const cards = allNodes.filter(n => n.role !== "zone");
+    const text = n => (n.text || "").toLowerCase();
+    const mv = n => n.cmc == null ? 0 : n.cmc;
+    const names = xs => xs.map(n => n.id);
+    const cardsMatching = re => cards.filter(n => re.test(text(n)));
+
+    // Rules from the Commander Brackets Beta sheet. Everything here is
+    // text-derived except GAME_CHANGERS, which is the official WotC reference
+    // list above. The classifier exposes all trigger cards/flags so a deck can
+    // be audited card-by-card instead of receiving an opaque power number.
+    const massLandDenialCards = cardsMatching(
+      /destroy all (nonbasic )?lands?|exile all (nonbasic )?lands?|sacrifices? (all|[a-z]+) lands?|each player sacrifices? .* lands?|return all lands|lands? don't untap during/
+    );
+    const extraTurnCards = cardsMatching(
+      /take an extra turn|take (two|an additional) .* turns?|extra turn after this one/
+    );
+
+    // "Chaining" is not a card type; it is a deck-construction risk. Two or more
+    // extra-turn effects, or a spell that explicitly grants multiple/additional
+    // extra turns, crosses the Bracket 2/3 no-chaining rule.
+    const chainedExtraTurnCards = extraTurnCards.filter(n =>
+      /take (two|an additional) .* turns?|for each .* take an extra turn/.test(text(n))
+    );
+    const hasChainedExtraTurns = extraTurnCards.length >= 2 || chainedExtraTurnCards.length > 0;
+
+    const realById = {};
+    for (const n of real) realById[n.id] = n;
+    const comboPairs = [];
+    const addPair = (a, b, family) => {
+      if (!a || !b) return;
+      const key = [a, b].sort().join("\u0000");
+      if (comboPairs.some(p => p.key === key)) return;
+      const pair = [realById[a], realById[b]].filter(Boolean);
+      const manaValue = pair.reduce((sum, n) => sum + mv(n), 0);
+      comboPairs.push({ key, cards: [a, b], family, manaValue });
+    };
+    for (const p of (combos.comboCriticalPairs || [])) addPair(p.a, p.b, p.family);
+    for (const p of (combos.loops || [])) addPair(p[0], p[1], "mutual enablement loop");
+
+    // Bracket 3 permits late-game two-card infinites. Without full turn-by-turn
+    // simulation, total mana value is the most explainable proxy: cheap compact
+    // pairs are optimized pressure; high-mana pairs are late-game finishers.
+    const earlyComboPairs = comboPairs.filter(p => p.manaValue > 0 && p.manaValue <= 6);
+    const lateComboPairs = comboPairs.filter(p => p.manaValue === 0 || p.manaValue > 6);
+
+    const gameChangerCount = wt.signals.gameChangers.raw;
+    const tutorRaw = wt.signals.consistency.raw;
+    const tutorCards = wt.signals.consistency.cards;
+    const fewTutors = tutorRaw <= 3;
+    const compactCombo = comboPairs.length > 0;
+    const highPower = wt.score >= 74;
+    const cedhTuned = wt.score >= 86
+      && (gameChangerCount >= 7 || (compactCombo && wt.signals.consistency.score >= 60 && wt.signals.speed.score >= 60));
+
+    const flags = {
+      gameChangerCount,
+      gameChangers: wt.signals.gameChangers.cards,
+      tutorRaw,
+      tutorCards,
+      fewTutors,
+      massLandDenialCards: names(massLandDenialCards),
+      extraTurnCards: names(extraTurnCards),
+      hasChainedExtraTurns,
+      chainedExtraTurnCards: names(chainedExtraTurnCards),
+      comboPairs: comboPairs.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
+      earlyComboPairs: earlyComboPairs.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
+      lateComboPairs: lateComboPairs.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
+      winTuningScore: wt.score,
+      winTuningBand: wt.score >= 86 ? "Highly tuned" : wt.score >= 74 ? "Tuned to win"
+        : wt.score >= 58 ? "Focused" : wt.score >= 42 ? "Casual" : "Untuned",
+    };
+
+    const ruleBreaks = [];
+    if (massLandDenialCards.length) ruleBreaks.push("mass land denial");
+    if (hasChainedExtraTurns) ruleBreaks.push("chaining extra turns");
+    if (earlyComboPairs.length) ruleBreaks.push("early two-card infinite combo");
+    if (gameChangerCount >= 4) ruleBreaks.push("4+ Game Changers");
+
+    let bracket;
+    if (cedhTuned) bracket = 5;
+    else if (ruleBreaks.length || highPower) bracket = 4;
+    else if (gameChangerCount >= 1 || lateComboPairs.length || tutorRaw > 3 || wt.score >= 58) bracket = 3;
+    else if (extraTurnCards.length || wt.score >= 42) bracket = 2;
+    else bracket = 1;
+
+    const namesByBracket = {
+      1: "Exhibition",
+      2: "Core",
+      3: "Upgraded",
+      4: "Optimized",
+      5: "cEDH",
+    };
+    const reasons = [];
+    if (bracket === 5) reasons.push("highly tuned with cEDH-like speed, tutors, combos, or Game Changer density");
+    if (bracket === 4 && ruleBreaks.length) reasons.push(`unrestricted-rule triggers: ${ruleBreaks.join(", ")}`);
+    if (bracket === 4 && !ruleBreaks.length) reasons.push("win-tuning is in the optimized range");
+    if (bracket === 3) {
+      if (gameChangerCount) reasons.push(`${gameChangerCount} Game Changer${gameChangerCount > 1 ? "s" : ""}`);
+      if (lateComboPairs.length) reasons.push("late-game two-card combo detected");
+      if (tutorRaw > 3) reasons.push("more than a few tutors");
+      if (wt.score >= 58) reasons.push("focused upgraded-level win tuning");
+    }
+    if (bracket === 2) {
+      if (extraTurnCards.length) reasons.push("single/non-chained extra-turn effect keeps it above Exhibition");
+      else reasons.push("core/precon-level tuning with no Game Changers or banned bracket-1/2 restrictions");
+    }
+    if (bracket === 1) reasons.push("ultra-casual tuning with no Game Changers, mass land denial, extra turns, or two-card combos");
+
+    return {
+      bracket,
+      name: namesByBracket[bracket],
+      label: `Bracket ${bracket} · ${namesByBracket[bracket]}`,
+      reasons,
+      ruleBreaks,
+      flags,
+    };
+  }
+
   function compute(graph) {
     const nodes = graph.nodes.filter(n => n.role !== "zone");
     const real = nodes.filter(n => n.role !== "land");          // nonland cards
@@ -540,6 +659,7 @@
     // rank is a popularity proxy, not a true power measure.
     const ss = selfSufficiency(real);
     const wt = winTuning(real, nodes, combos);
+    const commanderBracket = classifyCommanderBracket(real, nodes, combos, wt);
 
     // --- cohesion score (0-100). Round-3 recalibration: the audit found the
     // satWeightedAvgDeg/6 term was INVERTING intent — focused single-engine decks
@@ -594,18 +714,14 @@
         : wt.score >= 58 ? "Focused" : wt.score >= 42 ? "Casual" : "Untuned",
       winTuningSignals: wt.signals,
       winSummary: wt.summary,
-      // Game Changers + the official Commander Brackets mapping. Count is the
-      // number of WotC "Game Changer" cards in the list; the names are surfaced
-      // so the figure is auditable. Bracket: 0 → casual (1-2), 1-3 → upgraded
-      // (3), 4+ → optimised / cEDH (4). This is a hint from the GC count alone,
-      // not a full bracket ruling (which also weighs tutors, combos, mass land
-      // denial), but it tracks the official intent.
+      // Full Commander Brackets Beta classifier. It applies the image rules
+      // (Game Changer counts, mass land denial, chained extra turns, two-card
+      // combo timing, tutor density, and tuning) and returns auditable flags.
       gameChangerCount: wt.signals.gameChangers.raw,
       gameChangers: wt.signals.gameChangers.cards,
-      bracketHint: wt.signals.gameChangers.raw >= 4 ? 4 : wt.signals.gameChangers.raw >= 1 ? 3 : 2,
-      bracketLabel: wt.signals.gameChangers.raw >= 4 ? "Bracket 4 · Optimised / cEDH"
-        : wt.signals.gameChangers.raw >= 1 ? "Bracket 3 · Upgraded"
-        : "Bracket 1–2 · Casual",
+      commanderBracket,
+      bracketHint: commanderBracket.bracket,
+      bracketLabel: commanderBracket.label,
     };
   }
 

@@ -121,24 +121,25 @@ an out-of-box deck*. "Highly tuned" (≥86) is reserved for genuinely optimised,
 cEDH-adjacent lists. The sidebar shows this score first because it answers the
 win-rate question; Cohesion and Self-sufficiency remain explanatory axes below it.
 
-## Game Changers & bracket — official WotC power list
+## Commander Brackets classifier — rules plus official WotC power list
 
 **Game Changers** is the curated card list from WotC's *Commander Brackets*
 system — the cards powerful enough to define a deck's power level. Unlike the
 heuristics above this is authoritative reference data (transcribed verbatim in
 `metrics.js`; update it when WotC does), so a card is a Game Changer *iff* WotC
 says so. The deck's **count** of these — with the actual card names always
-surfaced, so it is fully auditable — feeds win tuning *and* yields a **bracket
-hint** following the official count mapping:
+surfaced, so it is fully auditable — feeds win tuning and the **Commander
+Bracket classifier**.
 
 - **0** Game Changers → Bracket 1–2 (Casual)
 - **1–3** → Bracket 3 (Upgraded)
 - **4+** → Bracket 4 (Optimised / cEDH)
 
-This is a hint from the GC count alone (a full bracket ruling also weighs tutors,
-combos and mass land denial), but it tracks the official intent. Validated across
-the 100-precon corpus: 88/100 precons run **zero** Game Changers and none run more
-than one — exactly the clean casual/optimised separation the list is meant to give.
+The classifier now applies the Beta rules directly where the decklist exposes
+them: mass land denial, extra-turn chaining, two-card combo timing (cheap compact
+pairs vs late-game pairs), tutor density, Game Changer count, and win-tuning
+band. It returns `commanderBracket.flags` and `commanderBracket.ruleBreaks` so
+every bracket decision is auditable per card instead of being a black box.
 
 ## In the browser
 

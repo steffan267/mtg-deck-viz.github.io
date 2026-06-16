@@ -49,6 +49,14 @@ function assertHasFamily(a, b, family) {
   );
 }
 
+function assertHasInteraction(a, b, predicate, message) {
+  const interactionList = interactions(a, b);
+  assert.ok(
+    interactionList.some(predicate),
+    `${message}; interactions=${JSON.stringify(interactionList)}`
+  );
+}
+
 function main() {
   const heartstone = node(
     'Heartstone',
@@ -192,6 +200,9 @@ When Gilded Goose enters, create a Food token.
   const slimeAgainstHumanity = node('Slime Against Humanity', 'Sorcery', 'Create a 0/0 green Ooze creature token with trample. Put X +1/+1 counters on it, where X is two plus the total number of cards you own in exile and in your graveyard that are Oozes or are named Slime Against Humanity. A deck can have any number of cards named Slime Against Humanity.');
   const genericTokenAmplifier = node('Generic Token Amplifier', 'Enchantment', 'If one or more tokens would be created under your control, twice that many of those tokens are created instead.');
   const genericTokenSpell = node('Generic Token Spell', 'Sorcery', 'Create a 2/2 green Bear creature token.');
+  const winota = node('Winota, Joiner of Forces', 'Legendary Creature — Human Warrior', 'Whenever a non-Human creature you control attacks, look at the top six cards of your library. You may put a Human creature card from among them onto the battlefield tapped and attacking. It gains indestructible until end of turn. Put the rest of the cards on the bottom of your library in a random order.');
+  const bladeHistorian = node('Blade Historian', 'Creature — Human Cleric', 'Attacking creatures you control have double strike.');
+  const parasiticGrasp = node('Parasitic Grasp', 'Instant', 'Parasitic Grasp deals 3 damage to target Human creature. You gain 3 life.');
   assertHasCap(quina, 'is-token-doubler');
   assertHasCap(quina, 'has-creature-activated-ability');
   assert.deepEqual(quina.consumes.tokens, ['you']);
@@ -203,6 +214,34 @@ When Gilded Goose enters, create a Food token.
   assertHasCap(genericTokenAmplifier, 'is-token-doubler');
   assertHasCap(genericTokenSpell, 'is-creature-token-producer');
   assertHasFamily(genericTokenSpell, genericTokenAmplifier, 'token-production→amplifier');
+  assertHasCap(winota, 'is-tribal-payoff');
+  assertHasFamily(winota, bladeHistorian, 'tribal-payoff→tribe');
+  assertHasEvent(winota, bladeHistorian, 'tribal');
+  assertNoCap(parasiticGrasp, 'is-tribal-payoff');
+
+  const deadeyeNavigator = node('Deadeye Navigator', 'Creature — Spirit', 'Soulbond (You may pair this creature with another unpaired creature when either enters. They remain paired for as long as you control both of them.)\nAs long as Deadeye Navigator is paired with another creature, each of those creatures has "{1}{U}: Exile this creature, then return it to the battlefield under your control."');
+  const peregrineDrake = node('Peregrine Drake', 'Creature — Drake', 'Flying\nWhen this creature enters, untap up to five lands.');
+  const cloudOfFaeries = node('Cloud of Faeries', 'Creature — Faerie', 'Flying\nWhen this creature enters, untap up to two lands.\nCycling {2} ({2}, Discard this card: Draw a card.)');
+  const ephemerate = node('Ephemerate', 'Instant', 'Exile target creature you control, then return it to the battlefield under its owner\'s control.');
+  assertHasCap(deadeyeNavigator, 'is-repeatable-blink');
+  assertHasCap(deadeyeNavigator, 'blink-cost:2');
+  assertHasCap(peregrineDrake, 'etb-untaps-land:5');
+  assertHasCap(cloudOfFaeries, 'etb-untaps-land:2');
+  assertHasInteraction(deadeyeNavigator, peregrineDrake,
+    it => it.family === 'blink→land-untap-etb' && it.strength === 'combo-critical',
+    'Deadeye Navigator + Peregrine Drake should be a combo-critical repeatable blink/land-untap loop');
+  assertHasInteraction(deadeyeNavigator, cloudOfFaeries,
+    it => it.family === 'blink→land-untap-etb' && it.strength === 'combo-critical',
+    'Deadeye Navigator + Cloud of Faeries should be a combo-critical repeatable blink/land-untap loop');
+  assertNoCap(ephemerate, 'is-repeatable-blink');
+  assertHasFamily(ephemerate, peregrineDrake, 'etb→blink');
+  assertNoEvent(ephemerate, peregrineDrake, 'enable:blink→land-untap-etb');
+
+  const genericRepeatableBlink = node('Generic Repeatable Blink Engine', 'Creature — Spirit', 'As long as this creature is paired with another creature, each of those creatures has "{1}{U}: Exile this creature, then return it to the battlefield under your control."');
+  const genericLandUntapEtb = node('Generic Land Untap Creature', 'Creature — Elemental', 'When this creature enters, untap up to three lands.');
+  assertHasInteraction(genericRepeatableBlink, genericLandUntapEtb,
+    it => it.family === 'blink→land-untap-etb' && it.strength === 'combo-critical' && it.evidence.blinkCost === 2 && it.evidence.untapCount === 3,
+    'same rules text on non-famous card names should still detect repeatable blink/land-untap combo');
 
   const profile = MODEL.interactionProfile({
     id: 'Heartstone',

@@ -237,7 +237,7 @@
           <p><b>Position shows power.</b> Each card has a <i>mass</i> that pulls it toward the centre, so the deck's most powerful and most-connected cards sit in the core and chaff drifts to the rim. The <span style="color:#e0c85a">gold-ringed</span> card in the middle is your commander (or, with no commander, the heaviest card). Bigger dot = heavier.</p></div>
         <div><h3>Three score axes</h3>
           <p><b>Win tuning</b> (0–100) rates how directly the list is optimized to win: speed, tutors, card flow, answers, compact finishers, resilience, efficiency, <b>Game Changers</b> and deck size. A one-line plain-English summary tells you <i>how</i> the deck wins, and hovering each bar lists the cards behind it. <b>Cohesion</b> rates synergy — winning through an engine of cards that feed each other. <b>Self-sufficiency</b> rates standalone card strength.</p>
-          <p><b>Game Changers</b> are WotC's official Commander-Brackets power cards; the count maps to a bracket (0 = casual, 1–3 = upgraded, 4+ = optimised/cEDH). A combat deck can be cohesive and resilient without being faster than a tutor/wheel/finisher deck. Read the three scores together. ⚡ flags a detected combo.</p></div>
+          <p><b>Game Changers</b> are WotC's official Commander-Brackets power cards. The bracket classifier also checks the Beta rules for mass land denial, chained extra turns, two-card combo timing, tutor density, and tuning. A combat deck can be cohesive and resilient without being faster than a tutor/wheel/finisher deck. Read the three scores together. ⚡ flags a detected combo.</p></div>
         <div><h3>Add & compare decks</h3>
           <p>Click <b>“+ Add Moxfield deck”</b> (top-left) and paste a Moxfield deck link — e.g. <code>moxfield.com/decks/…</code>. It loads instantly.</p>
           <p>Add as many as you like, switch between them in the sidebar, and click <b>“compare ▸”</b> to see their numbers side by side. <i>(Adding decks needs an internet connection.)</i></p></div>
@@ -1229,7 +1229,7 @@ function renderTabs(){
 const METRIC_DEFS=[
   {section:"Power at a glance"},
   {k:"winSummary",label:"How it wins",type:"text"},
-  {k:"bracketLabel",label:"Bracket (Game Changers)",type:"text"},
+  {k:"bracketLabel",label:"Commander bracket",type:"text"},
   {k:"winTuningScore",label:"Win tuning /100",type:"band",band:"winTuningBand",hi:true},
   {k:"gameChangerCount",label:"Game Changers",type:"gc",hi:true},
   {k:"cohesionScore",label:"Cohesion /100",type:"band",band:"cohesionBand",hi:true},

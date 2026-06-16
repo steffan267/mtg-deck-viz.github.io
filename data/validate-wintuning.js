@@ -15,8 +15,8 @@ const fs = require("fs");
 const path = require("path");
 const { loadCards, build, fetchMoxfield } = require("../src/build-deck-viz.js");
 
-const CORPUS = path.join(__dirname, "precon-sample-100.json");
-const OUT = path.join(__dirname, "wintuning-corpus.json");
+const DEFAULT_CORPUS = path.join(__dirname, "precon-sample-100.json");
+const DEFAULT_OUT = path.join(__dirname, "wintuning-corpus.json");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Fetch with backoff: the r.jina.ai proxy rate-limits (HTTP 429) under a fast
@@ -32,14 +32,66 @@ async function fetchWithRetry(id, tries = 5) {
   }
 }
 
+function parseArgs(argv) {
+  const opts = { corpus: DEFAULT_CORPUS, out: DEFAULT_OUT, limit: Infinity };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--corpus') opts.corpus = argv[++i];
+    else if (a === '--out') opts.out = argv[++i];
+    else if (a === '--limit') opts.limit = parseInt(argv[++i], 10) || Infinity;
+    else if (/^\d+$/.test(a)) opts.limit = parseInt(a, 10);
+    else if (a === '--help') {
+      console.error('Usage: node data/validate-wintuning.js [limit] [--corpus file] [--out file] [--limit n]');
+      process.exit(2);
+    }
+  }
+  return opts;
+}
+
+function loadCorpus(file) {
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  return Array.isArray(raw) ? raw : (raw.decks || []);
+}
+
+function loadPrior(out) {
+  if (!fs.existsSync(out)) return { results: [], failures: [] };
+  const raw = JSON.parse(fs.readFileSync(out, "utf8"));
+  if (Array.isArray(raw)) return { results: raw, failures: [] };
+  return {
+    results: Array.isArray(raw.results) ? raw.results : [],
+    failures: Array.isArray(raw.failures) ? raw.failures : [],
+  };
+}
+
+function buildOutput(corpusFile, requestedDecks, results, failures) {
+  return {
+    meta: {
+      corpus: corpusFile,
+      requestedDecks,
+      analyzedDecks: results.length,
+      failedDecks: failures.length,
+      complete: results.length + failures.length === requestedDecks,
+      updatedAt: new Date().toISOString(),
+    },
+    results,
+    failures,
+  };
+}
+
+function writeCheckpoint(out, payload) {
+  fs.writeFileSync(out, JSON.stringify(payload, null, 2));
+}
+
 async function main() {
-  const limit = parseInt(process.argv[2]) || Infinity;
-  const corpus = JSON.parse(fs.readFileSync(CORPUS, "utf8")).slice(0, limit);
+  const opts = parseArgs(process.argv.slice(2));
+  const limit = opts.limit;
+  const corpus = loadCorpus(opts.corpus).slice(0, limit);
   const idx = loadCards();
   // resume: keep decks already scored in a previous (rate-limited) run
-  const prior = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, "utf8")) : [];
-  const done = new Map(prior.map(r => [r.id, r]));
+  const prior = loadPrior(opts.out);
+  const done = new Map(prior.results.map(r => [r.id, r]));
   const results = [];
+  const failures = [];
   for (let i = 0; i < corpus.length; i++) {
     const { id, name } = corpus[i];
     if (done.has(id)) { results.push(done.get(id)); continue; }
@@ -53,18 +105,26 @@ async function main() {
         name: name.slice(0, 50), id,
         win: m.winTuningScore, band: m.winTuningBand,
         cohesion: m.cohesionScore, self: m.selfSufficiencyScore,
-        gc: m.gameChangerCount, gcCards: m.gameChangers, bracket: m.bracketHint,
+        gc: m.gameChangerCount, gcCards: m.gameChangers, bracket: m.bracketHint, sourceBracket: typeof corpus[i].bracket === "number" ? corpus[i].bracket : null, likes: corpus[i].likes ?? null,
         sig: Object.fromEntries(Object.entries(m.winTuningSignals).map(([k, v]) => [k, v.score])),
         summary: m.winSummary,
       });
       process.stdout.write(`win ${m.winTuningScore} (${m.winTuningBand}) · GC ${m.gameChangerCount} · B${m.bracketHint}\n`);
-      fs.writeFileSync(OUT, JSON.stringify(results, null, 2));   // checkpoint so a 429 mid-run is resumable
+      writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures));   // checkpoint so a 429 mid-run is resumable
     } catch (e) {
       process.stdout.write(`✗ ${e.message}\n`);
+      failures.push({
+        id,
+        name: name.slice(0, 50),
+        error: e.message,
+        sourceBracket: typeof corpus[i].bracket === "number" ? corpus[i].bracket : null,
+        likes: corpus[i].likes ?? null,
+      });
+      writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures));
     }
   }
 
-  fs.writeFileSync(OUT, JSON.stringify(results, null, 2));
+  writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures));
 
   // ---- distribution report ----
   const wins = results.map(r => r.win).sort((a, b) => a - b);
@@ -80,6 +140,7 @@ async function main() {
   console.log("win score: min", wins[0], "median", median, "mean", mean, "max", wins[wins.length - 1]);
   console.log("bands:", JSON.stringify(bands));
   console.log("brackets:", JSON.stringify(brackets));
+  console.log("analysis completeness:", `${results.length}/${corpus.length} succeeded`, `failures ${failures.length}`);
   console.log("game changers: min", Math.min(...gcs), "median", gcs.slice().sort((a, b) => a - b)[Math.floor(gcs.length / 2)], "max", Math.max(...gcs));
   console.log("\ntop 8 by win:");
   results.slice().sort((a, b) => b.win - a.win).slice(0, 8).forEach(r => console.log(`  ${r.win} ${(r.band).padEnd(12)} GC${r.gc} ${r.name}`));
@@ -89,6 +150,20 @@ async function main() {
   const gcFreq = {};
   for (const r of results) for (const c of r.gcCards) gcFreq[c] = (gcFreq[c] || 0) + 1;
   Object.entries(gcFreq).sort((a, b) => b[1] - a[1]).forEach(([c, n]) => console.log(`  ${n}× ${c}`));
-  console.log("\n✓ wrote " + OUT);
+  if (failures.length) {
+    console.log("\nFailed deck fetch/builds:");
+    failures.slice().sort((a, b) => (a.sourceBracket || 0) - (b.sourceBracket || 0) || (b.likes || 0) - (a.likes || 0) || a.name.localeCompare(b.name)).forEach(r => console.log(`  B${r.sourceBracket || "?"} ${r.name}: ${r.error}`));
+  }
+  console.log("\n✓ wrote " + opts.out);
 }
-main().catch(e => { console.error(e); process.exit(1); });
+
+if (require.main === module) {
+  main().catch(e => { console.error(e); process.exit(1); });
+} else {
+  module.exports = {
+    parseArgs,
+    loadCorpus,
+    loadPrior,
+    buildOutput,
+  };
+}

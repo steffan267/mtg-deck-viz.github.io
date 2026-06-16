@@ -29,8 +29,8 @@ function card({
   };
 }
 
-function graph(nodes) {
-  return { nodes, edges: [], zoneEdges: [], zones: [], eventLabels: {}, missing: [] };
+function graph(nodes, edges = []) {
+  return { nodes, edges, zoneEdges: [], zones: [], eventLabels: {}, missing: [] };
 }
 
 function main() {
@@ -116,10 +116,84 @@ function main() {
   assert.ok(!tuned.gameChangers.includes('Sol Ring'), 'Sol Ring is NOT on the Game Changers list');
   // count must equal the surfaced card list length (the figure is auditable)
   assert.equal(tuned.gameChangerCount, tuned.gameChangers.length);
-  // bracket hint follows the official count mapping (0 → 1-2, 1-3 → 3, 4+ → 4)
+  // bracket hint now uses the full Beta classifier; 4+ Game Changers still force Bracket 4+.
   assert.equal(tuned.bracketHint, 4, 'a list with 4+ Game Changers maps to Bracket 4');
   assert.ok(tuned.gameChangerCount > combat.gameChangerCount);
   assert.ok(combat.bracketHint <= 3);
+
+  // --- Commander Brackets classifier: applies the image rules, not GC count only.
+  const casualExhibition = METRICS.compute(graph([
+    card({ id: 'Friendly Commander', role: 'commander', cmc: 4, text: 'Whenever you gain life, scry 1.', edh: null }),
+    card({ id: 'Vanilla Friend', role: 'creature', cmc: 3, text: 'A friendly creature.', edh: null }),
+    card({ id: 'Forest', role: 'land', qty: 98, edh: null }),
+  ]));
+  assert.equal(casualExhibition.bracketHint, 1);
+  assert.equal(casualExhibition.commanderBracket.name, 'Exhibition');
+
+  const singleExtraTurn = METRICS.compute(graph([
+    card({ id: 'Slow Commander', role: 'commander', cmc: 4, edh: null }),
+    card({ id: 'One Time Warp', cmc: 5, text: 'Target player takes an extra turn after this one.', edh: null }),
+    card({ id: 'Island', role: 'land', qty: 98, edh: null }),
+  ]));
+  assert.equal(singleExtraTurn.bracketHint, 2, 'Bracket 1 forbids extra turns, but Bracket 2 forbids only chaining them');
+  assert.deepEqual(singleExtraTurn.commanderBracket.flags.extraTurnCards, ['One Time Warp']);
+
+  const chainedExtraTurns = METRICS.compute(graph([
+    card({ id: 'Turn Commander', role: 'commander', cmc: 4, edh: null }),
+    card({ id: 'First Time Warp', cmc: 5, text: 'Target player takes an extra turn after this one.', edh: null }),
+    card({ id: 'Second Time Warp', cmc: 5, text: 'Target player takes an extra turn after this one.', edh: null }),
+    card({ id: 'Island', role: 'land', qty: 97, edh: null }),
+  ]));
+  assert.equal(chainedExtraTurns.bracketHint, 4, 'chaining extra turns is unrestricted-bracket territory');
+  assert.ok(chainedExtraTurns.commanderBracket.ruleBreaks.includes('chaining extra turns'));
+
+  const massLandDenial = METRICS.compute(graph([
+    card({ id: 'Table Commander', role: 'commander', cmc: 4, edh: null }),
+    card({ id: 'Not-Armageddon', cmc: 4, text: 'Destroy all lands.', edh: null }),
+    card({ id: 'Plains', role: 'land', qty: 98, edh: null }),
+  ]));
+  assert.equal(massLandDenial.bracketHint, 4);
+  assert.deepEqual(massLandDenial.commanderBracket.flags.massLandDenialCards, ['Not-Armageddon']);
+
+  const threeGameChangers = METRICS.compute(graph([
+    card({ id: 'Value Commander', role: 'commander', cmc: 4, edh: null }),
+    card({ id: 'Rhystic Study', cmc: 3, text: 'Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.', edh: 20 }),
+    card({ id: 'Smothering Tithe', cmc: 4, text: 'Whenever an opponent draws a card, create a Treasure token unless they pay {2}.', edh: 20 }),
+    card({ id: 'Cyclonic Rift', cmc: 2, text: 'Return target nonland permanent you don’t control to its owner’s hand.', edh: 20 }),
+    card({ id: 'Island', role: 'land', qty: 96, edh: null }),
+  ]));
+  assert.equal(threeGameChangers.bracketHint, 3, '1-3 Game Changers maps to Upgraded');
+
+  const fourGameChangers = METRICS.compute(graph([
+    card({ id: 'Value Commander', role: 'commander', cmc: 4, edh: null }),
+    card({ id: 'Rhystic Study', cmc: 3, text: 'Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.', edh: 20 }),
+    card({ id: 'Smothering Tithe', cmc: 4, text: 'Whenever an opponent draws a card, create a Treasure token unless they pay {2}.', edh: 20 }),
+    card({ id: 'Cyclonic Rift', cmc: 2, text: 'Return target nonland permanent you don’t control to its owner’s hand.', edh: 20 }),
+    card({ id: 'Mystical Tutor', cmc: 1, text: 'Search your library for an instant or sorcery card, reveal it, then shuffle and put that card on top.', edh: 20 }),
+    card({ id: 'Island', role: 'land', qty: 95, edh: null }),
+  ]));
+  assert.equal(fourGameChangers.bracketHint, 4, '4+ Game Changers maps to Optimized/unrestricted');
+  assert.ok(fourGameChangers.commanderBracket.ruleBreaks.includes('4+ Game Changers'));
+
+  const lateCombo = METRICS.compute(graph([
+    card({ id: 'Big Engine A', cmc: 4, text: '{T}: Untap target permanent.', edh: null }),
+    card({ id: 'Big Engine B', cmc: 4, text: 'Whenever this becomes untapped, add mana.', edh: null }),
+    card({ id: 'Forest', role: 'land', qty: 98, edh: null }),
+  ], [
+    { source: 'Big Engine A', target: 'Big Engine B', interactions: [{ kind: 'enablement', direction: 'A→B', strength: 'combo-critical', family: 'untap loop' }] },
+  ]));
+  assert.equal(lateCombo.bracketHint, 3, 'late-game two-card combos are allowed in Bracket 3');
+  assert.deepEqual(lateCombo.commanderBracket.flags.lateComboPairs[0].cards, ['Big Engine A', 'Big Engine B']);
+
+  const earlyCombo = METRICS.compute(graph([
+    card({ id: 'Cheap Engine A', cmc: 2, text: '{T}: Untap target permanent.', edh: null }),
+    card({ id: 'Cheap Engine B', cmc: 2, text: 'Whenever this becomes untapped, add mana.', edh: null }),
+    card({ id: 'Forest', role: 'land', qty: 98, edh: null }),
+  ], [
+    { source: 'Cheap Engine A', target: 'Cheap Engine B', interactions: [{ kind: 'enablement', direction: 'A→B', strength: 'combo-critical', family: 'untap loop' }] },
+  ]));
+  assert.equal(earlyCombo.bracketHint, 4, 'cheap two-card infinites are above the Bracket 3 late-game exception');
+  assert.deepEqual(earlyCombo.commanderBracket.flags.earlyComboPairs[0].cards, ['Cheap Engine A', 'Cheap Engine B']);
 
   // --- plain-English summary names the win path so the score reads as a story
   assert.match(tuned.winSummary, /finisher|combo/i, `summary should describe the win path: "${tuned.winSummary}"`);

@@ -658,6 +658,27 @@
     if (/^\{0\}/.test(cost) || cost === "" ) return true;
     return !/\{[1-9wubrgc]/.test(cost);                  // no real mana in the cost
   }
+
+  function numberWordValue(word) {
+    const map = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+    if (word == null) return 1;
+    const s = String(word).toLowerCase();
+    if (/^\d+$/.test(s)) return parseInt(s, 10);
+    return map[s] || 1;
+  }
+
+  function manaCostValue(cost) {
+    let total = 0;
+    for (const m of String(cost || "").matchAll(/\{([^}]+)\}/g)) {
+      const sym = m[1].toLowerCase();
+      if (/^\d+$/.test(sym)) total += parseInt(sym, 10);
+      else if (/^[wubrgc]$/.test(sym)) total += 1;
+      else if (sym === "x") total += 0;
+      else total += 1;
+    }
+    return total;
+  }
+
   const NON_ACCESS_EXILE_COUNTERS = new Set([
     "age", "charge", "coin", "experience", "flying", "indestructible", "lifelink",
     "loyalty", "oil", "poison", "shield", "stun", "time", "verse", "vigilance"
@@ -736,12 +757,30 @@
             caps.add(tgt === "permanent" ? "untaps-any" : "untaps-" + tgt);  // untaps-creature / untaps-land / untaps-artifact / untaps-any
           }
         }
+        if (s.kind === "etb") {
+          const lm = e.match(/untap (?:up to )?(one|two|three|four|five|six|seven|eight|nine|ten|\d+)? ?(?:target )?lands?/);
+          if (lm) {
+            caps.add("etb-untaps-land");
+            caps.add("etb-untaps-land:" + numberWordValue(lm[1]));
+          }
+        }
       }
       // ETB: a trigger that fires when this permanent enters
       if (s.kind === "triggered" || s.kind === "etb") caps.add("has-trigger");
       if (s.kind === "etb" && /\bthis\b|^when [a-z]+ enters|enters the battlefield/.test(s.trigger)) caps.add("has-etb");
       // blink/flicker: exile then return to the battlefield
       if (/exile .* return (it|them|that card|those cards|the exiled)/.test(e) && /battlefield/.test(e)) caps.add("is-blink");
+      // Repeatable blink engines can turn ETB land-untappers into loops. This is
+      // capability-based, not a card-name exception: it covers granted
+      // activated blink abilities as well as native activated flicker text.
+      if (/exile (this creature|target creature|another target creature|target permanent|another target permanent|it|them|that card).{0,80}return (it|them|that card|the exiled|this creature) to the battlefield/.test(effectAndRaw)) {
+        const quoted = effectAndRaw.match(/has\s+"([^"]+):[^"]*exile [^"]*return [^"]*battlefield[^"]*"/);
+        const blinkCost = s.kind === "activated" ? manaCostValue(c) : quoted ? manaCostValue(quoted[1]) : 0;
+        if (s.kind === "activated" || quoted) {
+          caps.add("is-repeatable-blink");
+          caps.add("blink-cost:" + blinkCost);
+        }
+      }
       // sac outlet: an activated ability whose COST sacrifices a creature/permanent
       if (s.kind === "activated" && /sacrifice (a|an|another|two|three|x|that) (creature|permanent|artifact|token)/.test(c)) {
         caps.add("is-sac-outlet");
@@ -881,6 +920,11 @@
       // counter MULTIPLIER (doublers): much stronger than a single counter source
       if (/(twice that many|double the number of|for each .* counter .* put that many|additional \+1\/\+1 counter|if .* would (have|get) .* counters? .* instead)/.test(e))
         caps.add("is-counter-multiplier");
+      // tribe-specific deployment/recruitment payoff: a card that explicitly
+      // turns a referenced creature type into cards or battlefield presence
+      // should link to matching bodies even when it is not a lord/anthem.
+      if (/put a[n]? [a-z]+ creature card .* onto the battlefield|put a[n]? [a-z]+ creature card .* into your hand|reveal .* put .* [a-z]+ creature card .* (onto the battlefield|into your hand)/.test(effectAndRaw))
+        caps.add("is-tribal-payoff");
 
       // --- Round 3: high-coverage missing archetypes (the too-low bucket) ---
       // ENCHANTRESS / CONSTELLATION: "whenever you cast/an enchantment enters → draw/trigger"
@@ -1058,6 +1102,9 @@
   const capSuffixes = (node, prefix) => (node.caps || [])
     .filter(cap => cap.startsWith(prefix))
     .map(cap => cap.slice(prefix.length));
+  const maxCapNumber = (node, prefix) => Math.max(0, ...capSuffixes(node, prefix)
+    .map(x => parseInt(x, 10))
+    .filter(Number.isFinite));
 
   // Build the full set of classified Interactions between two cards (both ways).
   function interactionsBetween(a, b) {
@@ -1084,6 +1131,11 @@
     if ((aLord && tribalMatch(a.tribalRefs, b.myTypes)) || (bLord && tribalMatch(b.tribalRefs, a.myTypes)))
       out.push({ kind: "synergy", family: "lord→tribe", event: "tribal", direction: "both",
         strength: typedTribal ? "moderate" : "weak", loops: false, evidence: { tribal: true, typed: typedTribal } });
+    const aTribalPayoff = hasCap(a, "is-tribal-payoff") && tribalMatch(a.tribalRefs.filter(r => r !== "creature"), b.myTypes);
+    const bTribalPayoff = hasCap(b, "is-tribal-payoff") && tribalMatch(b.tribalRefs.filter(r => r !== "creature"), a.myTypes);
+    if (aTribalPayoff || bTribalPayoff)
+      out.push({ kind: "synergy", family: "tribal-payoff→tribe", event: "tribal", direction: "both",
+        strength: "moderate", loops: false, evidence: { tribal: true, recruiter: true } });
 
     // 3) ramp ↔ sink: near-universal in EDH (most decks ramp into a payoff), so
     // keep it weak — it's a real link but not what makes a deck cohesive.
@@ -1109,6 +1161,8 @@
       for (const [src, dst, dir] of [[a, b, "A→B"], [b, a, "B→A"]]) {
         if (hasCap(src, f.from) && hasCap(dst, f.to)) {
           let strength = f.strength;
+          let family = f.family;
+          let evidence = { from: f.from, to: f.to };
           // free untap re-tapping a MANA ability = combo-critical — but ONLY if
           // the untapper can actually untap the type that produces the mana
           // (untaps-any, or untaps the rock's/dork's type). Untapping lands
@@ -1119,8 +1173,18 @@
               || (hasCap(dst, "mana-from-artifact") && hasCap(src, "untaps-artifact"));
             if (canRetap) strength = "combo-critical";
           }
-          out.push({ kind: f.kind, family: f.family, event: "enable:" + f.family, direction: dir,
-            strength, loops: false, evidence: { from: f.from, to: f.to } });
+          // Repeatable blink + ETB land untap is capability-based. If the
+          // land-untapper refreshes at least enough lands to pay the blink
+          // activation, it is a loop; exact net mana may depend on land output.
+          if (f.family === "etb→blink" && hasCap(src, "is-repeatable-blink") && hasCap(dst, "etb-untaps-land")) {
+            const blinkCost = maxCapNumber(src, "blink-cost:");
+            const untapCount = maxCapNumber(dst, "etb-untaps-land:");
+            family = "blink→land-untap-etb";
+            evidence = { from: f.from, to: f.to, blinkCost, untapCount };
+            if (untapCount >= blinkCost && blinkCost > 0) strength = "combo-critical";
+          }
+          out.push({ kind: f.kind, family, event: "enable:" + family, direction: dir,
+            strength, loops: false, evidence });
         }
       }
     }
@@ -1210,6 +1274,7 @@
   EVENT_LABEL.tribal = "tribal (creature-type synergy)";
   EVENT_LABEL["enable:untap→tap-ability"] = "untap → re-use tap ability (combo)";
   EVENT_LABEL["enable:etb→blink"] = "blink → re-trigger ETB";
+  EVENT_LABEL["enable:blink→land-untap-etb"] = "repeatable blink → land-untap ETB loop";
   EVENT_LABEL["enable:sac-fodder→outlet"] = "sac fodder → sacrifice outlet";
   EVENT_LABEL["enable:cost-reduction→ability"] = "cost reduction → activated ability";
   EVENT_LABEL["enable:copy→trigger"] = "copy → re-trigger";
@@ -1232,7 +1297,9 @@
   EVENT_LABEL["enable:goad→punisher"] = "goad → punish forced attackers (political)";
   EVENT_LABEL["enable:exiled-card-access"] = "exiled card access";
   EVENT_LABEL["copy→trigger"] = "copy → trigger";
+  EVENT_LABEL["blink→land-untap-etb"] = "repeatable blink → land-untap ETB loop";
   EVENT_LABEL["lord→tribe"] = "tribal (creature-type synergy)";
+  EVENT_LABEL["tribal-payoff→tribe"] = "tribal payoff → matching creature";
   EVENT_LABEL["exiled-card-access"] = "exiled card access";
   EVENT_LABEL["ramp→sink"] = "ramp ↔ mana sink";
 
