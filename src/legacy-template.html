@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deck Interaction Map</title>
+<style>
+  :root{--bg:#0e0d12;--panel:#17151d;--panel2:#1f1c28;--line:#2c2838;
+    --text:#e8e4f0;--dim:#9a93ac;--accent:#d9434f}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  #app{display:flex;height:100vh;width:100vw}
+  #side{width:330px;min-width:330px;background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;overflow:hidden}
+  #side h1{font-size:16px;margin:0;padding:15px 16px 2px;letter-spacing:.2px}
+  #side .sub{font-size:11px;color:var(--dim);padding:0 16px 11px}
+  .section{padding:10px 16px;border-top:1px solid var(--line)}
+  .section h2{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin:0 0 8px}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none}
+  .legend-item:hover{background:var(--panel2)}
+  .legend-item.off{opacity:.32}
+  .dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto}
+  .count{margin-left:auto;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+  #search{width:100%;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:8px;color:var(--text);font-size:13px;outline:none}
+  #search:focus{border-color:var(--accent)}
+  .scroll{overflow-y:auto}
+  .scroll::-webkit-scrollbar{width:8px}.scroll::-webkit-scrollbar-thumb{background:#332f40;border-radius:4px}
+  #main{flex:1;position:relative}
+  canvas{display:block;width:100%;height:100%;cursor:grab}
+  canvas.dragging{cursor:grabbing}
+  #detail{position:absolute;top:14px;right:14px;width:310px;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:14px;display:none;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  #detail.show{display:block}
+  #detail .cname{font-size:15px;font-weight:600;margin-bottom:2px}
+  #detail .ctype{font-size:11px;color:var(--dim);margin-bottom:8px}
+  #detail .pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;margin:0 4px 4px 0}
+  #detail .ctext{font-size:12px;line-height:1.5;color:#cfc9da;white-space:pre-wrap;margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+  #detail .links{margin-top:10px;font-size:11px;color:var(--dim)}
+  #detail .links b{color:var(--text)} #detail .links span{color:#bfb6d4}
+  .closebtn{position:absolute;top:10px;right:12px;cursor:pointer;color:var(--dim);font-size:16px}
+  .closebtn:hover{color:var(--text)}
+  #topbar{position:absolute;top:14px;left:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:60%}
+  .btn{background:var(--panel);border:1px solid var(--line);color:var(--text);font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer}
+  .btn:hover{border-color:var(--accent)}
+  #hint{position:absolute;bottom:12px;left:14px;font-size:11px;color:var(--dim)}
+  .statline{font-size:12px;color:var(--dim);padding:2px 0}.statline b{color:var(--text)}
+  .barwrap{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:11px}
+  .barwrap .lbl{width:90px;color:var(--dim);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .barwrap .bar{height:7px;border-radius:4px;background:var(--accent)}
+  .barwrap .num{width:22px;color:var(--dim)}
+  .barwrap.clickable{cursor:pointer;border-radius:6px;padding:1px 4px;margin-left:-4px;border:1px solid transparent}
+  .barwrap.clickable:hover{background:var(--panel2)}
+  .barwrap.fsel{background:var(--panel2);border-color:var(--accent)}
+  #tip{position:absolute;pointer-events:none;display:none;max-width:300px;z-index:20;
+    background:rgba(20,18,26,.97);border:1px solid var(--line);border-radius:10px;padding:9px 11px;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+  #tip.show{display:block}
+  #tip .tname{font-size:13px;font-weight:600;margin-bottom:1px}
+  #tip .ttype{font-size:10px;color:var(--dim);margin-bottom:6px}
+  #tip .ttext{font-size:11px;line-height:1.45;color:#cfc9da;white-space:pre-wrap;max-height:160px;overflow:hidden}
+  #tip .trole{display:inline-block;font-size:9px;padding:1px 6px;border-radius:12px;margin-bottom:6px}
+  #tip .tev{font-size:10px;color:#bfb6d4;margin-top:6px;border-top:1px solid var(--line);padding-top:5px}
+  #tip .tfam{margin-top:7px;border-top:1px solid var(--line);padding-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+  #tip .fchip{font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;line-height:1.5}
+  #tip .fchip .fc{font-weight:400;opacity:.7}
+  #score{font-size:12px;color:var(--dim)}
+  #score .big{font-size:26px;font-weight:700;color:var(--text)}
+  #score .lab{font-size:10px;text-transform:uppercase;letter-spacing:1px}
+  #drop{position:absolute;inset:0;background:rgba(14,13,18,.92);display:none;align-items:center;justify-content:center;z-index:40;
+    border:2px dashed var(--accent)}
+  #drop.show{display:flex}
+  #drop div{font-size:18px;color:var(--text)}
+  /* import loading overlay */
+  #loading{position:absolute;inset:0;background:rgba(14,13,18,.94);display:none;align-items:center;justify-content:center;z-index:60}
+  #loading.show{display:flex}
+  #loadbox{text-align:center;min-width:280px}
+  #loadbox .spinner{width:38px;height:38px;margin:0 auto 18px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #loadphase{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:10px}
+  #loadcount{font-size:46px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1}
+  #loadtot{color:var(--dim);font-size:30px}
+  #loadlabel{font-size:12px;color:var(--dim);margin-top:4px}
+  #loadbar{width:240px;height:5px;border-radius:3px;background:var(--line);margin:16px auto 0;overflow:hidden}
+  #loadbarfill{height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .12s linear}
+  /* deck tabs */
+  .decktab{display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 8px;border-radius:6px;cursor:pointer;margin-bottom:3px;border:1px solid transparent}
+  .decktab:hover{background:var(--panel2)}
+  .decktab.active{background:var(--panel2);border-color:var(--accent)}
+  .decktab .tdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .decktab .tscore{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--dim)}
+  .decktab .tx{color:var(--dim);cursor:pointer;padding:0 2px}
+  .decktab .tx:hover{color:var(--accent)}
+  /* cohesion score block */
+  #score .scorebig{font-size:30px;font-weight:700}
+  #score .band{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
+  #score .metricgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:8px;font-size:12px}
+  #score .metricgrid .k{color:var(--dim)} #score .metricgrid .v{color:var(--text);font-weight:600;text-align:right}
+  #score .combobadge{margin-top:8px;display:inline-block;font-size:11px;font-weight:600;color:#ff7a3d;background:rgba(255,122,61,.13);border:1px solid rgba(255,122,61,.35);border-radius:6px;padding:3px 8px;cursor:help;transition:background .12s,border-color .12s,box-shadow .12s}
+  #score .combobadge:hover{background:rgba(255,122,61,.22);border-color:rgba(255,122,61,.75);box-shadow:0 0 0 2px rgba(255,122,61,.12)}
+  #score .enginebadge{margin-top:6px;font-size:12px;color:var(--dim)} #score .enginebadge b{color:#54c98a}
+  /* win-tuning: plain-English summary + Game Changers */
+  #score .winsummary{margin:6px 0 2px;font-size:12px;line-height:1.4;color:var(--text)}
+  #score .gcbadge{margin:6px 0 8px;font-size:12px;color:var(--text)} #score .gcbadge b{color:#e0c85a}
+  #score .gcbadge .gclist{margin-top:3px;font-size:11px;color:var(--dim);line-height:1.4}
+  /* second axis: self-sufficiency */
+  #score .axis2{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+  #score .axis2 .a2head{display:flex;align-items:baseline;gap:7px}
+  #score .axis2 .a2score{font-size:22px;font-weight:700}
+  #score .axis2 .a2band{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
+  #score .axis2 .a2lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:3px}
+  #score .sigrow{display:flex;align-items:center;gap:7px;font-size:11px;margin:2px 0}
+  #score .sigrow .sk{width:84px;color:var(--dim);text-align:right;white-space:nowrap}
+  #score .sigrow .sbar{height:6px;border-radius:3px;background:#5aa6ff;min-width:2px}
+  #score .sigrow .sv{color:var(--text);font-variant-numeric:tabular-nums}
+  /* comparison modal */
+  #cmpmodal{position:absolute;inset:0;background:rgba(8,7,11,.8);display:none;align-items:center;justify-content:center;z-index:50}
+  #cmpmodal.show{display:flex}
+  #cmpbox{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;min-width:560px;max-width:90vw;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #addmoxinput:focus{outline:none;border-color:var(--accent)}
+  #cmptable table{border-collapse:collapse;width:100%;font-size:13px}
+  #cmptable th,#cmptable td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  #cmptable th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  #cmptable td.num{text-align:right;font-variant-numeric:tabular-nums}
+  #cmptable .best{color:#54c98a;font-weight:700}
+  #cmptable .deckname{font-weight:600}
+  #cmptable .barcell{position:relative}
+  #cmptable .barfill{position:absolute;left:0;top:0;bottom:0;background:rgba(217,67,79,.18);border-radius:3px;z-index:0}
+  #cmptable .barcell span{position:relative;z-index:1}
+  #cmptable tr.sechead td{padding-top:15px;color:var(--accent);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--line)}
+  #cmptable td.txt{text-align:left;white-space:normal;font-size:12px;color:var(--text);max-width:240px;vertical-align:top}
+  #cmptable td.txt.best{color:#54c98a}
+  #cmptable .band{display:block;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:400}
+  #cmptable .gclist{display:block;font-size:10px;color:var(--dim);margin-top:3px;white-space:normal;line-height:1.45}
+  /* help / welcome overlay */
+  #help{position:absolute;inset:0;background:rgba(8,7,11,.85);display:none;align-items:center;justify-content:center;z-index:60}
+  #help.show{display:flex}
+  #helpbox{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px 28px;max-width:760px;max-height:88vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.65)}
+  #helpbox h2{font-size:20px}
+  #helpbox .hsub{color:var(--dim);font-size:13px;margin:0 0 18px}
+  #helpbox .hgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 26px}
+  #helpbox h3{font-size:13px;margin:0 0 5px;color:var(--accent)}
+  #helpbox p{font-size:13px;line-height:1.5;color:#cfc9da;margin:0 0 9px}
+  #helpbox code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12px}
+  #helpbox .btn{background:var(--accent);border-color:var(--accent);font-size:13px;padding:9px 16px}
+
+  /* recommendations drawer */
+  #recDrawer{width:360px;min-width:360px;background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;overflow:hidden;box-shadow:-14px 0 40px rgba(0,0,0,.35)}
+  #recDrawer.closed{display:none}
+  #recDrawer h2{font-size:13px;margin:0;padding:14px 16px 3px;letter-spacing:.2px}
+  #recDrawer .sub{font-size:11px;color:var(--dim);padding:0 16px 10px;line-height:1.35}
+  #recstatus{font-size:11px;color:var(--dim);padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);line-height:1.35}
+  #recprogress{height:5px;border-radius:3px;background:var(--line);margin-top:8px;overflow:hidden}
+  #recprogressfill{height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .12s linear}
+  #recmode,#decksearch{width:100%;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:12px;outline:none}
+  #recmode:focus,#decksearch:focus{border-color:var(--accent)}
+  .rec-tabs{display:flex;gap:6px}
+  .rec-tab{flex:1;text-align:center;font-size:11px;padding:6px 7px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;color:var(--dim)}
+  .rec-tab.active{border-color:var(--accent);color:var(--text)}
+  .rec-card{border:1px solid var(--line);border-radius:10px;margin:7px 0;background:rgba(31,28,40,.65);overflow:hidden}
+  .rec-head{padding:9px 10px;cursor:pointer;display:flex;gap:8px;align-items:flex-start}
+  .rec-head:hover{background:var(--panel2)}
+  .rec-name{font-size:12px;font-weight:600;line-height:1.25}.rec-meta{font-size:10px;color:var(--dim);margin-top:2px;line-height:1.35}.rec-score{margin-left:auto;font-size:12px;color:#54c98a;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rec-body{display:none;border-top:1px solid var(--line);padding:9px 10px}.rec-card.open .rec-body{display:block}
+  .rec-actions{display:flex;gap:6px;margin-top:8px}.rec-actions .btn{font-size:11px;padding:5px 8px}
+  .rec-list .empty{font-size:12px;color:var(--dim);line-height:1.45;padding:8px 2px}
+  .rec-chip{display:inline-block;font-size:10px;border-radius:14px;padding:1px 6px;margin:0 4px 4px 0;background:rgba(217,67,79,.16);color:#ff8a93}
+  .rec-text{font-size:11px;color:#cfc9da;line-height:1.4;white-space:pre-wrap;max-height:95px;overflow:auto;border-top:1px solid var(--line);padding-top:7px;margin-top:7px}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1 id="decktitle">Deck Interaction Map</h1>
+    <div class="sub">Edges = real mechanical interactions (one card produces what another reacts to). Hover a card to trace its web · click for detail.</div>
+    <div id="decktabs" class="section" style="flex:0 0 auto;display:none"></div>
+    <div class="section">
+      <input id="search" placeholder="Search cards…" autocomplete="off">
+    </div>
+    <div class="section" style="flex:0 0 auto">
+      <h2>Scores <span id="cmpbtn" style="text-transform:none;float:right;font-weight:400;cursor:pointer;color:var(--accent);display:none">compare ▸</span></h2>
+      <div id="score"></div>
+    </div>
+    <div class="section scroll" style="flex:0 0 auto;max-height:160px">
+      <h2>Roles <span style="text-transform:none;float:right;font-weight:400">(click to toggle)</span></h2>
+      <div id="legend"></div>
+    </div>
+    <div class="section scroll" style="flex:1 1 auto">
+      <h2>Most / least interactive cards</h2>
+      <div id="ranks"></div>
+    </div>
+  </aside>
+  <main id="main">
+    <canvas id="cv"></canvas>
+    <div id="topbar">
+      <input id="addmoxinput" type="text" placeholder="Paste Moxfield URL + Enter to add…"
+        autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter'){window.importMoxfield&&window.importMoxfield(this.value.trim());this.blur();}"
+        style="width:280px;padding:7px 11px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:13px">
+      <button class="btn" id="addmox" onclick="window.importMoxfield&&window.importMoxfield(document.getElementById('addmoxinput').value.trim())">+ Add</button>
+      <label class="btn" for="file">Import file…</label>
+      <input id="file" type="file" accept=".txt,.dec,.dek" style="display:none">
+      <button class="btn" id="reset">Reset view</button>
+      <button class="btn" id="relayout">Re-layout</button>
+      <button class="btn" id="freeze">Freeze</button>
+      <button class="btn" id="layoutmode" title="What pulls cards toward the centre">Gravity: links + power</button>
+      <button class="btn" id="hideiso">Hide isolated: off</button>
+      <button class="btn" id="recbtn">Recommendations</button>
+      <button class="btn" id="helpbtn">? Help</button>
+    </div>
+    <div id="hint">drag nodes · scroll to zoom · pan background · "+ Add Moxfield deck" to compare</div>
+    <div id="tip"><div class="trole"></div><div class="tname"></div><div class="ttype"></div><div class="ttext"></div><div class="tev"></div><div class="tfam"></div></div>
+    <div id="detail">
+      <span class="closebtn" id="closeDetail">✕</span>
+      <div class="cname"></div><div class="ctype"></div><div class="pills"></div><div class="ctext"></div><div class="links"></div>
+    </div>
+    <div id="drop"><div>Drop decklist to add it</div></div>
+    <div id="loading"><div id="loadbox">
+      <div class="spinner"></div>
+      <div id="loadphase">Loading deck…</div>
+      <div id="loadcount"><span id="loadnum">0</span><span id="loadtot"></span></div>
+      <div id="loadlabel">cards analysed</div>
+      <div id="loadbar"><div id="loadbarfill"></div></div>
+    </div></div>
+    <div id="cmpmodal"><div id="cmpbox">
+      <span class="closebtn" id="cmpclose">✕</span>
+      <h2 style="margin:0 0 12px">Deck score comparison</h2>
+      <div id="cmptable"></div>
+    </div></div>
+    <div id="help"><div id="helpbox">
+      <span class="closebtn" id="helpclose">✕</span>
+      <h2 style="margin:0 0 4px">MTG Deck Interaction Map</h2>
+      <p class="hsub">This shows how the cards in a Commander deck actually work <i>together</i> — not just what they are.</p>
+      <div class="hgrid">
+        <div><h3>What the dots & lines mean</h3>
+          <p>Each dot is a card, colored by its job (ramp, draw, removal…). A <b>line means two cards mechanically interact</b> — one does something the other cares about. <b>Line strength shows how real the synergy is:</b> faint grey = incidental, blue = moderate, green = strong, <span style="color:#ff7a3d">orange = combo-critical</span>.</p>
+          <p><b>Position shows power.</b> Each card has a <i>mass</i> that pulls it toward the centre, so the deck's most powerful and most-connected cards sit in the core and chaff drifts to the rim. The <span style="color:#e0c85a">gold-ringed</span> card in the middle is your commander (or, with no commander, the heaviest card). Bigger dot = heavier.</p></div>
+        <div><h3>Three score axes</h3>
+          <p><b>Win tuning</b> (0–100) rates how directly the list is optimized to win: speed, tutors, card flow, answers, compact finishers, resilience, efficiency, <b>Game Changers</b> and deck size. A one-line plain-English summary tells you <i>how</i> the deck wins, and hovering each bar lists the cards behind it. <b>Cohesion</b> rates synergy — winning through an engine of cards that feed each other. <b>Self-sufficiency</b> rates standalone card strength.</p>
+          <p><b>Game Changers</b> are WotC's official Commander-Brackets power cards. The bracket classifier also checks the Beta rules for mass land denial, chained extra turns, two-card combo timing, tutor density, and tuning. A combat deck can be cohesive and resilient without being faster than a tutor/wheel/finisher deck. Read the three scores together. ⚡ flags a detected combo.</p></div>
+        <div><h3>Add & compare decks</h3>
+          <p>Click <b>“+ Add Moxfield deck”</b> (top-left) and paste a Moxfield deck link — e.g. <code>moxfield.com/decks/…</code>. It loads instantly.</p>
+          <p>Add as many as you like, switch between them in the sidebar, and click <b>“compare ▸”</b> to see their numbers side by side. <i>(Adding decks needs an internet connection.)</i></p></div>
+        <div><h3>Tips</h3>
+          <p>Drag dots around · scroll to zoom · drag the background to pan. Use <b>Hide isolated</b> to drop cards that don’t interact. The <b>Gravity</b> button switches what pulls cards inward: <i>links + power</i> (both), <i>links · size = power</i> (position = synergy, size = standalone power), or <i>power-weighted links</i> (linking to strong cards pulls hardest — the true engine knots up).</p></div>
+      </div>
+      <button class="btn" id="helpgo" style="margin-top:14px">Got it — explore the deck</button>
+    </div></div>
+  </main>
+  <aside id="recDrawer">
+    <h2>Recommendations <span id="recclose" title="Hide recommendations" style="float:right;cursor:pointer;color:var(--dim)">✕</span></h2>
+    <div class="sub">Background-ranked cards filtered to this deck's color identity. Open a deck card for swap and synergy ideas.</div>
+    <div class="section">
+      <div id="recstatus">Preparing recommendations…<div id="recprogress"><div id="recprogressfill"></div></div></div>
+    </div>
+    <div class="section">
+      <select id="recmode">
+        <option value="total">Total value across all scores (weighted)</option>
+        <option value="cohesion">What increases cohesion?</option>
+        <option value="win">What increases win-tuning?</option>
+        <option value="self">Self-sufficient cards that fit</option>
+      </select>
+    </div>
+    <div class="section">
+      <input id="decksearch" placeholder="Search decklist…" autocomplete="off">
+    </div>
+    <div class="section">
+      <div class="rec-tabs"><div class="rec-tab active" data-tab="global">Top adds</div><div class="rec-tab" data-tab="deck">Decklist</div></div>
+    </div>
+    <div class="section scroll" style="flex:1 1 auto">
+      <div id="reclist" class="rec-list"></div>
+    </div>
+  </aside>
+</div>
+<script id="sharedlogic">
+/*__MODEL__*/
+</script>
+<script type="application/json" id="candidateIndex">/*__CANDIDATES__*/ []</script>
+<script>
+let TITLE = /*__TITLE__*/ "Deck";
+let PAYLOAD = /*__DATA__*/ {decks:[],active:0};
+// Optional CORS proxy for live Moxfield import on a static host (GitHub Pages).
+// Baked in at build time from the MOXFIELD_PROXY env var (empty for local/CLI
+// maps, which fetch Moxfield directly). See deploy/moxfield-proxy/.
+const MOXFIELD_PROXY = /*__MOXFIELD_PROXY__*/ "";
+// Backward/forward compatible: support either {decks:[{title,graph}],active} or a bare graph.
+if(!PAYLOAD.decks){ PAYLOAD = {decks:[{title:TITLE,graph:PAYLOAD}],active:0}; }
+let DECK = PAYLOAD.decks.length ? PAYLOAD.decks[PAYLOAD.active].graph : {nodes:[],edges:[],zoneEdges:[],zones:[]};
+
+const ROLE_COLORS={commander:"#f0c040",ramp:"#54c98a",draw:"#5aa6ff",payoff:"#d9434f",
+  finisher:"#ff7a3d",political:"#c061f0",reanimation:"#9a6cff",tutor:"#ffd166",
+  removal:"#ff5d7a",wipe:"#ff3b3b",creature:"#e0a8ff",land:"#6b6478",utility:"#8a8298"};
+const ROLE_LABELS={commander:"Commander",ramp:"Ramp / mana",draw:"Card draw",payoff:"Draw-tax payoff",
+  finisher:"Finisher / drain",political:"Political / goad",reanimation:"Reanimation",tutor:"Tutor",
+  removal:"Spot removal",wipe:"Board wipe",creature:"Creature",land:"Land",utility:"Utility"};
+// strength rank used across edge styling + family weighting. Declared HERE (early)
+// because draw()/buildRenderLinks() use it during init, before the sidebar code.
+const STRENGTH_RANK={weak:1,moderate:2,strong:3,"combo-critical":4};
+
+let nodes,byId,links,centerNode=null;
+// ---- layout gravity modes ----------------------------------------------------
+// The graph layout reveals the deck's most POWERFUL cards: each card has a
+// "mass" that pulls it toward the centre, so heavy cards sink to the core and
+// chaff drifts to the rim. Mass has two ingredients computed per node in
+// computeMass(): linkMass = Σ of its edge strengths (weak1/mod2/strong3/combo4),
+// and power = cardPower() from metrics.js (standalone card strength + Game
+// Changer + staple). Three switchable modes combine them differently:
+//   blend  — mass = linkMass + power           (synergy AND lone bombs pull in)
+//   split  — centre by linkMass, SIZE by power (two clean dimensions)
+//   pwlink — mass = Σ(strength × partner power) (true core engine knots up)
+const LAYOUT_MODES=[
+  {key:"blend", label:"links + power"},
+  {key:"split", label:"links · size=power"},
+  {key:"pwlink",label:"power-weighted links"},
+];
+let layoutMode=0;
+// Fungible "resource pool" families fan out as O(n²) cliques (every rock↔every
+// X-spell, every graveyard card↔every other). The audit flagged this as visual
+// clutter. We collapse each such family to HUB-AND-SPOKE for RENDERING ONLY —
+// one existing member becomes the hub and the rest spoke to it (n-1 lines
+// instead of n(n-1)/2). DECK.edges and the cohesion metrics (computed at build,
+// validated across 5 audit rounds) are left completely untouched.
+const POOL_FAMILIES=new Set(["ramp→sink","graveyard","energy","counters","proliferate→counters"]);
+function ingest(){
+  // zone nodes are gone — the layout is now driven by card mass, not by which
+  // game zones a card touches (those were universal hubs that told us little).
+  nodes=DECK.nodes.map(n=>({...n})).filter(n=>n.role!=="zone");
+  byId={}; nodes.forEach(n=>byId[n.id]=n);
+  links=buildRenderLinks(DECK.edges);
+  computeMass();
+}
+// Compute per-node power + link mass once, then the per-mode mass/size the
+// physics reads. Pin the commander (or, lacking one, the heaviest card) dead
+// centre so the eye always starts at the deck's anchor.
+function computeMass(){
+  const power=window.DECK_METRICS&&window.DECK_METRICS.cardPower;
+  for(const n of nodes){ n.power=power?power(n):0; n.linkMass=0; n.pwLinkMass=0; }
+  for(const l of links){
+    const s=edgeStrength(l), a=l.source, b=l.target; if(!a||!b)continue;
+    a.linkMass+=s; b.linkMass+=s;
+    a.pwLinkMass+=s*(1+(b.power||0)); b.pwLinkMass+=s*(1+(a.power||0));
+  }
+  // per-mode mass (drives centre gravity) and sizeMass (drives node radius)
+  for(const n of nodes){
+    n._massByMode={
+      blend:  n.linkMass + (n.power||0)*2,
+      split:  n.linkMass,
+      pwlink: n.pwLinkMass,
+    };
+    n._sizeByMode={
+      blend:  n.linkMass + (n.power||0)*2,
+      split:  (n.power||0)*3,
+      pwlink: n.pwLinkMass,
+    };
+  }
+  // choose the centre anchor: commander first, else the heaviest blended node
+  centerNode=nodes.find(n=>n.role==="commander")||null;
+  if(!centerNode){
+    let best=null,bm=-1; for(const n of nodes){const m=n._massByMode.blend; if(m>bm){bm=m;best=n;}}
+    centerNode=best;
+  }
+}
+function massOf(n){return (n._massByMode&&n._massByMode[LAYOUT_MODES[layoutMode].key])||0;}
+function sizeMassOf(n){return (n._sizeByMode&&n._sizeByMode[LAYOUT_MODES[layoutMode].key])||0;}
+function buildRenderLinks(edges){
+  const RANK={weak:1,moderate:2,strong:3,"combo-critical":4};
+  const domFam=e=>{
+    if(e.interactions&&e.interactions.length)
+      return e.interactions.reduce((b,it)=>(RANK[it.strength]||0)>(RANK[b.strength]||0)?it:b).family;
+    return (e.events&&e.events[0])||"misc";
+  };
+  const direct=[], pool={};
+  for(const e of edges){
+    const a=byId[e.source],b=byId[e.target]; if(!a||!b)continue;
+    const fam=domFam(e);
+    if(POOL_FAMILIES.has(fam)) (pool[fam]=pool[fam]||[]).push(e);
+    else direct.push({source:a,target:b,events:e.events,interactions:e.interactions});
+  }
+  const out=[...direct];
+  for(const fam in pool){
+    const es=pool[fam], deg={};
+    es.forEach(e=>{deg[e.source]=(deg[e.source]||0)+1;deg[e.target]=(deg[e.target]||0)+1;});
+    const members=Object.keys(deg);
+    if(members.length<=3){ // tiny cluster isn't clutter — keep its real edges
+      es.forEach(e=>out.push({source:byId[e.source],target:byId[e.target],events:e.events,interactions:e.interactions}));
+      continue;
+    }
+    const hub=members.reduce((h,m)=>deg[m]>deg[h]?m:h,members[0]);
+    const str=(es[0].interactions&&es[0].interactions[0]&&es[0].interactions[0].strength)||"weak";
+    for(const m of members){ if(m===hub)continue;
+      out.push({source:byId[m],target:byId[hub],events:[fam],interactions:[{family:fam,strength:str}],hubSpoke:true}); }
+  }
+  return out;
+}
+ingest();
+
+// ---------- state ----------
+const roleOn={}; Object.keys(ROLE_COLORS).forEach(r=>roleOn[r]=true);
+let hoverNode=null,selNode=null,searchTerm="",frozen=false,hideIso=false,hoverCombo=false;
+
+// ---------- canvas ----------
+const cv=document.getElementById("cv"),ctx=cv.getContext("2d");
+let W,H,DPR,cam={x:0,y:0,k:0.95};
+function resize(){DPR=window.devicePixelRatio||1;W=cv.clientWidth;H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+window.addEventListener("resize",resize);
+function fitGraphToView(overscan=1.12){
+  const visible=nodes.filter(nodeVisible);
+  if(!visible.length||!W||!H)return;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const n of visible){
+    const pad=nodeRadius(n)+18; // include node radius plus a little edge/label breathing room
+    minX=Math.min(minX,n.x-pad); maxX=Math.max(maxX,n.x+pad);
+    minY=Math.min(minY,n.y-pad); maxY=Math.max(maxY,n.y+pad);
+  }
+  const graphW=Math.max(1,maxX-minX), graphH=Math.max(1,maxY-minY);
+  cam.x=-(minX+maxX)/2; cam.y=-(minY+maxY)/2;
+  cam.k=Math.min(W/graphW,H/graphH)*overscan;
+  cam.k=Math.max(0.3,Math.min(4,cam.k));
+}
+function settleAndFit(iterations=140,overscan=1.12){
+  for(let i=0;i<iterations;i++)tick();
+  fitGraphToView(overscan);
+}
+
+// ---------- layout ----------
+// Power-gravity layout: every card is pulled toward the centre with a force
+// proportional to its MASS (see computeMass), so the deck's most powerful /
+// connected cards sink to the core and chaff drifts to the rim. Links act as
+// springs whose stiffness scales with interaction STRENGTH, so real synergy
+// groups clump into tight clusters. The centre anchor (commander, else the
+// heaviest card) is pinned dead centre.
+let alpha=1;
+function massGravity(n){ // heavier ⇒ stronger pull to centre (normalised per deck)
+  const m=massOf(n); return 0.00055+0.0016*Math.min(1,m/(maxMass||1));
+}
+let maxMass=1;
+function initPositions(){
+  maxMass=Math.max(1,...nodes.map(massOf));
+  nodes.forEach((n,i)=>{
+    if(n===centerNode){n.x=0;n.y=0;n.fx=0;n.fy=0;n.vx=0;n.vy=0;return;}
+    n.fx=null;n.fy=null;
+    // seed radius shrinks with mass so heavy cards start nearer the core
+    const a=Math.sin(i*12.9898)*99 % (Math.PI*2)+i*2.399, frac=massOf(n)/(maxMass||1);
+    const rad=120+(1-frac)*360+(i%5)*14;
+    n.x=Math.cos(a)*rad; n.y=Math.sin(a)*rad; n.vx=0;n.vy=0;
+  });
+}
+function tick(){
+  if(frozen)return;
+  alpha*=0.992; if(alpha<0.02)alpha=0.02; const k=alpha;
+  for(let i=0;i<nodes.length;i++){const a=nodes[i];
+    for(let j=i+1;j<nodes.length;j++){const b=nodes[j];
+      let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||0.01,d=Math.sqrt(d2),f=1400/d2;
+      a.vx+=dx/d*f*k;a.vy+=dy/d*f*k;b.vx-=dx/d*f*k;b.vy-=dy/d*f*k;}}
+  // springs: stronger interactions pull harder and want a shorter rest length
+  for(const l of links){const a=l.source,b=l.target;
+    const s=edgeStrength(l), stiff=0.006+s*0.006, rest=110-s*12;
+    let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||0.01,f=(d-rest)*stiff;
+    a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f;}
+  // mass gravity toward the centre (the heart of the power-gravity layout)
+  for(const n of nodes){const g=massGravity(n);n.vx+=(-n.x)*g;n.vy+=(-n.y)*g;
+    if(n.fx==null){n.x+=n.vx;n.y+=n.vy;}else{n.x=n.fx;n.y=n.fy;} n.vx*=0.86;n.vy*=0.86;}
+}
+
+// ---------- helpers ----------
+function nodeRadius(n){
+  if(n.role==="land")return 4.5;
+  if(n===centerNode)return 13;                  // anchor is always prominent
+  return 5+Math.min(13,sizeMassOf(n)*1.1);      // size = the active mode's mass metric
+}
+function nodeVisible(n){
+  if(!roleOn[n.role])return false;
+  if(hideIso && n.role!=="land" && (n.degree||0)===0)return false;
+  if(searchTerm && !n.id.toLowerCase().includes(searchTerm))return false;
+  return true;
+}
+let neighbors=new Set(),selNeighbors=new Set();
+function computeNeighbors(node,set){set.clear();if(!node)return;
+  for(const l of links){if(l.source===node)set.add(l.target.id);if(l.target===node)set.add(l.source.id);}}
+function isComboLink(l){return (l.interactions||[]).some(it=>it.strength==="combo-critical");}
+function computeComboNodes(){
+  const set=new Set();
+  for(const l of links){if(isComboLink(l)){set.add(l.source.id);set.add(l.target.id);}}
+  return set;
+}
+// ---- interaction-family selection (highlight a whole synergy family) ----
+let selFamily=null, famNodes=new Set(), comboNodes=computeComboNodes();
+function edgeFamily(l){
+  const its=l.interactions||[];
+  if(!its.length)return (l.events&&l.events[0])||"misc";
+  return its.reduce((b,it)=>(STRENGTH_RANK[it.strength]||0)>(STRENGTH_RANK[b.strength]||0)?it:b).family;
+}
+function computeFamNodes(){famNodes.clear();if(!selFamily)return;
+  for(const l of links){if(edgeFamily(l)===selFamily){famNodes.add(l.source.id);famNodes.add(l.target.id);}}}
+function isDimmed(n){
+  if(hoverCombo)return !comboNodes.has(n.id);
+  if(hoverNode){if(n===hoverNode)return false;return !neighbors.has(n.id);}
+  if(selNode){if(n===selNode)return false;return !selNeighbors.has(n.id);}
+  if(selFamily)return !famNodes.has(n.id);
+  return false;
+}
+function toScreen(n){return {x:(n.x+cam.x)*cam.k+W/2,y:(n.y+cam.y)*cam.k+H/2};}
+function fromScreen(px,py){return {x:(px-W/2)/cam.k-cam.x,y:(py-H/2)/cam.k-cam.y};}
+function hexA(hex,a){const h=hex.replace("#","");const n=parseInt(h,16);return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function shortName(n){return n.id.split("//")[0].replace(/,.*$/,"").trim();}
+
+// ---------- draw ----------
+function draw(){
+  tick(); ctx.clearRect(0,0,W,H);
+  // edges styled by interaction STRENGTH: weak edges faint+thin, combo edges
+  // bold+warm. This makes the real synergy backbone visually pop over incidental
+  // links — matching the strength-weighted cohesion model.
+  const STR_BASE={1:"rgba(150,140,170,0.10)",2:"rgba(120,150,210,0.28)",3:"rgba(110,200,150,0.45)",4:"rgba(255,140,80,0.75)"};
+  for(const l of links){
+    if(!nodeVisible(l.source)||!nodeVisible(l.target))continue;
+    const a=toScreen(l.source),b=toScreen(l.target);
+    const famActive=selFamily&&edgeFamily(l)===selFamily;
+    const comboActive=hoverCombo&&isComboLink(l);
+    const active=comboActive||(!hoverCombo&&((hoverNode&&(l.source===hoverNode||l.target===hoverNode))||(selNode&&(l.source===selNode||l.target===selNode))||famActive));
+    const str=edgeStrength(l);
+    let col=STR_BASE[str]||STR_BASE[1];
+    if(comboActive)col="rgba(255,170,75,1)";
+    else if(active)col=str>=4?"rgba(255,140,80,0.95)":"rgba(217,67,79,0.85)";
+    else if(hoverNode||selNode||selFamily||hoverCombo)col="rgba(120,110,140,0.04)";
+    ctx.strokeStyle=col; ctx.lineWidth=comboActive?4.5:active?1.5+str*0.7:(0.6+str*0.4);
+    if(comboActive){ctx.shadowColor="rgba(255,140,80,0.8)";ctx.shadowBlur=10;}
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    if(comboActive){ctx.shadowBlur=0;}
+  }
+  for(const n of nodes){
+    if(!nodeVisible(n))continue;
+    const p=toScreen(n),dim=isDimmed(n);
+    const r=nodeRadius(n)*Math.sqrt(cam.k); ctx.globalAlpha=dim?0.16:1;
+    ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fillStyle=ROLE_COLORS[n.role]||"#888";ctx.fill();
+    if(n===centerNode){ // anchor (commander / heaviest card): gold ring
+      ctx.lineWidth=2.5;ctx.strokeStyle=dim?"rgba(224,200,90,0.4)":"#e0c85a";ctx.stroke();
+    }
+    if(n===selNode||n===hoverNode){ctx.lineWidth=2;ctx.strokeStyle="#fff";ctx.stroke();}
+    const showLabel=n===centerNode||cam.k>1.3||n===hoverNode||n===selNode||(hoverCombo&&comboNodes.has(n.id))||(selNode&&selNeighbors.has(n.id))||(n.degree||0)>=8;
+    if(showLabel&&!dim){ctx.globalAlpha=1;ctx.font=(n===centerNode?"600 12px":"11px")+" -apple-system,sans-serif";ctx.fillStyle=n===centerNode?"#f0e3b0":"#e8e4f0";ctx.textAlign="center";
+      ctx.fillText(shortName(n),p.x,p.y-r-4);}
+    ctx.globalAlpha=1;
+  }
+  requestAnimationFrame(draw);
+}
+resize();initPositions();settleAndFit();draw();
+
+// ---------- pick / interaction ----------
+let dragNode=null,panning=false,last={x:0,y:0};
+function pick(px,py){let best=null,bd=1e9;
+  for(const n of nodes){if(!nodeVisible(n))continue;const p=toScreen(n),r=Math.max(8,nodeRadius(n)*Math.sqrt(cam.k)+4),dx=px-p.x,dy=py-p.y,d=dx*dx+dy*dy;
+    if(d<r*r&&d<bd){bd=d;best=n;}}return best;}
+const tip=document.getElementById("tip");
+// families a single card participates in, with edge counts + strongest strength
+const FAM_COLOR={1:"#6b6478",2:"#5aa6ff",3:"#54c98a",4:"#ff7a3d"};
+function nodeFamilies(n){
+  const L=DECK.eventLabels||{},fam={};
+  for(const l of links){
+    if(l.source!==n&&l.target!==n)continue;
+    const k=edgeFamily(l),its=l.interactions||[];
+    const w=its.length?Math.max(...its.map(it=>STRENGTH_RANK[it.strength]||1)):2;
+    const slot=fam[k]||(fam[k]={count:0,w:0,label:L[k]||L["enable:"+k]||k});
+    slot.count++; slot.w=Math.max(slot.w,w);
+  }
+  return Object.entries(fam).map(([k,v])=>({family:k,...v})).sort((a,b)=>(b.w*b.count)-(a.w*a.count)||b.count-a.count);
+}
+function showTip(n,px,py){
+  const c=ROLE_COLORS[n.role]||"#888",role=tip.querySelector(".trole");
+  role.textContent=(n===centerNode?"★ ":"")+(ROLE_LABELS[n.role]||n.role);role.style.background=hexA(c,0.2);role.style.color=c;
+  tip.querySelector(".tname").textContent=n.id;
+  const powerBits=[]; if(n.power)powerBits.push("power "+n.power); if(n.linkMass)powerBits.push("link mass "+n.linkMass);
+  tip.querySelector(".ttype").textContent=(n.mana?n.mana+"  ·  ":"")+n.type+(n.degree?("  ·  "+n.degree+" interactions"):"  ·  no interactions")+(powerBits.length?"  ·  "+powerBits.join("  ·  "):"");
+  tip.querySelector(".ttext").textContent=n.text||"(no rules text)";
+  const evs=evtSummary(n);
+  tip.querySelector(".tev").textContent=evs; tip.querySelector(".tev").style.display=evs?"block":"none";
+  // distinct interaction families this card is part of, as colored chips
+  const famEl=tip.querySelector(".tfam"); famEl.innerHTML="";
+  const fams=nodeFamilies(n);
+  if(fams.length){
+    for(const f of fams){const ch=document.createElement("span");ch.className="fchip";
+      const col=FAM_COLOR[f.w]||"#888";ch.style.background=hexA(col,0.16);ch.style.color=col;
+      ch.innerHTML=`${f.label}<span class="fc">×${f.count}</span>`;famEl.appendChild(ch);}
+    famEl.style.display="flex";
+  }else famEl.style.display="none";
+  tip.classList.add("show");
+  const tw=tip.offsetWidth,th=tip.offsetHeight,pad=14;let x=px+pad,y=py+pad;
+  if(x+tw>W)x=px-tw-pad; if(y+th>H)y=py-th-pad;
+  tip.style.left=Math.max(4,x)+"px";tip.style.top=Math.max(4,y)+"px";
+}
+function hideTip(){tip.classList.remove("show");}
+function evtSummary(n){
+  const L=DECK.eventLabels||{};
+  const p=Object.keys(n.produces||{}).map(e=>L[e]||e), c=Object.keys(n.consumes||{}).map(e=>L[e]||e);
+  let s=""; if(p.length)s+="Produces: "+p.join(", "); if(c.length)s+=(s?"\n":"")+"Reacts to: "+c.join(", "); return s;
+}
+cv.addEventListener("mousemove",e=>{
+  const px=e.offsetX,py=e.offsetY;
+  if(dragNode){const w=fromScreen(px,py);dragNode.fx=w.x;dragNode.fy=w.y;alpha=Math.max(alpha,0.3);hideTip();return;}
+  if(panning){cam.x+=(px-last.x)/cam.k;cam.y+=(py-last.y)/cam.k;last={x:px,y:py};hideTip();return;}
+  const n=pick(px,py);
+  if(n!==hoverNode){hoverNode=n;computeNeighbors(n,neighbors);cv.style.cursor=n?"pointer":"grab";}
+  if(n)showTip(n,px,py);else hideTip();
+});
+cv.addEventListener("mouseleave",hideTip);
+cv.addEventListener("mousedown",e=>{const n=pick(e.offsetX,e.offsetY);
+  if(n){dragNode=n;n.fx=n.x;n.fy=n.y;cv.classList.add("dragging");}
+  else{panning=true;last={x:e.offsetX,y:e.offsetY};cv.classList.add("dragging");}});
+window.addEventListener("mouseup",()=>{
+  // release the drag pin — except the centre anchor, which stays pinned at its spot
+  if(dragNode&&dragNode!==centerNode){dragNode.fx=null;dragNode.fy=null;}
+  dragNode=null;panning=false;cv.classList.remove("dragging");});
+cv.addEventListener("click",e=>{const n=pick(e.offsetX,e.offsetY);if(n)selectNode(n);else{selNode=null;selNeighbors.clear();hideDetail();if(selFamily)selectFamily(null);}});
+cv.addEventListener("wheel",e=>{e.preventDefault();const b=fromScreen(e.offsetX,e.offsetY);
+  cam.k*=Math.exp(-e.deltaY*0.0012);cam.k=Math.max(0.3,Math.min(4,cam.k));const a=fromScreen(e.offsetX,e.offsetY);
+  cam.x+=a.x-b.x;cam.y+=a.y-b.y;},{passive:false});
+
+// ---------- detail ----------
+const detail=document.getElementById("detail");
+function selectNode(n){
+  if(selFamily){selFamily=null;famNodes.clear();}
+  selNode=n;computeNeighbors(n,selNeighbors);
+  const c=ROLE_COLORS[n.role]||"#888";
+  detail.querySelector(".cname").textContent=(n===centerNode?"★ ":"")+n.id;
+  detail.querySelector(".ctype").textContent=(n.mana?n.mana+"  ·  ":"")+n.type+(n.cmc?("  ·  CMC "+n.cmc):"");
+  const pills=detail.querySelector(".pills");pills.innerHTML="";
+  const rp=document.createElement("span");rp.className="pill";rp.style.background=hexA(c,0.2);rp.style.color=c;
+  rp.textContent=ROLE_LABELS[n.role]||n.role;pills.appendChild(rp);
+  if(n.degree!=null){const dp=document.createElement("span");dp.className="pill";dp.style.background=hexA("#d9434f",0.18);dp.style.color="#ff8a93";
+    dp.textContent=n.degree+" interactions";pills.appendChild(dp);}
+  if(n.power){const pp=document.createElement("span");pp.className="pill";pp.style.background=hexA("#e0c85a",0.18);pp.style.color="#e0c85a";
+    pp.textContent="power "+n.power;pills.appendChild(pp);}
+  detail.querySelector(".ctext").textContent=n.text||"(no rules text)";
+  const nb=[...selNeighbors].map(id=>byId[id]).filter(Boolean).sort((a,b)=>a.id.localeCompare(b.id));
+  const links2=detail.querySelector(".links");
+  const ev=evtSummary(n).replace(/\n/g,"<br>");
+  links2.innerHTML=(ev?("<b>Mechanics:</b><br><span>"+ev+"</span><br><br>"):"")+
+    "<b>Interacts with ("+nb.length+"):</b><br><span>"+
+    nb.map(shortName).join(", ")+"</span>"+(n.edh?"<br><br><b>EDHREC rank:</b> <span>#"+n.edh+"</span>":"");
+  detail.classList.add("show");
+}
+function hideDetail(){detail.classList.remove("show");}
+document.getElementById("closeDetail").onclick=()=>{hideDetail();selNode=null;selNeighbors.clear();};
+// select (or clear) an interaction family to spotlight on the canvas
+function selectFamily(fam){
+  selFamily=fam; computeFamNodes();
+  if(fam){selNode=null;selNeighbors.clear();hideDetail();}
+  hintEl&&(hintEl.textContent=fam?("Highlighting “"+((DECK.eventLabels||{})[fam]||(DECK.eventLabels||{})["enable:"+fam]||fam)+"” — click the family again to clear"):"");
+  renderSidebar();
+}
+
+// ---------- sidebar ----------
+function edgeStrength(l){
+  if(l.interactions&&l.interactions.length)return Math.max(...l.interactions.map(it=>STRENGTH_RANK[it.strength]||1));
+  return 2;
+}
+// family breakdown of a graph's edges, weighted by strength; returns sorted list
+function familyBreakdown(graph){
+  const L=graph.eventLabels||{};const fam={};
+  for(const e of (graph.edges||[])){
+    const its=e.interactions||[];
+    if(!its.length){const k=(e.events&&e.events[0])||"misc";fam[k]=fam[k]||{count:0,w:0,label:L[k]||k};fam[k].count++;continue;}
+    // strongest interaction defines the edge's family
+    const top=its.reduce((b,it)=>(STRENGTH_RANK[it.strength]||0)>(STRENGTH_RANK[b.strength]||0)?it:b);
+    const k=top.family;fam[k]=fam[k]||{count:0,w:0,label:L[k]||L["enable:"+k]||k};
+    fam[k].count++;fam[k].w=Math.max(fam[k].w,STRENGTH_RANK[top.strength]||1);
+  }
+  return Object.entries(fam).map(([k,v])=>({family:k,...v})).sort((a,b)=>(b.w*b.count)-(a.w*a.count)||b.count-a.count);
+}
+function topFamily(graph){const b=familyBreakdown(graph);
+  // prefer a moderate+ family as the "engine"; fall back to densest
+  const strong=b.filter(f=>f.w>=2);return (strong[0]||b[0])||null;}
+// the six self-sufficiency signals as mini-bars (normalized to the same targets
+// metrics.js saturates against, so the bars reflect each signal's actual contribution)
+function ssSignalBars(sig,N){
+  const rows=[
+    {k:"Interaction",v:sig.interaction,t:12,title:"removal, counters, board wipes, burn — efficient answers"},
+    {k:"Card adv.",v:sig.cardAdvantage,t:14,title:"draw, impulse, treasure, card-search — refuel"},
+    {k:"Ramp",v:sig.ramp,t:12,title:"mana producers"},
+    {k:"Tutors",v:sig.tutors,t:6,title:"library search — consistency"},
+    {k:"Resilience",v:sig.resilience,t:8,title:"protection, recursion, uncounterable — hard to disrupt"},
+    {k:"Staples",v:sig.premiumShare,t:100,suffix:"%",title:"share of cards that are widely-played efficient staples (EDHREC top tier)"},
+  ];
+  return rows.map(r=>{const w=Math.min(1,r.v/r.t)*92+2;
+    return `<div class="sigrow" title="${r.title}"><span class="sk">${r.k}</span><span class="sbar" style="width:${w}px"></span><span class="sv">${r.v}${r.suffix||""}</span></div>`;}).join("");
+}
+function wtSignalBars(sig){
+  const rows=[
+    {k:"Speed",s:sig.speed,title:"fast mana and efficient acceleration; slow ramp counts less"},
+    {k:"Tutors",s:sig.consistency,title:"library search, weighted by flexibility and cost"},
+    {k:"Card flow",s:sig.cardFlow,title:"wheels, draw engines, impulse/cast-from-exile and recursion velocity"},
+    {k:"Answers",s:sig.interaction,title:"efficient removal, board wipes, free interaction and stax/hatebears"},
+    {k:"Closure",s:sig.closure,title:"compact win conditions and combos; combat finishers count but are discounted because they are board-dependent"},
+    {k:"Resilience",s:sig.resilience,title:"protection, recursion, uncounterability and defensive free spells"},
+    {k:"Efficiency",s:sig.efficiency,title:"average mana value plus widely-played efficient staples"},
+    {k:"Game changers",s:sig.gameChangers,title:"official WotC Commander-Brackets power cards in the list"},
+    {k:"Deck size",s:sig.legality,title:"Commander deck-size check; 100 cards scores best"},
+  ];
+  return rows.map(r=>{const score=r.s?r.s.score:0,w=Math.min(1,score/100)*92+2;
+    const cards=r.s&&r.s.cards&&r.s.cards.length?"\n• "+r.s.cards.join("\n• "):"";
+    const raw=r.s&&r.s.raw!=null?` · raw ${r.s.raw}`:"";
+    return `<div class="sigrow" title="${r.title}${raw}${cards}"><span class="sk">${r.k}</span><span class="sbar" style="width:${w}px;background:#54c98a"></span><span class="sv">${score}</span></div>`;}).join("");
+}
+
+function renderSidebar(){
+  document.getElementById("decktitle").textContent=TITLE?prettyTitle(TITLE):"Deck Interaction Map";
+  const cardNodes=nodes.filter(n=>n.role!=="zone");
+  const real=cardNodes.filter(n=>n.role!=="land");
+  // metrics (precomputed at build; recompute defensively if missing)
+  const m=(DECK.metrics&&DECK.metrics.winTuningScore!=null)?DECK.metrics:window.DECK_METRICS.compute(DECK);
+  DECK.metrics=m;
+  const bandColor=m.cohesionScore>=70?"#54c98a":m.cohesionScore>=50?"#9ad17a":m.cohesionScore>=32?"#e0a85a":"#ff7a3d";
+  // detected engine = densest MEANINGFUL family; combos surfaced separately
+  const engine=topFamily(DECK);
+  const comboLine=m.hasCombo?`<div class="combobadge">⚡ combo detected · ${(m.comboCriticalPairs||[]).length} key pairs</div>`:"";
+  // second power axis: self-sufficiency (standalone, non-synergy strength)
+  const ss=m.selfSufficiencyScore, sig=m.selfSufficiencySignals;
+  const ssColor=ss>=70?"#54c98a":ss>=50?"#9ad17a":ss>=32?"#e0a85a":"#ff7a3d";
+  const ssBlock=(ss!=null)?(
+    `<div class="axis2">`+
+      `<div class="a2lbl" title="A deck's standalone power: efficient interaction, card advantage, mana, consistency, resilience and card quality — the power that does NOT come from synergy. The complement to Cohesion.">Self-sufficiency <span style="float:right;text-transform:none">standalone power</span></div>`+
+      `<div class="a2head"><span class="a2score" style="color:${ssColor}">${ss}</span><span style="color:var(--dim)">/ 100</span><span class="a2band">${m.selfSufficiencyBand||""}</span></div>`+
+      (sig?ssSignalBars(sig,real.length):"")+
+    `</div>`):"";
+  const wt=m.winTuningScore, wtSig=m.winTuningSignals;
+  const wtColor=wt>=86?"#54c98a":wt>=74?"#9ad17a":wt>=58?"#e0c85a":wt>=42?"#e0a85a":"#ff7a3d";
+  // plain-English "how this deck wins" line + Game Changers (the auditable
+  // power list) + the official Commander-Brackets hint derived from GC count.
+  const summaryLine=m.winSummary?`<div class="winsummary">${m.winSummary}</div>`:"";
+  const gcCards=m.gameChangers||[];
+  const gcLine=(m.gameChangerCount!=null)?(
+    `<div class="gcbadge" title="Official WotC Commander-Brackets power cards detected in this deck.${gcCards.length?'\n• '+gcCards.join('\n• '):''}">`+
+      `<b>${m.gameChangerCount}</b> Game Changer${m.gameChangerCount===1?"":"s"} `+
+      `<span style="color:var(--dim)">· ${m.bracketLabel||""}</span>`+
+      (gcCards.length?`<div class="gclist">${gcCards.join(" · ")}</div>`:"")+
+    `</div>`):"";
+  const wtBlock=(wt!=null)?(
+    `<div>`+
+      `<span class="scorebig" style="color:${wtColor}">${wt}</span><span style="color:var(--dim)"> / 100</span>`+
+      ` <span class="band">${m.winTuningBand||""}</span>`+
+      `<div class="a2lbl" style="margin-top:3px" title="How directly the deck is tuned to win: speed, tutors, card flow, answers, compact finishers, resilience, efficiency, Game Changers and deck size.">Win tuning <span style="float:right;text-transform:none">optimized to win</span></div>`+
+      summaryLine+
+      gcLine+
+      (wtSig?wtSignalBars(wtSig):"")+
+    `</div>`):"";
+  document.getElementById("score").innerHTML=
+    wtBlock+
+    `<div class="axis2">`+
+      `<div class="a2head"><span class="a2score" style="color:${bandColor}">${m.cohesionScore}</span><span style="color:var(--dim)">/ 100</span><span class="a2band">${m.cohesionBand}</span></div>`+
+      `<div class="a2lbl" style="margin-top:3px">Cohesion <span style="float:right;text-transform:none">synergy / engine</span></div>`+
+      comboLine+
+      (engine?`<div class="enginebadge">engine: <b>${engine.label}</b> <span style="color:var(--dim)">(${engine.count} links)</span></div>`:"")+
+      `<div class="metricgrid">`+
+        `<span class="k" title="% of nonland cards with at least one moderate-or-stronger interaction">Meaningfully linked</span><span class="v">${m.pctMeaningful!=null?m.pctMeaningful:m.pctInteractive}%</span>`+
+        `<span class="k" title="largest web built from moderate+ edges only">Core web</span><span class="v">${m.meaningfulWebShare!=null?m.meaningfulWebShare:m.largestWebShare}%</span>`+
+        `<span class="k" title="any interaction, incl. weak/incidental">Any interaction</span><span class="v">${m.pctInteractive}%</span>`+
+        `<span class="k">Interaction edges</span><span class="v">${m.edgeCount}</span>`+
+        `<span class="k">Avg interactions</span><span class="v">${m.avgDegree}</span>`+
+        `<span class="k">Islands</span><span class="v">${m.islandCount}</span>`+
+      `</div>`+
+    `</div>`+
+    ssBlock;
+  const comboBadge=document.querySelector("#score .combobadge");
+  if(comboBadge){
+    comboBadge.title="Hover to spotlight combo-critical links in the deck";
+    comboBadge.onmouseenter=()=>{
+      hoverCombo=true;
+      hoverNode=null;
+      neighbors.clear();
+      hideTip();
+      hintEl&&(hintEl.textContent="Spotlighting combo-critical links — move off the combo marker to clear");
+    };
+    comboBadge.onmouseleave=()=>{
+      hoverCombo=false;
+      hintEl&&(hintEl.textContent=selFamily?("Highlighting “"+((DECK.eventLabels||{})[selFamily]||(DECK.eventLabels||{})["enable:"+selFamily]||selFamily)+"” — click the family again to clear"):"");
+    };
+  }else{
+    hoverCombo=false;
+  }
+  // compare button visible when >1 deck
+  document.getElementById("cmpbtn").style.display=PAYLOAD.decks.length>1?"inline":"none";
+  // legend
+  const rc={};cardNodes.forEach(n=>rc[n.role]=(rc[n.role]||0)+n.qty);
+  const legend=document.getElementById("legend");legend.innerHTML="";
+  Object.keys(ROLE_LABELS).forEach(r=>{if(!rc[r])return;
+    const d=document.createElement("div");d.className="legend-item"+(roleOn[r]?"":" off");
+    d.innerHTML=`<span class="dot" style="background:${ROLE_COLORS[r]}"></span>${ROLE_LABELS[r]}<span class="count">${rc[r]}</span>`;
+    d.onclick=()=>{roleOn[r]=!roleOn[r];d.classList.toggle("off",!roleOn[r]);};legend.appendChild(d);});
+  // ranks: families + top 8 + bottom (islands)
+  const ranks=document.getElementById("ranks");ranks.innerHTML="";
+  // --- interaction families (what the deck's synergies actually ARE) ---
+  const fams=familyBreakdown(DECK).slice(0,8);
+  if(fams.length){
+    const fmax=Math.max(1,fams[0].count);
+    const fh=document.createElement("div");fh.className="statline";fh.innerHTML="<b>Interaction families</b>";ranks.appendChild(fh);
+    const sCol={1:"#6b6478",2:"#5aa6ff",3:"#54c98a",4:"#ff7a3d"};
+    for(const f of fams){const d=document.createElement("div");
+      d.className="barwrap clickable"+(selFamily===f.family?" fsel":"");
+      d.innerHTML=`<span class="lbl" title="${f.label} — click to highlight">${f.label}</span><span class="bar" style="width:${f.count/fmax*120+2}px;background:${sCol[f.w]||'#888'}"></span><span class="num">${f.count}</span>`;
+      d.onclick=()=>selectFamily(selFamily===f.family?null:f.family);
+      ranks.appendChild(d);}
+    const sh=document.createElement("div");sh.className="statline";sh.style.marginTop="10px";sh.innerHTML="<b>Most connected cards</b>";ranks.appendChild(sh);
+  }
+  const sorted=[...real].sort((a,b)=>(b.degree||0)-(a.degree||0));
+  const max=Math.max(1,sorted[0]?.degree||1);
+  const top=sorted.slice(0,8);
+  const islands=sorted.filter(n=>(n.degree||0)===0).slice(0,8);
+  function row(n){const d=document.createElement("div");d.className="barwrap";
+    d.innerHTML=`<span class="lbl" title="${n.id}">${shortName(n)}</span><span class="bar" style="width:${(n.degree||0)/max*120+2}px;background:${ROLE_COLORS[n.role]||'#888'}"></span><span class="num">${n.degree||0}</span>`;
+    d.style.cursor="pointer";d.onclick=()=>{selectNode(n);cam.x=-n.x;cam.y=-n.y;cam.k=1.6;};return d;}
+  top.forEach(n=>ranks.appendChild(row(n)));
+  if(islands.length){const h=document.createElement("div");h.className="statline";h.style.marginTop="8px";h.innerHTML="<b>Islands (0 interactions):</b>";ranks.appendChild(h);
+    islands.forEach(n=>ranks.appendChild(row(n)));}
+}
+function prettyTitle(t){return t.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase());}
+renderSidebar();
+
+// ---------- controls ----------
+document.getElementById("reset").onclick=()=>fitGraphToView();
+document.getElementById("relayout").onclick=()=>{initPositions();alpha=1;settleAndFit();};
+const fb=document.getElementById("freeze");fb.onclick=()=>{frozen=!frozen;fb.textContent=frozen?"Unfreeze":"Freeze";};
+const lm=document.getElementById("layoutmode");
+lm.textContent="Gravity: "+LAYOUT_MODES[layoutMode].label;   // keep label in sync with the active mode
+lm.onclick=()=>{layoutMode=(layoutMode+1)%LAYOUT_MODES.length;lm.textContent="Gravity: "+LAYOUT_MODES[layoutMode].label;initPositions();alpha=1;settleAndFit();};
+const ib=document.getElementById("hideiso");ib.onclick=()=>{hideIso=!hideIso;ib.textContent="Hide isolated: "+(hideIso?"on":"off");};
+document.getElementById("search").addEventListener("input",e=>{searchTerm=e.target.value.toLowerCase();});
+
+// ---------- shared graph builder (mirrors build-deck-viz.js, browser side) ----------
+const MODEL = window.INTERACTION_MODEL;
+const CANDIDATE_INDEX = (() => {
+  try { return JSON.parse(document.getElementById("candidateIndex").textContent || "[]"); }
+  catch (_) { return []; }
+})();
+const CANDIDATE_BY_NAME = new Map(CANDIDATE_INDEX.map(c => [c.name, c]));
+// Normalize cross-axis "total value" by the observed spread of each score in
+// the 100-precon calibration corpus (analysis/bracket/wintuning-corpus.json):
+//   win σ=6.94, cohesion σ=16.59, self σ=7.19.
+// A +3 on an axis with a naturally narrow precon range is therefore worth more
+// than +3 on an axis that swings widely across normal deck construction.
+const TOTAL_VALUE_AXIS_SIGMA = { win: 6.94, cohesion: 16.59, self: 7.19 };
+const REC_MODES = {
+  total: { label: "total value", sort: r => r.totalValue },
+  cohesion: { label: "cohesion", sort: r => r.deltaCohesion },
+  win: { label: "win tuning", sort: r => r.deltaWin },
+  self: { label: "standalone fit", sort: r => r.power },
+};
+let recWorker = null, recActiveKey = null, recTab = "global";
+const recCache = new Map();
+const recDrawer = document.getElementById("recDrawer");
+const recStatus = document.getElementById("recstatus");
+const recProgress = document.getElementById("recprogress");
+const recProgressFill = document.getElementById("recprogressfill");
+const recList = document.getElementById("reclist");
+const recModeEl = document.getElementById("recmode");
+const deckSearchEl = document.getElementById("decksearch");
+
+function colorSetOfDeck(graph) {
+  const real = (graph.nodes || []).filter(n => n.role !== "zone");
+  const cmd = real.find(n => n.role === "commander" && n.ci && n.ci.length);
+  const source = cmd ? [cmd] : real;
+  return new Set(source.flatMap(n => n.ci || []));
+}
+function colorLabelOfDeck(graph) {
+  const colors = [...colorSetOfDeck(graph)];
+  return colors.length ? colors.join("") : "colorless";
+}
+function deckSignature(graph) {
+  return (graph.nodes || []).filter(n => n.role !== "zone").map(n => `${n.id}#${n.qty || 1}`).sort().join("|");
+}
+function recEsc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function recShortText(s) { return String(s || "").replace(/\s+/g, " ").slice(0, 260); }
+function setRecProgress(done, total) {
+  recProgressFill.style.width = total ? `${Math.max(0, Math.min(100, Math.round(done / total * 100)))}%` : "0%";
+}
+function showRecProgress(show) {
+  recProgress.style.display = show ? "block" : "none";
+}
+function setRecStatus(text, done, total) {
+  recStatus.firstChild.nodeValue = text;
+  if (done != null || total != null) setRecProgress(done || 0, total || 0);
+}
+function candidateNode(c) {
+  const cls = MODEL.classify({ type_line: c.type, oracle_text: c.text });
+  return { id: c.name, qty: 1, role: cls.role, cmc: c.cmc || 0, type: c.type || "", mana: c.mana || "",
+    text: c.text || "", ci: c.ci || [], edh: c.edh || null, produces: cls.produces, consumes: cls.consumes,
+    zones: cls.zones, myTypes: cls.myTypes, tribalRefs: cls.tribalRefs, caps: cls.caps };
+}
+function recStrengthScore(ints) {
+  return (ints || []).reduce((sum, it) => sum + (STRENGTH_RANK[it.strength] || 1), 0);
+}
+function recommendationWorker() {
+  if (recWorker) return recWorker;
+  const shared = document.getElementById("sharedlogic").textContent;
+  const harness = `
+    const MODEL = self.INTERACTION_MODEL, METRICS = self.DECK_METRICS;
+    const RANK = { weak:1, moderate:2, strong:3, "combo-critical":4 };
+    function nodeFromCandidate(c){
+      const cls = MODEL.classify({type_line:c.type, oracle_text:c.text});
+      return {id:c.name, qty:1, role:cls.role, cmc:c.cmc||0, type:c.type||"", mana:c.mana||"", text:c.text||"",
+        ci:c.ci||[], edh:c.edh||null, produces:cls.produces, consumes:cls.consumes, zones:cls.zones,
+        myTypes:cls.myTypes, tribalRefs:cls.tribalRefs, caps:cls.caps};
+    }
+    function colorSet(graph){
+      const real=(graph.nodes||[]).filter(n=>n.role!=="zone");
+      const cmd=real.find(n=>n.role==="commander"&&n.ci&&n.ci.length);
+      return new Set((cmd?[cmd]:real).flatMap(n=>n.ci||[]));
+    }
+    function inColors(c,set){ return (c.ci||[]).every(x=>set.has(x)); }
+    function cloneGraphWith(graph,cnode){
+      const nodes=(graph.nodes||[]).filter(n=>n.role!=="zone").map(n=>Object.assign({},n));
+      const by={}; nodes.forEach(n=>by[n.id]=n);
+      const edges=(graph.edges||[]).filter(e=>by[e.source]&&by[e.target]).map(e=>Object.assign({},e));
+      const add=Object.assign({},cnode); nodes.push(add); by[add.id]=add;
+      for(const n of nodes){
+        if(n.id===add.id)continue;
+        const ints=MODEL.interactionsBetween(add,n);
+        if(ints.length)edges.push({source:add.id,target:n.id,interactions:ints,events:MODEL.eventsFromInteractions?MODEL.eventsFromInteractions(ints):ints.map(x=>x.event||x.family)});
+      }
+      const deg={}; nodes.forEach(n=>deg[n.id]=0); edges.forEach(e=>{deg[e.source]=(deg[e.source]||0)+1;deg[e.target]=(deg[e.target]||0)+1;});
+      nodes.forEach(n=>n.degree=deg[n.id]||0);
+      return {nodes,edges,zoneEdges:[],zones:[],eventLabels:graph.eventLabels||{}};
+    }
+    function sigScores(m){ const out={}; for(const k in (m.winTuningSignals||{}))out[k]=m.winTuningSignals[k].score||0; return out; }
+    const TOTAL_VALUE_AXIS_SIGMA = { win: 6.94, cohesion: 16.59, self: 7.19 };
+    self.onmessage=e=>{
+      const {key,graph,candidates}=e.data;
+      const base=graph.metrics&&graph.metrics.winTuningScore!=null?graph.metrics:METRICS.compute(graph);
+      const baseSig=sigScores(base), colors=colorSet(graph), names=new Set((graph.nodes||[]).map(n=>String(n.id).toLowerCase()));
+      const weakest=Object.entries(baseSig).sort((a,b)=>a[1]-b[1]).slice(0,4).map(([k,v])=>[k,(100-v)/100]);
+      const results=[]; let done=0;
+      const tick=()=>{ done++; if(done%400===0)self.postMessage({type:"progress",key,done,total:candidates.length}); };
+      for(const c of candidates){
+        if(!c||names.has(String(c.name).toLowerCase())||!inColors(c,colors)){ tick(); continue; }
+        const cn=nodeFromCandidate(c), g=cloneGraphWith(graph,cn), m=METRICS.compute(g), sig=sigScores(m);
+        const signalDeltas={}; for(const k in sig)signalDeltas[k]=sig[k]-(baseSig[k]||0);
+        let scoreMissing=0; for(const [k,w] of weakest)scoreMissing+=Math.max(0,signalDeltas[k]||0)*w;
+        const deltaWin=m.winTuningScore-base.winTuningScore, deltaCohesion=m.cohesionScore-base.cohesionScore, deltaSelf=m.selfSufficiencyScore-base.selfSufficiencyScore;
+        const totalValue=(Math.max(0,deltaWin)/TOTAL_VALUE_AXIS_SIGMA.win)+(Math.max(0,deltaCohesion)/TOTAL_VALUE_AXIS_SIGMA.cohesion)+(Math.max(0,deltaSelf)/TOTAL_VALUE_AXIS_SIGMA.self);
+        results.push({name:c.name,role:cn.role,cmc:cn.cmc,power:METRICS.cardPower(cn),newEdges:Math.max(0,(cn.degree||0)),
+          deltaWin,deltaCohesion,deltaSelf,totalValue:+totalValue.toFixed(2),scoreMissing:+scoreMissing.toFixed(2),signalDeltas});
+        tick();
+      }
+      self.postMessage({type:"done",key,total:candidates.length,results});
+    };
+  `;
+  recWorker = new Worker(URL.createObjectURL(new Blob([shared + "\n" + harness], { type: "text/javascript" })));
+  recWorker.onmessage = e => {
+    const msg = e.data;
+    if (msg.type === "progress") {
+      if (msg.key === recActiveKey) setRecStatus(`Preparing recommendations… ${msg.done}/${msg.total} candidates`, msg.done, msg.total);
+      return;
+    }
+    if (msg.type === "done") {
+      recCache.set(msg.key, { state: "done", results: msg.results, total: msg.total });
+      if (msg.key === recActiveKey) renderRecommendations();
+    }
+  };
+  recWorker.onerror = e => {
+    recCache.set(recActiveKey, { state: "error", message: e.message || "Worker failed" });
+    renderRecommendations();
+  };
+  return recWorker;
+}
+function startRecommendations() {
+  recActiveKey = deckSignature(DECK);
+  if (!CANDIDATE_INDEX.length) {
+    recCache.set(recActiveKey, { state: "error", message: "No build-time candidate index found. Run npm run build-web with data/out/commander-search.json present." });
+    renderRecommendations(); return;
+  }
+  if (recCache.has(recActiveKey)) { renderRecommendations(); return; }
+  recCache.set(recActiveKey, { state: "pending" });
+  renderRecommendations();
+  recommendationWorker().postMessage({ key: recActiveKey, graph: DECK, candidates: CANDIDATE_INDEX });
+}
+function currentRecRows() {
+  const cached = recCache.get(recActiveKey);
+  if (!cached || cached.state !== "done") return [];
+  const mode = recModeEl.value, sort = REC_MODES[mode].sort;
+  return [...cached.results]
+    .filter(r => mode === "self" ? r.power > 0 : sort(r) > 0)
+    .sort((a, b) => sort(b) - sort(a) || b.deltaWin - a.deltaWin || b.power - a.power)
+    .slice(0, 28);
+}
+function recRowHtml(r, detail) {
+  const c = CANDIDATE_BY_NAME.get(r.name) || {};
+  return `<div class="rec-card"><div class="rec-head"><div><div class="rec-name">${recEsc(r.name)}</div>`+
+    `<div class="rec-meta">${recEsc(ROLE_LABELS[r.role] || r.role)} · MV ${r.cmc || 0} · ${r.newEdges || 0} new links</div></div>`+
+    `<div class="rec-score">${detail || "+" + Math.max(r.deltaWin, r.deltaCohesion, r.deltaSelf, r.scoreMissing).toFixed(1)}</div></div>`+
+    `<div class="rec-body"><span class="rec-chip">win ${r.deltaWin >= 0 ? "+" : ""}${r.deltaWin}</span>`+
+    `<span class="rec-chip">cohesion ${r.deltaCohesion >= 0 ? "+" : ""}${r.deltaCohesion}</span>`+
+    `<span class="rec-chip">self ${r.deltaSelf >= 0 ? "+" : ""}${r.deltaSelf}</span>`+
+    `<span class="rec-chip">power ${r.power}</span>`+
+    `<div class="rec-text">${recEsc(recShortText(c.text))}</div></div></div>`;
+}
+function renderRecommendations() {
+  const cached = recCache.get(recActiveKey);
+  if (!cached || cached.state === "pending") { showRecProgress(true); setRecStatus("Preparing recommendations in the background…", 0, 1); recList.innerHTML = '<div class="empty">Scoring the candidate pool against this deck. You can keep using the map.</div>'; return; }
+  if (cached.state === "error") { showRecProgress(false); setRecStatus("Recommendations unavailable", 0, 1); recList.innerHTML = `<div class="empty">${recEsc(cached.message)}</div>`; return; }
+  showRecProgress(false);
+  setRecStatus(`Ready · scored ${cached.results.length}/${cached.total} legal ${colorLabelOfDeck(DECK)} candidates`, cached.total, cached.total);
+  if (recTab === "deck") renderRecommendationDecklist(); else renderGlobalRecommendations();
+}
+function renderGlobalRecommendations() {
+  const rows = currentRecRows(), mode = recModeEl.value;
+  if (!rows.length) { recList.innerHTML = '<div class="empty">No positive recommendations found for this mode.</div>'; return; }
+  recList.innerHTML = rows.map(r => recRowHtml(r, mode === "total" ? "+" + r.totalValue.toFixed(2) + "σ" : mode === "cohesion" ? (r.deltaCohesion >= 0 ? "+" : "") + r.deltaCohesion : mode === "win" ? (r.deltaWin >= 0 ? "+" : "") + r.deltaWin : r.power)).join("");
+  recList.querySelectorAll(".rec-card").forEach(card => card.querySelector(".rec-head").onclick = () => card.classList.toggle("open"));
+}
+function renderRecommendationDecklist() {
+  const q = deckSearchEl.value.trim().toLowerCase();
+  const cards = (DECK.nodes || []).filter(n => n.role !== "zone" && (!q || n.id.toLowerCase().includes(q)));
+  recList.innerHTML = "";
+  if (!cards.length) { recList.innerHTML = '<div class="empty">No deck cards match the search.</div>'; return; }
+  for (const n of cards) {
+    const d = document.createElement("div"); d.className = "rec-card";
+    d.innerHTML = `<div class="rec-head"><div><div class="rec-name">${recEsc(n.id)}</div><div class="rec-meta">${recEsc(ROLE_LABELS[n.role] || n.role)} · MV ${n.cmc || 0} · ${n.degree || 0} links</div></div></div>`+
+      `<div class="rec-body"><div class="rec-actions"><button class="btn" data-a="replace">Show replacements</button><button class="btn" data-a="match">Matching cards</button></div><div class="rec-result"><div class="rec-text">Choose an action.</div></div></div>`;
+    d.querySelector(".rec-head").onclick = () => { selectNode(byId[n.id] || n); const live = byId[n.id]; if (live) { cam.x = -live.x; cam.y = -live.y; cam.k = 1.6; } d.classList.toggle("open"); };
+    d.querySelector('[data-a="replace"]').onclick = ev => { ev.stopPropagation(); fillReplacementList(d, n); };
+    d.querySelector('[data-a="match"]').onclick = ev => { ev.stopPropagation(); fillMatchList(d, n); };
+    recList.appendChild(d);
+  }
+}
+function fillReplacementList(cardEl, n) {
+  const cached = recCache.get(recActiveKey); if (!cached || cached.state !== "done") return;
+  const plausible = cached.results.filter(r => r.role === n.role || Math.abs((r.cmc || 0) - (n.cmc || 0)) <= 1)
+    .sort((a, b) => (b.deltaWin + b.deltaCohesion + b.deltaSelf) - (a.deltaWin + a.deltaCohesion + a.deltaSelf)).slice(0, 8);
+  cardEl.querySelector(".rec-result").innerHTML = `${plausible.map(r => recRowHtml(r, (r.deltaWin + r.deltaCohesion + r.deltaSelf >= 0 ? "+" : "") + (r.deltaWin + r.deltaCohesion + r.deltaSelf).toFixed(1))).join("") || '<div class="empty">No plausible swaps found.</div>'}`;
+}
+function fillMatchList(cardEl, n) {
+  const base = byId[n.id] || n;
+  const names = new Set((DECK.nodes || []).map(x => String(x.id).toLowerCase()));
+  const rows = CANDIDATE_INDEX.filter(c => !names.has(c.name.toLowerCase()) && (c.ci || []).every(x => colorSetOfDeck(DECK).has(x)))
+    .map(c => { const cn = candidateNode(c), ints = MODEL.interactionsBetween(base, cn); return { c, ints, score: recStrengthScore(ints), node: cn }; })
+    .filter(x => x.score > 0).sort((a, b) => b.score - a.score || (a.c.edh || 999999) - (b.c.edh || 999999)).slice(0, 8);
+  cardEl.querySelector(".rec-result").innerHTML = `${rows.map(x => `<div class="rec-card"><div class="rec-head"><div><div class="rec-name">${recEsc(x.c.name)}</div><div class="rec-meta">${recEsc(ROLE_LABELS[x.node.role] || x.node.role)} · ${x.ints.length} interactions</div></div><div class="rec-score">${x.score}</div></div><div class="rec-body" style="display:block"><div class="rec-text">${recEsc(x.ints.map(i => i.family || i.event || i.kind).join(" · "))}</div></div></div>`).join("") || '<div class="empty">No direct matching synergies found.</div>'}`;
+}
+function refitAfterDrawerChange(){ requestAnimationFrame(()=>{resize();fitGraphToView();}); }
+document.getElementById("recbtn").onclick=()=>{recDrawer.classList.toggle("closed");startRecommendations();refitAfterDrawerChange();};
+document.getElementById("recclose").onclick=()=>{recDrawer.classList.add("closed");refitAfterDrawerChange();};
+recModeEl.onchange=renderRecommendations;
+deckSearchEl.oninput=()=>{ if(recTab==="deck")renderRecommendationDecklist(); };
+document.querySelectorAll(".rec-tab").forEach(t=>t.onclick=()=>{
+  recTab=t.dataset.tab;
+  document.querySelectorAll(".rec-tab").forEach(x=>x.classList.toggle("active",x===t));
+  renderRecommendations();
+});
+function parseDecklist(text){
+  const out=[];
+  for(let line of text.split("\n")){
+    line=line.trim();
+    if(!line||line.startsWith("#")||/^(commander|deck|sideboard|maybeboard)\b/i.test(line))continue;
+    const m=line.match(/^(\d+)\s*x?\s+(.+)$/i)||line.match(/^()(.+)$/);
+    if(!m)continue;
+    const qty=m[1]?parseInt(m[1]):1;
+    let name=m[2].replace(/\s*\([A-Za-z0-9]{2,6}\)\s*[A-Za-z0-9-]*\s*/g," ").replace(/\*[^*]+\*/g,"").replace(/\s+/g," ").trim();
+    if(name)out.push({qty,name});
+  }
+  return out;
+}
+function isCommanderish(c){const t=(c.type_line||"").toLowerCase();return t.includes("legendary")&&(t.includes("creature")||/planeswalker/.test(t));}
+// ---- loading overlay ----
+const loadEl=document.getElementById("loading");
+function showLoading(phase){
+  document.getElementById("loadphase").textContent=phase||"Loading…";
+  document.getElementById("loadnum").textContent="0";
+  document.getElementById("loadtot").textContent="";
+  document.getElementById("loadbarfill").style.width="0%";
+  loadEl.classList.add("show");
+}
+function setLoadPhase(phase){document.getElementById("loadphase").textContent=phase;}
+function setLoadProgress(done,total,label){
+  document.getElementById("loadnum").textContent=done;
+  document.getElementById("loadtot").textContent=total?(" / "+total):"";
+  if(label)document.getElementById("loadlabel").textContent=label;
+  document.getElementById("loadbarfill").style.width=(total?Math.round(done/total*100):0)+"%";
+}
+function hideLoading(){loadEl.classList.remove("show");}
+const nextFrame=()=>new Promise(r=>requestAnimationFrame(()=>r()));
+
+// buildGraph is async so the loading overlay's card counter animates: the
+// interaction analysis is an O(n²) pass where outer index i = "cards analysed
+// against the rest", so we report i/N and yield to the browser periodically.
+async function buildGraph(cardsResolved,onProgress){
+  // cardsResolved: [{qty, card:{name,type_line,oracle_text,mana_cost,cmc,edhrec_rank}}]
+  const nodes=[]; let commanderAssigned=false;
+  for(const {qty,card} of cardsResolved){
+    const cls=MODEL.classify({type_line:card.type_line,oracle_text:card.oracle_text});
+    let role=cls.role;
+    if(!commanderAssigned&&isCommanderish(card)){role="commander";commanderAssigned=true;}
+    nodes.push({id:card.name,qty,role,cmc:card.cmc!=null?card.cmc:0,type:card.type_line||"",
+      mana:card.mana_cost||"",text:(card.oracle_text||"").replace(/\r/g,""),ci:card.color_identity||[],edh:card.edhrec_rank||null,
+      produces:cls.produces,consumes:cls.consumes,zones:cls.zones,myTypes:cls.myTypes,tribalRefs:cls.tribalRefs,caps:cls.caps});
+  }
+  const edges=[],seen={},N=nodes.length;
+  for(let i=0;i<N;i++){
+    for(let j=i+1;j<N;j++){
+      const a=nodes[i],b=nodes[j],ints=MODEL.interactionsBetween(a,b);
+      if(ints.length){const k=[a.id,b.id].sort().join("||");if(!seen[k]){seen[k]=1;edges.push({source:a.id,target:b.id,interactions:ints,events:MODEL.eventsFromInteractions(ints)});}}
+    }
+    if(onProgress&&(i%5===0||i===N-1)){onProgress(i+1,N);await nextFrame();}
+  }
+  const deg={};nodes.forEach(n=>deg[n.id]=0);edges.forEach(e=>{deg[e.source]++;deg[e.target]++;});
+  nodes.forEach(n=>n.degree=deg[n.id]);
+  const g={nodes,edges,zoneEdges:[],zones:[],eventLabels:MODEL.EVENT_LABEL,missing:[]};
+  g.metrics=window.DECK_METRICS.compute(g);
+  return g;
+}
+
+// ====================== DECK MANAGEMENT (load / switch / compare) ======================
+const hintEl=document.getElementById("hint");
+
+// switch the active deck and rebuild the view from its stored graph
+function switchDeck(i){
+  if(i<0||i>=PAYLOAD.decks.length)return;
+  PAYLOAD.active=i; DECK=PAYLOAD.decks[i].graph; TITLE=PAYLOAD.decks[i].title;
+  ingest(); comboNodes=computeComboNodes(); initPositions(); settleAndFit();
+  selNode=null; hoverNode=null; hoverCombo=false; selNeighbors.clear(); selFamily=null; famNodes.clear(); searchTerm="";
+  document.getElementById("search").value="";
+  renderSidebar(); renderTabs();
+  startRecommendations();
+}
+function addDeck(title,graph){
+  PAYLOAD.decks.push({title,graph});
+  switchDeck(PAYLOAD.decks.length-1);
+}
+function removeDeck(i){
+  PAYLOAD.decks.splice(i,1);
+  if(!PAYLOAD.decks.length){ location.reload(); return; }
+  switchDeck(Math.max(0,Math.min(PAYLOAD.active,PAYLOAD.decks.length-1)));
+}
+
+// ---- resolvers ----
+// Scryfall batch resolver for raw text decklists (file import / paste)
+async function resolveViaScryfall(decklist){
+  const qtyByName={}; decklist.forEach(d=>{qtyByName[d.name.toLowerCase()]=(qtyByName[d.name.toLowerCase()]||0)+d.qty;});
+  const ids=decklist.map(d=>({name:d.name})); const resolved=[],missing=[];
+  for(let i=0;i<ids.length;i+=75){
+    const done=Math.min(i+75,ids.length);
+    hintEl.textContent=`Resolving via Scryfall… ${done}/${ids.length}`;
+    setLoadProgress(done,ids.length,"cards resolved");
+    const res=await fetch("https://api.scryfall.com/cards/collection",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identifiers:ids.slice(i,i+75)})});
+    if(!res.ok)throw new Error("Scryfall "+res.status);
+    const data=await res.json();
+    (data.not_found||[]).forEach(nf=>missing.push(nf.name));
+    for(const c of data.data){let o=c.oracle_text||"";if(!o&&c.card_faces)o=c.card_faces.map(f=>f.oracle_text||"").join(" ");
+      resolved.push({qty:qtyByName[c.name.toLowerCase()]||qtyByName[c.name.split(" // ")[0].toLowerCase()]||1,
+        card:{name:c.name,type_line:c.type_line||"",oracle_text:o,mana_cost:c.mana_cost||(c.card_faces&&c.card_faces[0].mana_cost)||"",cmc:c.cmc,edhrec_rank:c.edhrec_rank, color_identity:c.color_identity||[]}});}
+    await new Promise(r=>setTimeout(r,110));
+  }
+  return {resolved,missing};
+}
+// Moxfield: API is Cloudflare-gated, so we go through the r.jina.ai reader proxy.
+function moxfieldId(url){const m=String(url).match(/moxfield\.com\/decks\/([A-Za-z0-9_-]+)/);return m?m[1]:(/^[A-Za-z0-9_-]{8,}$/.test(url.trim())?url.trim():null);}
+async function fetchMoxfield(id){
+  hintEl.textContent="Fetching Moxfield deck…";
+  const api="https://api2.moxfield.com/v3/decks/all/"+id;
+  // Try sources in order until one returns parseable JSON:
+  //   1) Moxfield directly — works from the CLI / Node (no CORS); blocked in
+  //      browsers, where it just fails and we fall through.
+  //   2) Our own CORS proxy, if configured (the published-site path).
+  //   3) The public r.jina.ai reader as a last-resort fallback.
+  const sources=["direct"];
+  if(MOXFIELD_PROXY) sources.push("proxy");
+  sources.push("jina");
+  let body=null,lastErr=null;
+  for(const src of sources){
+    try{
+      const url=src==="direct"?api
+        :src==="proxy"?(MOXFIELD_PROXY.replace(/\/+$/,"")+"/"+id)
+        :("https://r.jina.ai/"+api);
+      const r=await fetch(url);
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const t=await r.text();
+      if(t.indexOf("{")<0)throw new Error("no JSON");
+      body=t; break;
+    }catch(e){lastErr=e;}
+  }
+  if(body==null)throw new Error("Moxfield fetch failed"+(lastErr?(" ("+lastErr.message+")"):"")+(MOXFIELD_PROXY?"":" — set up a CORS proxy for live web import"));
+  const s=body.indexOf("{");if(s<0)throw new Error("No JSON from Moxfield");
+  const data=JSON.parse(body.slice(s)); const boards=data.boards||{}; const resolved=[];
+  for(const board of ["commanders","mainboard"]){
+    const cards=(boards[board]&&boards[board].cards)||{};
+    for(const e of Object.values(cards)){const c=e.card;if(!c)continue;
+      let o=c.oracle_text||"";if(!o&&c.card_faces)o=c.card_faces.map(f=>f.oracle_text||"").join(" ");
+      resolved.push({qty:e.quantity||1,card:{name:c.name,type_line:c.type_line||"",oracle_text:o,mana_cost:c.mana_cost||"",cmc:c.cmc,edhrec_rank:c.edhrec_rank, color_identity:c.color_identity||[]}});}
+  }
+  return {resolved,title:data.name||("Moxfield "+id)};
+}
+
+async function importMoxfield(url){
+  const id=moxfieldId(url); if(!id){alert("Not a Moxfield deck URL.");return;}
+  showLoading("Fetching Moxfield deck…");
+  try{
+    hintEl&&(hintEl.textContent="Fetching Moxfield deck…");
+    const {resolved,title}=await fetchMoxfield(id);
+    setLoadPhase("Analysing “"+title+"”");
+    const g=await buildGraph(resolved,(d,t)=>setLoadProgress(d,t,"cards analysed"));
+    addDeck(title,g);
+    hintEl&&(hintEl.textContent="Added “"+title+"” ("+resolved.length+" cards)");
+    const inp=document.getElementById("addmoxinput"); if(inp)inp.value="";
+  }catch(err){alert("Moxfield import failed: "+err.message+"\n\nIf this persists, regenerate via CLI:\n  node src/build-deck-viz.js "+url);
+    hintEl&&(hintEl.textContent="Import failed."); }
+  finally{hideLoading();}
+}
+async function importText(text,title){
+  const decklist=parseDecklist(text); if(!decklist.length){alert("No cards found.");return;}
+  showLoading("Resolving via Scryfall…");
+  try{
+    const {resolved,missing}=await resolveViaScryfall(decklist);
+    setLoadPhase("Analysing “"+(title||"deck")+"”");
+    const g=await buildGraph(resolved,(d,t)=>setLoadProgress(d,t,"cards analysed")); g.missing=missing; addDeck(title||"Imported deck",g);
+    hintEl.textContent=missing.length?("Added. Not found: "+missing.join(", ")):"Added “"+(title||"deck")+"”";
+  }catch(err){alert("Import failed: "+err.message+"\n(Needs internet for Scryfall.)");}
+  finally{hideLoading();}
+}
+
+// ---- UI wiring ----
+// Expose importMoxfield globally so the topbar input's inline onkeydown/onclick
+// attributes can call it even if anything later in this script throws (inline
+// HTML handlers don't depend on JS-attached listeners running successfully).
+window.importMoxfield=importMoxfield;
+const fileInput=document.getElementById("file");
+fileInput.addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importText(r.result,f.name.replace(/\.[^.]+$/,""));r.readAsText(f);});
+const drop=document.getElementById("drop");
+window.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("show");});
+window.addEventListener("dragleave",e=>{if(e.relatedTarget===null)drop.classList.remove("show");});
+window.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("show");const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=()=>importText(r.result,f.name.replace(/\.[^.]+$/,""));r.readAsText(f);}});
+
+// ---- deck tabs ----
+function renderTabs(){
+  const el=document.getElementById("decktabs");
+  if(PAYLOAD.decks.length<=1 && !window.__forceTabs){ el.style.display="none"; }
+  el.style.display="block";
+  el.innerHTML='<h2>Decks <span style="text-transform:none;float:right;font-weight:400;color:var(--dim)">'+PAYLOAD.decks.length+' loaded</span></h2>';
+  PAYLOAD.decks.forEach((d,i)=>{
+    const m=(d.graph.metrics&&d.graph.metrics.winTuningScore!=null)?d.graph.metrics:window.DECK_METRICS.compute(d.graph);
+    d.graph.metrics=m;
+    const tabScore=m.winTuningScore!=null?m.winTuningScore:m.cohesionScore;
+    const row=document.createElement("div");row.className="decktab"+(i===PAYLOAD.active?" active":"");
+    row.innerHTML=`<span class="tdot" style="background:${i===PAYLOAD.active?'var(--accent)':'#555'}"></span>`+
+      `<span class="tname" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px">${d.title}</span>`+
+      `<span class="tscore" title="Win tuning">${tabScore}</span>`+
+      (PAYLOAD.decks.length>1?`<span class="tx" title="remove">✕</span>`:``);
+    row.querySelector(".tname").onclick=()=>switchDeck(i);
+    row.querySelector(".tdot").onclick=()=>switchDeck(i);
+    row.querySelector(".tscore").onclick=()=>switchDeck(i);
+    const x=row.querySelector(".tx"); if(x)x.onclick=(ev)=>{ev.stopPropagation();removeDeck(i);};
+    el.appendChild(row);
+  });
+}
+
+// ---- comparison modal ----
+// Compare rows. type: "num" (bar + green-best, default), "text" (plain-English,
+// no winner), "band" (score + its band label), "gc" (Game-Changer count + the
+// actual card names — keeps the figure auditable). "section" inserts a header.
+const METRIC_DEFS=[
+  {section:"Power at a glance"},
+  {k:"winSummary",label:"How it wins",type:"text"},
+  {k:"bracketLabel",label:"Commander bracket",type:"text"},
+  {k:"winTuningScore",label:"Win tuning /100",type:"band",band:"winTuningBand",hi:true},
+  {k:"gameChangerCount",label:"Game Changers",type:"gc",hi:true},
+  {k:"cohesionScore",label:"Cohesion /100",type:"band",band:"cohesionBand",hi:true},
+  {k:"selfSufficiencyScore",label:"Self-sufficiency /100",type:"band",band:"selfSufficiencyBand",hi:true},
+  {section:"Win-tuning signals"},
+  {k:"_wt_speed",label:"Speed",hi:true},
+  {k:"_wt_consistency",label:"Tutors",hi:true},
+  {k:"_wt_cardFlow",label:"Card flow",hi:true},
+  {k:"_wt_interaction",label:"Answers",hi:true},
+  {k:"_wt_closure",label:"Closure",hi:true},
+  {k:"_wt_resilience",label:"Resilience",hi:true},
+  {k:"_wt_efficiency",label:"Efficiency",hi:true},
+  {k:"_wt_gameChangers",label:"Game-changer score",hi:true},
+  {k:"_wt_legality",label:"Deck-size score",hi:true},
+  {section:"Synergy & structure"},
+  {k:"pctMeaningful",label:"% meaningfully linked",hi:true,suffix:"%"},
+  {k:"meaningfulWebShare",label:"Core web %",hi:true,suffix:"%"},
+  {k:"pctInteractive",label:"% any interaction",hi:true,suffix:"%"},
+  {k:"edgeCount",label:"Interaction edges",hi:true},
+  {k:"largestWebShare",label:"Biggest web % (all)",hi:true,suffix:"%"},
+  {k:"islandCount",label:"Islands (0 links)",hi:false},
+  {k:"nonlandCount",label:"Nonland cards",hi:null},
+];
+function openCompare(){
+  const decks=PAYLOAD.decks, multi=decks.length>1;
+  const numValue=(metrics,key)=>{
+    if(!metrics)return 0;
+    if(key.startsWith("_wt_")){
+      const sigKey=key.slice(4);
+      return metrics.winTuningSignals&&metrics.winTuningSignals[sigKey]?metrics.winTuningSignals[sigKey].score:0;
+    }
+    return metrics[key]!=null?metrics[key]:0;
+  };
+  const esc=s=>String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  let html='<table><thead><tr><th>Metric</th>'+decks.map(d=>`<th class="num deckname">${esc(d.title)}</th>`).join("")+'</tr></thead><tbody>';
+  for(const def of METRIC_DEFS){
+    if(def.section){html+=`<tr class="sechead"><td colspan="${decks.length+1}">${def.section}</td></tr>`;continue;}
+    const ms=decks.map(d=>d.graph.metrics);
+    if(def.type==="text"){
+      html+=`<tr><td>${def.label}</td>`+ms.map(m=>`<td class="txt">${esc(m&&m[def.k]!=null?m[def.k]:"—")}</td>`).join("")+'</tr>';
+      continue;
+    }
+    if(def.type==="gc"){
+      const vals=ms.map(m=>numValue(m,def.k)), best=multi?Math.max(...vals):null;
+      html+=`<tr><td>${def.label}</td>`+ms.map((m,i)=>{
+        const v=vals[i], isBest=best!==null&&v===best&&v>0;
+        const names=(m&&m.gameChangers&&m.gameChangers.length)?`<span class="gclist">${esc(m.gameChangers.join(" · "))}</span>`:"";
+        return `<td class="txt ${isBest?'best':''}"><b>${v}</b>${names}</td>`;
+      }).join("")+'</tr>';
+      continue;
+    }
+    // numeric / band rows: bar + green-best, band rows add the label underneath
+    const vals=ms.map(m=>numValue(m,def.k));
+    let best=null;
+    if(def.hi===true)best=Math.max(...vals); else if(def.hi===false)best=Math.min(...vals);
+    const max=Math.max(...vals.map(v=>Math.abs(v)))||1;
+    html+=`<tr><td>${def.label}</td>`+vals.map((v,i)=>{
+      const isBest=best!==null&&v===best&&multi;
+      const w=Math.abs(v)/max*100;
+      const band=def.type==="band"&&ms[i]&&ms[i][def.band]?`<span class="band">${esc(ms[i][def.band])}</span>`:"";
+      return `<td class="num barcell"><span class="barfill" style="width:${w}%"></span><span class="${isBest?'best':''}">${v}${def.suffix||""}</span>${band}</td>`;
+    }).join("")+'</tr>';
+  }
+  html+='</tbody></table><div style="font-size:11px;color:var(--dim);margin-top:10px">Green = best among loaded decks. <b>How it wins</b> and <b>Bracket</b> describe each deck in plain terms; <b>Win tuning</b> is the “optimized to win” axis (speed, tutors, card flow, answers, compact closure, resilience, efficiency, Game Changers, deck size). <b>Cohesion</b> is the synergy/engine axis and <b>Self-sufficiency</b> is standalone card strength.</div>';
+  document.getElementById("cmptable").innerHTML=html;
+  document.getElementById("cmpmodal").classList.add("show");
+}
+document.getElementById("cmpclose").onclick=()=>document.getElementById("cmpmodal").classList.remove("show");
+document.getElementById("cmpmodal").addEventListener("click",e=>{if(e.target.id==="cmpmodal")e.target.classList.remove("show");});
+document.getElementById("cmpbtn").onclick=openCompare;
+
+// ---- help / welcome overlay ----
+const helpEl=document.getElementById("help");
+function showHelp(){helpEl.classList.add("show");}
+function hideHelp(){helpEl.classList.remove("show");}
+document.getElementById("helpbtn").onclick=showHelp;
+document.getElementById("helpclose").onclick=hideHelp;
+document.getElementById("helpgo").onclick=hideHelp;
+helpEl.addEventListener("click",e=>{if(e.target.id==="help")hideHelp();});
+// show automatically the first time this file is opened on a given browser
+try{ if(!localStorage.getItem("mtgmap_seen")){ showHelp(); localStorage.setItem("mtgmap_seen","1"); } }catch(_){ showHelp(); }
+
+renderTabs();
+startRecommendations();
+</script>
+</body>
+</html>

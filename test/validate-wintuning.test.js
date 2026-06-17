@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const VALIDATE = require("../data/validate-wintuning.js");
+const VALIDATE = require("../analysis/bracket/validate-wintuning.js");
 
 function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "validate-wintuning-"));

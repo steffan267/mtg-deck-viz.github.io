@@ -11,8 +11,7 @@ too, so you can see how each card reads from / writes to them.
 
 ## Generate a map (one or many decks)
 
-Run from the repo root. Source lives in `src/`, sample/corpus data in `data/`,
-and generated maps land in the root workspace by default.
+Run from the repo root. Source lives in `src/`, reusable sample data lives in `data/`, and local analysis/calibration artifacts live in `analysis/`.
 
 ```bash
 # single deck (file) -> output.html
@@ -114,7 +113,7 @@ noncombat finisher, backed by fast mana, tutor consistency, strong card flow."*)
 so the number is always explainable and auditable — never a black box.
 
 Bands: **≥86 Highly tuned · 74–85 Tuned to win · 58–73 Focused · 42–57 Casual · <42 Untuned.**
-These cutoffs are **calibrated against the 100-precon corpus** (`data/validate-wintuning.js`),
+These cutoffs are **calibrated against the 100-precon corpus** (`analysis/bracket/validate-wintuning.js`),
 a known-casual baseline: precons span min 39 / median 57 / max 73, so "Tuned to
 win" begins at 74 — one point above the strongest precon — i.e. *upgraded beyond
 an out-of-box deck*. "Highly tuned" (≥86) is reserved for genuinely optimised,
@@ -176,28 +175,58 @@ EDHREC-staple bonus). The button cycles three lenses:
 
 ## Layout
 
-Engine source lives in `src/`, sample + validation data in `data/`, and
-generated maps land in the root workspace.
+Engine source lives in `src/`, reusable sample data lives in `data/`, local analysis/improvement artifacts live in `analysis/`, and the GitHub Pages source lives in `src/web/`.
 
 **`src/` — engine source**
 - `build-deck-viz.js` — CLI generator (Node; local DB + Moxfield/Scryfall fetch).
 - `interaction-model.js` — shared produce/consume event taxonomy. Edit to tune
   what counts as an interaction; CLI and browser both use it, so they never drift.
 - `metrics.js` — shared win-tuning, cohesion, and self-sufficiency metrics (same numbers everywhere).
-- `template.html` — the visualization shell (data injected at build time).
-- `build-web.js` — builds the GitHub Pages site into `docs/` (see *Publishing* below).
+- `web/` — Vue 3 + TypeScript browser app using `<script setup>` components, composables, typed services, and a canvas renderer facade.
+- `legacy-template.html` — legacy CLI-only self-contained visualization shell used by `build-deck-viz.js` for ad hoc `deck-map.html` exports; the published Pages app is now Vue/Vite.
+- `build-web.js` — builds the Vue/Vite GitHub Pages site into `docs/` (see *Publishing* below).
 - `README.md` — this file.
 
-**`data/` — samples, corpus & audit**
+**`data/` — reusable app/CLI data**
 - `sample-decklist.txt` — the Xantcha deck used as the default.
-- `precon-sample-100.json` / `precon-results.json` — the 100-precon validation
-  corpus and its current scores.
+- `precon-sample-100.json` / `precon-results.json` — reusable validation inputs/results.
 - `AUDIT-100-decks-round5-FINAL.json` — the final per-deck AI audit of the model.
+- `out/` — generated Scryfall card database files used by local tools and builds.
 
-**root workspace — generated output**
-- `MTG Deck Map.html` — a prebuilt, self-contained map (the shareable artifact).
-- Generated maps are written wherever you point `-o`, or `deck-map.html` in the
-  root by default (self-contained HTML).
+**`analysis/` — local analysis & improvement artifacts**
+- `bracket/` — Moxfield bracket sampling, win-tuning calibration scripts, corpora, and reports.
+
+**generated outputs**
+- `docs/` — generated GitHub Pages artifact uploaded by the workflow.
+- `dist/web/` — intermediate Vite build output.
+- Ad hoc CLI maps are written wherever you point `-o`, or `deck-map.html` in the root by default.
+
+## Browser app development
+
+The published browser app lives in `src/web/` and is built with Vue 3,
+TypeScript, Vite, and `<script setup lang="ts">` single-file components. The
+app keeps reusable UI primitives under `src/web/components/common/`, score and
+sidebar components under `src/web/components/score/` and `src/web/components/sidebar/`,
+and behavior behind typed services/composables such as importers, recommendation
+providers, graph layout strategies, and the canvas renderer facade.
+
+Useful commands:
+
+```bash
+npm run dev        # Vite dev server for src/web
+npm run build      # strict typecheck + Vite build to dist/web
+npm run build-web  # strict typecheck + generate docs/ for GitHub Pages
+npm run typecheck  # vue-tsc app check + tsc config check
+npm run test:web   # web adapter/static build smoke tests
+```
+
+Do not open `src/web/index.html` directly with `file://` for development: it is
+a Vite TypeScript source entry and browsers cannot execute `main.ts` modules
+from the filesystem. Use `npm run dev`, or open the generated `docs/index.html`
+after `npm run build-web`.
+
+`npm test` includes the legacy Node tests plus `npm run test:web`; `npm run
+check` includes JavaScript syntax checks plus Vue/TypeScript typechecking.
 
 ## Publishing to GitHub Pages
 
@@ -207,25 +236,22 @@ only when you click **Run workflow** in the Actions tab, never automatically on
 push.
 
 What it does: install deps → `npm run build-data` (downloads the Scryfall bulk
-Oracle Cards DB, which is gitignored) → `npm run build-web` (writes a
-self-contained `docs/index.html` + `docs/.nojekyll`) → deploy to Pages.
+Oracle Cards DB, which is gitignored) → `npm run build-web` (builds the
+Vue/Vite app, writes the sample deck/candidate `bootstrap-data.json`, writes
+`docs/index.html` + `docs/.nojekyll`) → deploy to Pages.
 
 **What works on the published site**
 
 | Feature | Works on Pages? | Why |
 |---------|-----------------|-----|
-| Viewing the map, all scores, compare, layout modes | ✅ | the HTML is fully self-contained |
+| Viewing the map, all scores, compare, layout modes | ✅ | the static Pages build includes the Vue shell plus cacheable bootstrap data |
 | **Import file / paste / drag-drop** decklist | ✅ | Scryfall's API allows browser (CORS `*`) requests |
 | **+ Add Moxfield deck** (live URL) | ⚠️ needs a proxy | Moxfield's API is Cloudflare-gated with no CORS, so browsers can't fetch it directly |
 
 **Enabling live Moxfield import.** Deploy the tiny Cloudflare Worker in
 `deploy/moxfield-proxy/` (see its README — `wrangler deploy`, free tier), then
 add its URL as an Actions **repository variable** named `MOXFIELD_PROXY`
-(*Settings → Secrets and variables → Actions → Variables*). The build bakes it
-into the page; at runtime the page tries Moxfield directly → the proxy → the
-`r.jina.ai` reader, so a deck loads even if one path is down. Without the
-variable set, the site still publishes and file/paste import still works —
-Moxfield import just shows a helpful error.
+(*Settings → Secrets and variables → Actions → Variables*). The build bakes the proxy URL into the page; at runtime the page tries Moxfield directly and then the explicitly configured proxy. Without the variable set, the site still publishes and file/paste import still works — Moxfield import just shows a helpful error. No unconfigured third-party reader fallback is used by the Vue app.
 
 **One-time setup**
 
@@ -238,7 +264,7 @@ To preview the exact published artifact locally:
 
 ```bash
 npm run build-data            # once, to fetch the card DB
-npm run build-web             # writes docs/index.html (+ .nojekyll)
+npm run build-web             # builds Vue app and writes docs/index.html (+ .nojekyll)
 # open docs/index.html in a browser
 ```
 

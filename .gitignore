@@ -1,4 +1,5 @@
 node_modules/
+**/node_modules/
 data/out/*.json
 data/out/*.json.gz
 !data/out/.gitkeep
@@ -7,6 +8,22 @@ data/out/*.json.gz
 .DS_Store
 **/.DS_Store
 deck-viz.zip
+/index.html
+/.nojekyll
+/bootstrap-data.json
+/recommendation.worker-*.js
+/recommendation.worker-*.ts
 
 # generated GitHub Pages output (the deploy workflow rebuilds it from source)
 docs/
+dist/
+src/web/generated/
+
+# local-only analysis/improvement scratch outputs
+analysis/bracket/*.json
+analysis/bracket/*.md
+analysis/**/out/
+analysis/**/*.tmp
+
+# TypeScript incremental metadata
+*.tsbuildinfo

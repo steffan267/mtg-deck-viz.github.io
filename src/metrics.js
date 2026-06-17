@@ -706,7 +706,7 @@
       selfSufficiencySignals: ss.signals,
       winTuningScore: wt.score,
       // Bands calibrated against the 100-precon corpus (a known-casual baseline:
-      // see data/validate-wintuning.js). Precons span min 39 / median 57 / max
+      // see analysis/bracket/validate-wintuning.js). Precons span min 39 / median 57 / max
       // 73, so "Tuned to win" starts at 74 — one point above the strongest
       // precon — meaning "upgraded beyond an out-of-box deck"; "Highly tuned"
       // (≥86) is reserved for genuinely optimised lists (cEDH-adjacent).

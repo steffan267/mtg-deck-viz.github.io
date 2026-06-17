@@ -82,17 +82,26 @@ npm run report-bracket-analysis
 What this does:
 
 - `npm run fetch-bracket-sample` seeds each Moxfield bracket from its public likes-sorted page, keeps the inline bracket value when the page mixes bracket labels, then fills additional decks from the global likes leaderboard until each bracket bucket reaches 100 decks or the accessible source exhausts.
-- `npm run analyze-bracket-sample` runs the existing deck metrics / win-tuning analysis over the fetched sample and writes `data/moxfield-bracket-corpus.json`, including explicit failure metadata if some decks cannot be fetched or built from the accessible network path.
+- `npm run analyze-bracket-sample` runs the existing deck metrics / win-tuning analysis over the fetched sample and writes `analysis/bracket/moxfield-bracket-corpus.json`, including explicit failure metadata if some decks cannot be fetched or built from the accessible network path.
 - `npm run report-bracket-analysis` turns the analyzed corpus into reusable bracket-summary artifacts, including a centroid-based check of how well `{win, cohesion, self}` alone recover the source brackets.
 
 Artifacts:
 
-- `data/moxfield-bracket-sample-500.json` — fetched public sample plus counts/shortfalls metadata
-- `data/moxfield-bracket-corpus.json` — analyzed corpus with win/cohesion/self-sufficiency/Game Changer output per deck
-- `data/moxfield-bracket-report.md` — human-readable summary of source-bracket means plus exact / ±1 / coarse-bucket classifier accuracy
-- `data/moxfield-bracket-report.json` — machine-readable version of the same analysis
+- `analysis/bracket/moxfield-bracket-sample-500.json` — fetched public sample plus counts/shortfalls metadata
+- `analysis/bracket/moxfield-bracket-corpus.json` — analyzed corpus with win/cohesion/self-sufficiency/Game Changer output per deck
+- `analysis/bracket/moxfield-bracket-report.md` — human-readable summary of source-bracket means plus exact / ±1 / coarse-bucket classifier accuracy
+- `analysis/bracket/moxfield-bracket-report.json` — machine-readable version of the same analysis
 
 Because Moxfield search and deck pages are Cloudflare-gated, these scripts rely on the same network-access path already used elsewhere in this repo and may still report source shortfalls when a bracket cannot be paged deeply enough from the accessible surfaces.
+
+
+## Repository layout
+
+- `src/`, `lib/`, `bin/`, and `scripts/` contain source files.
+- `src/web/` is the Vue/Vite source for the GitHub Pages app.
+- `data/` contains reusable card data, sample deck inputs, and generated Scryfall search files in `data/out/`.
+- `analysis/` contains local-only research, calibration, reports, and improvement artifacts that are not page source.
+- `docs/` is generated GitHub Pages output; `dist/` is intermediate Vite output.
 
 ## Files
 

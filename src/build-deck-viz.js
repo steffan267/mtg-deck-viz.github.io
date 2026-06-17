@@ -215,7 +215,7 @@ function build(decklist, idx) {
 
 // ---------------------------------------------------------------- emit HTML
 function emit(payload) {
-  const tpl = fs.readFileSync(path.join(__dirname, "template.html"), "utf8");
+  const tpl = fs.readFileSync(path.join(__dirname, "legacy-template.html"), "utf8");
   const modelSrc = fs.readFileSync(path.join(__dirname, "interaction-model.js"), "utf8");
   const metricsSrc = fs.readFileSync(path.join(__dirname, "metrics.js"), "utf8");
   // Optional Moxfield CORS proxy URL, baked in for the published (static) site

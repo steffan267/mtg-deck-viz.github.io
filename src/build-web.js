@@ -1,59 +1,86 @@
 #!/usr/bin/env node
 /*
- * build-web.js — generate the GitHub Pages site.
+ * build-web.js — generate the Vue/Vite GitHub Pages site.
  *
- * Produces a self-contained root index.html for branch-based GitHub Pages,
- * plus docs/index.html for the Actions deploy artifact. Both are seeded with
- * the bundled sample deck and include .nojekyll markers so GitHub serves the HTML as-is.
- * The live "Add Moxfield deck" feature in the published page routes through the
- * CORS proxy named in the MOXFIELD_PROXY env var (see deploy/moxfield-proxy/);
- * with no proxy set, file/paste import still works and Moxfield import degrades
- * gracefully.
- *
- *   MOXFIELD_PROXY="https://…workers.dev" node src/build-web.js
- *   node src/build-web.js                  # no proxy (file import only)
+ * Builds the bundled sample deck, writes browser bootstrap JSON, runs Vite,
+ * then copies the static build to docs/ for GitHub Pages deployment.
  */
 const fs = require("fs");
 const path = require("path");
+const cp = require("child_process");
 const { loadCards, resolveSource, build, candidateIndex } = require("./build-deck-viz.js");
-// emit() is not exported; re-read the template ourselves to keep build-web
-// independent. Reuse the same placeholder contract as build-deck-viz emit().
+
 const ROOT = path.resolve(__dirname, "..");
 const DOCS = path.join(ROOT, "docs");
-const ROOT_INDEX = path.join(ROOT, "index.html");
+const DIST = path.join(ROOT, "dist/web");
 const SAMPLE = path.join(ROOT, "data/sample-decklist.txt");
+const GENERATED = path.join(ROOT, "src/web/generated");
+
+function rmrf(target) {
+  fs.rmSync(target, { recursive: true, force: true });
+}
+
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const from = path.join(src, entry.name);
+    const to = path.join(dest, entry.name);
+    if (entry.isDirectory()) copyDir(from, to);
+    else fs.copyFileSync(from, to);
+  }
+}
 
 function htmlJson(value) {
-  return JSON.stringify(value).replace(/</g, "\\u003c");
+  return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-function emit(payload, candidates) {
-  const tpl = fs.readFileSync(path.join(__dirname, "template.html"), "utf8");
-  const modelSrc = fs.readFileSync(path.join(__dirname, "interaction-model.js"), "utf8");
-  const metricsSrc = fs.readFileSync(path.join(__dirname, "metrics.js"), "utf8");
-  const proxy = process.env.MOXFIELD_PROXY || "";
-  return tpl
-    .replace("/*__MODEL__*/", () => modelSrc + "\n" + metricsSrc)
-    .replace("/*__CANDIDATES__*/ []", () => htmlJson(candidates || []))
-    .replace('/*__TITLE__*/ "Deck"', () => JSON.stringify(payload.decks[payload.active].title))
-    .replace("/*__DATA__*/ {decks:[],active:0}", () => JSON.stringify(payload))
-    .replace('/*__MOXFIELD_PROXY__*/ ""', () => JSON.stringify(proxy));
+function inlineBuiltAssets(html, bootstrap) {
+  html = html.replace(/<link rel=\"stylesheet\" crossorigin href=\"(\.\/assets\/[^\"]+\.css)\">/g, (_, href) => {
+    const css = fs.readFileSync(path.join(DIST, href.replace(/^\.\//, '')), 'utf8');
+    return `<style>${css}</style>`;
+  });
+  html = html.replace(/<script type=\"module\" crossorigin src=\"(\.\/assets\/[^\"]+\.js)\"><\/script>/g, (_, src) => {
+    const js = fs.readFileSync(path.join(DIST, src.replace(/^\.\//, '')), 'utf8');
+    const globals = `<script>window.__MTG_BOOTSTRAP_URL__ = "./bootstrap-data.json";window.__MOXFIELD_PROXY__ = ${JSON.stringify(bootstrap.moxfieldProxy || '')};</script>`;
+    return `${globals}<script type=\"module\">${js}</script>`;
+  });
+  return html;
 }
 
-async function main() {
+async function writeBootstrap() {
   const idx = loadCards();
   const candidates = candidateIndex(idx);
   const { decklist } = await resolveSource(SAMPLE, idx);
   const graph = build(decklist, idx);
-  const title = "Sample deck — Xantcha";   // friendly default; users add their own decks live
-  fs.mkdirSync(DOCS, { recursive: true });
-  const html = emit({ decks: [{ title, graph }], active: 0 }, candidates);
-  fs.writeFileSync(path.join(DOCS, "index.html"), html);
-  fs.writeFileSync(ROOT_INDEX, html);
-  fs.writeFileSync(path.join(DOCS, ".nojekyll"), "");
-  fs.writeFileSync(path.join(ROOT, ".nojekyll"), "");
-  const proxy = process.env.MOXFIELD_PROXY || "";
-  console.log(`✓ index.html and docs/index.html  (sample: ${title}, candidates: ${candidates.length})`);
-  console.log(`  Moxfield proxy: ${proxy ? proxy : "(none — file/paste import only)"}`);
+  const title = "Sample deck — Xantcha";
+  const bootstrap = {
+    decks: [{ title, graph }],
+    active: 0,
+    candidates,
+    title,
+    moxfieldProxy: process.env.MOXFIELD_PROXY || "",
+    generatedAt: new Date().toISOString(),
+  };
+  fs.mkdirSync(GENERATED, { recursive: true });
+  fs.writeFileSync(path.join(GENERATED, "bootstrap-data.json"), JSON.stringify(bootstrap));
+  return bootstrap;
 }
+
+async function main() {
+  const bootstrap = await writeBootstrap();
+  rmrf(DIST);
+  cp.execFileSync(path.join(ROOT, "node_modules/.bin/vite"), ["build"], { cwd: ROOT, stdio: "inherit" });
+  rmrf(DOCS);
+  copyDir(DIST, DOCS);
+  fs.copyFileSync(path.join(GENERATED, "bootstrap-data.json"), path.join(DOCS, "bootstrap-data.json"));
+  const inlined = inlineBuiltAssets(fs.readFileSync(path.join(DOCS, "index.html"), "utf8"), bootstrap);
+  fs.writeFileSync(path.join(DOCS, "index.html"), inlined);
+  for (const asset of fs.readdirSync(path.join(DOCS, "assets"))) {
+    if (/^recommendation\.worker-.*\.js$/.test(asset)) fs.copyFileSync(path.join(DOCS, "assets", asset), path.join(DOCS, asset));
+  }
+  fs.writeFileSync(path.join(DOCS, ".nojekyll"), "");
+  console.log(`✓ Vue site built to docs/ (sample: ${bootstrap.title}, candidates: ${bootstrap.candidates.length})`);
+  console.log(`  Moxfield proxy: ${process.env.MOXFIELD_PROXY || "(none — file/paste import only)"}`);
+}
+
 main().catch(e => { console.error(e); process.exit(1); });

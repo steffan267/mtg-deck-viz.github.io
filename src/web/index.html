@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deck Interaction Map</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="file-open-help" style="display:none;max-width:760px;margin:12vh auto;padding:24px;border:1px solid #2c2838;border-radius:14px;background:#17151d;color:#e8e4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5">
+      <h1 style="margin-top:0;font-size:20px">Use the local dev server or the built Pages file</h1>
+      <p><code>src/web/index.html</code> is a Vite + TypeScript source entry. Browsers cannot run its <code>main.ts</code> module correctly from <code>file://</code>.</p>
+      <p>Run <code>npm run dev</code> and open the shown localhost URL, or run <code>npm run build-web</code> and open <code>docs/index.html</code>.</p>
+    </div>
+    <script>
+      if (window.location.protocol === "file:" && /\/src\/web\/index\.html$/.test(window.location.pathname)) document.getElementById("file-open-help").style.display = "block";
+      window.__MTG_BOOTSTRAP_URL__ = window.__MTG_BOOTSTRAP_URL__ || "./generated/bootstrap-data.json";
+    </script>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

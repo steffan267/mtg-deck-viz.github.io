@@ -45,9 +45,10 @@ Settings → Secrets and variables → Actions → Variables → New repository 
   Value: https://mtg-moxfield-proxy.<you>.workers.dev
 ```
 
-The build bakes that URL into the page. At runtime the page tries Moxfield
-directly first, then the proxy, then the `r.jina.ai` reader as a last resort —
-so a deck still loads even if one path is down.
+The build bakes that URL into the page. At runtime the Vue app tries Moxfield
+directly first, then the explicitly configured proxy. It does not use an
+unconfigured third-party reader fallback, so a missing proxy produces a clear
+Moxfield import error while file/paste import continues to work.
 
 ## Test it
 
