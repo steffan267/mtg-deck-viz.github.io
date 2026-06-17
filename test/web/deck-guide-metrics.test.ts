@@ -50,7 +50,15 @@ describe('buildDeckGuideMetrics', () => {
     const thirtySevenLands = Array.from({ length: 37 }, (_, index) => node({ id: `Land ${index}`, role: 'land' }))
     const fiftyLands = Array.from({ length: 50 }, (_, index) => node({ id: `Land ${index}`, role: 'land' }))
 
-    expect(buildDeckGuideMetrics(thirtySevenLands, null).find(metric => metric.id === 'mana-base')).toMatchObject({ percent: 100, tone: 'ok' })
-    expect(buildDeckGuideMetrics(fiftyLands, null).find(metric => metric.id === 'mana-base')).toMatchObject({ percent: 76, tone: 'watch' })
+    expect(buildDeckGuideMetrics(thirtySevenLands, null).find(metric => metric.id === 'mana-base')).toMatchObject({ currentLabel: '37', targetLabel: '36–38', percent: 100, tone: 'ok', overRecommended: false })
+    expect(buildDeckGuideMetrics(fiftyLands, null).find(metric => metric.id === 'mana-base')).toMatchObject({ percent: 76, tone: 'watch', overRecommended: true })
+  })
+
+  it('flags only values more than 10% above the recommendation for awareness styling', () => {
+    const elevenRamp = Array.from({ length: 11 }, (_, index) => node({ id: `Rock ${index}`, role: 'ramp' }))
+    const twelveRamp = Array.from({ length: 12 }, (_, index) => node({ id: `Rock ${index}`, role: 'ramp' }))
+
+    expect(buildDeckGuideMetrics(elevenRamp, null).find(metric => metric.id === 'ramp')).toMatchObject({ status: '11/10', currentLabel: '11', targetLabel: '10', overRecommended: false })
+    expect(buildDeckGuideMetrics(twelveRamp, null).find(metric => metric.id === 'ramp')).toMatchObject({ status: '12/10', currentLabel: '12', targetLabel: '10', overRecommended: true })
   })
 })

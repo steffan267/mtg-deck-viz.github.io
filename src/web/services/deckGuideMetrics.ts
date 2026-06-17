@@ -7,8 +7,11 @@ export interface DeckMetricStatus {
   target: number
   percent: number
   status: string
+  currentLabel: string
+  targetLabel: string
   title: string
   tone: 'ok' | 'watch' | 'warn'
+  overRecommended: boolean
 }
 
 export function buildDeckGuideMetrics(nodes: readonly GraphNode[], metrics: DeckMetrics | null): DeckMetricStatus[] {
@@ -20,12 +23,12 @@ export function buildDeckGuideMetrics(nodes: readonly GraphNode[], metrics: Deck
   const wipeCount = countCards(cards, isBoardWipeCard)
   const planScore = Math.round((((metrics?.winTuningScore || 0) + (metrics?.cohesionScore || 0)) / 2) || 0)
   return [
-    minMetric('deck-plan', 'Deck plan', planScore, 70, `${planScore}/100`, 'Measured from win tuning and cohesion: a focused plan should be visible in both the score and graph.'),
-    rangeMetric('mana-base', 'Land / mana base', landCount, 36, 38, `${landCount}/36–38`, 'The reference guideline suggests roughly 36–38 lands before deck-specific adjustments.'),
-    minMetric('ramp', 'Mana ramp', rampCount, 10, `${rampCount}/10`, 'The reference guideline suggests about 10 dedicated mana ramp cards.'),
-    minMetric('card-draw', 'Card draw', drawCount, 10, `${drawCount}/10`, 'The reference guideline suggests about 10 card draw or card-flow cards.'),
-    minMetric('targeted-removal', 'Targeted removal', removalCount, 5, `${removalCount}/5`, 'The reference guideline suggests about 5 targeted removal spells.'),
-    minMetric('board-wipes', 'Board wipes', wipeCount, 5, `${wipeCount}/5`, 'The reference guideline suggests about 5 board wipes.'),
+    minMetric('deck-plan', 'Deck plan', planScore, 70, `${planScore}`, '100', 'Measured from win tuning and cohesion: a focused plan should be visible in both the score and graph.', { warnOverage: false }),
+    rangeMetric('mana-base', 'Land / mana base', landCount, 36, 38, `${landCount}`, '36–38', 'The reference guideline suggests roughly 36–38 lands before deck-specific adjustments.'),
+    minMetric('ramp', 'Mana ramp', rampCount, 10, `${rampCount}`, '10', 'The reference guideline suggests about 10 dedicated mana ramp cards.'),
+    minMetric('card-draw', 'Card draw', drawCount, 10, `${drawCount}`, '10', 'The reference guideline suggests about 10 card draw or card-flow cards.'),
+    minMetric('targeted-removal', 'Targeted removal', removalCount, 5, `${removalCount}`, '5', 'The reference guideline suggests about 5 targeted removal spells.'),
+    minMetric('board-wipes', 'Board wipes', wipeCount, 5, `${wipeCount}`, '5', 'The reference guideline suggests about 5 board wipes.'),
   ]
 }
 
@@ -67,18 +70,20 @@ function cardText(node: GraphNode): string {
   return String(node.text || '').toLowerCase()
 }
 
-function minMetric(id: string, label: string, value: number, target: number, status: string, title: string): DeckMetricStatus {
+function minMetric(id: string, label: string, value: number, target: number, currentLabel: string, targetLabel: string, title: string, options: { warnOverage?: boolean } = {}): DeckMetricStatus {
   const percent = Math.max(0, Math.min(100, Math.round((value / Math.max(1, target)) * 100)))
-  return { id, label, value, target, percent, status, title, tone: metricTone(percent) }
+  const overRecommended = options.warnOverage !== false && value > target * 1.1
+  return { id, label, value, target, percent, status: `${currentLabel}/${targetLabel}`, currentLabel, targetLabel, title, tone: metricTone(percent), overRecommended }
 }
 
-function rangeMetric(id: string, label: string, value: number, min: number, max: number, status: string, title: string): DeckMetricStatus {
+function rangeMetric(id: string, label: string, value: number, min: number, max: number, currentLabel: string, targetLabel: string, title: string): DeckMetricStatus {
   const percent = value < min
     ? Math.max(0, Math.round((value / Math.max(1, min)) * 100))
     : value > max
       ? Math.max(0, Math.round((max / Math.max(1, value)) * 100))
       : 100
-  return { id, label, value, target: min, percent, status, title, tone: metricTone(percent) }
+  const overRecommended = value > max * 1.1
+  return { id, label, value, target: min, percent, status: `${currentLabel}/${targetLabel}`, currentLabel, targetLabel, title, tone: metricTone(percent), overRecommended }
 }
 
 function metricTone(percent: number): DeckMetricStatus['tone'] {
