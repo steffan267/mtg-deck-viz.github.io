@@ -22,3 +22,12 @@ describe('legacy module adapters', () => {
     expect(normalizeMetricsModule({ default: api }).cardPower({} as never)).toBe(0)
   })
 })
+
+import appSource from '../../src/web/App.vue?raw'
+
+describe('legacy module app wiring', () => {
+  it('uses side-effect globals before Vite namespace imports for legacy browser modules', () => {
+    expect(appSource).toContain('browserGlobals.INTERACTION_MODEL || INTERACTION_MODEL')
+    expect(appSource).toContain('browserGlobals.DECK_METRICS || metricsNamespace')
+  })
+})

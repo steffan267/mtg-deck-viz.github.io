@@ -74,9 +74,10 @@ const layoutModeLabel = computed(() => layoutStrategies.find(strategy => strateg
 const saltReferences = computed(() => saltyCardReferences(cardNodes.value.map(node => node.id)))
 const deckGuideMetrics = computed(() => buildDeckGuideMetrics(cardNodes.value, activeMetrics.value))
 
+const browserGlobals = globalThis as typeof globalThis & { INTERACTION_MODEL?: unknown; DECK_METRICS?: unknown }
 const metricsNamespace = DECK_METRICS_NAMESPACE as unknown as MetricsModule
-const deckMetrics = normalizeMetricsModule(((globalThis as typeof globalThis & { DECK_METRICS?: MetricsModule }).DECK_METRICS || metricsNamespace))
-const interactionModel = normalizeInteractionModel(INTERACTION_MODEL)
+const deckMetrics = normalizeMetricsModule(browserGlobals.DECK_METRICS || metricsNamespace)
+const interactionModel = normalizeInteractionModel(browserGlobals.INTERACTION_MODEL || INTERACTION_MODEL)
 const buildGraph = createBrowserGraphBuilder(interactionModel, deckMetrics)
 const deckImport = useDeckImport({
   buildGraph,

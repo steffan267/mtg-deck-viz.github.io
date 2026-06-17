@@ -165,12 +165,8 @@ function signalScores(metricsRecord: Record<string, unknown>): Record<string, nu
   return out
 }
 
-function model(): LegacyModel {
-  return (scope.INTERACTION_MODEL as LegacyModel | undefined) || (INTERACTION_MODEL as unknown as LegacyModel)
-}
-
 function metrics(): LegacyMetrics {
-  return (scope.DECK_METRICS as LegacyMetrics | undefined) || (DECK_METRICS as unknown as LegacyMetrics)
+  return deckMetrics
 }
 
 function scoreValue(value: unknown): number {
