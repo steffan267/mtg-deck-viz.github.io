@@ -115,9 +115,17 @@ Because Moxfield search and deck pages are Cloudflare-gated, these scripts rely 
 
 ## Validation
 
-Run both tests and syntax checks:
+Run the full local QA gate:
 
 ```bash
+npm run baseline:interaction:check
+npm run validate:interactions:check
+npm run hardening:interactions
 npm test
 npm run check
 ```
+
+Interaction-engine maintainers should also read `src/INTERACTION_ENGINE.md`.
+It documents the ontology, combo-family contribution checklist, runtime vs
+audit-only boundaries, validation thresholds, proof-payload budgets, and known
+behavior notes for the rulesbuilder.

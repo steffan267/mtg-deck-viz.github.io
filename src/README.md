@@ -140,6 +140,34 @@ pairs vs late-game pairs), tutor density, Game Changer count, and win-tuning
 band. It returns `commanderBracket.flags` and `commanderBracket.ruleBreaks` so
 every bracket decision is auditable per card instead of being a black box.
 
+## Interaction proofs and combo packages
+
+The rulesbuilder now supports a bounded `interactionProofs` payload. Static/CLI
+builds opt into emitting it up front; browser imports keep proof search off the
+initial graph-build path and do not load the Node/CommonJS proof engine directly.
+Imported browser decks can display proof packages when they are already present
+in the payload or supplied by an explicitly injected browser-safe proof builder.
+Proof packages are not a full MTG rules engine; they are compact, auditable
+direct/two-card/three-card proofs over typed facts. Each package records:
+
+- cards and contribution roles;
+- proof sequence;
+- result/resource deltas;
+- assumptions and limiting clauses;
+- confidence and repeatability notes;
+- hyperedge references when a three-card AND package is involved.
+
+The browser exposes these through the **Proofs** drawer with family and package
+size filters. Selecting a package highlights all cards in the graph, and card
+detail panels link back to every proof involving that card after packages are
+available. Three-card packages remain grouped as packages instead of being
+inflated into pairwise combo cliques. The schema version and required fields are
+owned by `src/interaction-proof-packages.js` and enforced by the hardening gate;
+browser runtime code treats that file as a Node/static-build boundary.
+
+For maintenance rules, ontology definitions, budgets, and the contribution
+checklist, read `src/INTERACTION_ENGINE.md`.
+
 ## In the browser
 
 - **+ Add Moxfield deck** — paste a URL to fetch and add a deck live.
@@ -181,6 +209,16 @@ Engine source lives in `src/`, reusable sample data lives in `data/`, local anal
 - `build-deck-viz.js` — CLI generator (Node; local DB + Moxfield/Scryfall fetch).
 - `interaction-model.js` — shared produce/consume event taxonomy. Edit to tune
   what counts as an interaction; CLI and browser both use it, so they never drift.
+- `interaction-indexes.js` — deterministic event/capability/modifier indexes and
+  bounded pair/triple/closure candidate APIs.
+- `interaction-hypergraph.js` — AND-shaped package candidates with proof
+  serialization and pair-summary projection.
+- `interaction-proof-search.js` — bounded abstract proof search for compact
+  combo packages and near-miss explanations.
+- `interaction-proof-packages.js` — JSON-safe product payload for proof drawer
+  presentation.
+- `combo-family-library.js` — declarative combo archetype definitions, fixtures,
+  disqualifiers, and UI explanations.
 - `metrics.js` — shared win-tuning, cohesion, and self-sufficiency metrics (same numbers everywhere).
 - `web/` — Vue 3 + TypeScript browser app using `<script setup>` components, composables, typed services, and a canvas renderer facade.
 - `legacy-template.html` — legacy CLI-only self-contained visualization shell used by `build-deck-viz.js` for ad hoc `deck-map.html` exports; the published Pages app is now Vue/Vite.
@@ -195,6 +233,10 @@ Engine source lives in `src/`, reusable sample data lives in `data/`, local anal
 
 **`analysis/` — local analysis & improvement artifacts**
 - `bracket/` — Moxfield bracket sampling, win-tuning calibration scripts, corpora, and reports.
+- `interaction-baseline/` — deterministic baseline/audit artifacts for current
+  interaction behavior.
+- `interaction-validation/` — proof-search validation corpus and reproducible
+  metrics report.
 
 **generated outputs**
 - `docs/` — generated GitHub Pages artifact uploaded by the workflow.
@@ -218,6 +260,7 @@ npm run build      # strict typecheck + Vite build to dist/web
 npm run build-web  # strict typecheck + generate docs/ for GitHub Pages
 npm run typecheck  # vue-tsc app check + tsc config check
 npm run test:web   # web adapter/static build smoke tests
+npm run hardening:interactions # ontology/family/validation/proof-payload budgets
 ```
 
 Do not open `src/web/index.html` directly with `file://` for development: it is

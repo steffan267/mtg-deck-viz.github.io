@@ -28,6 +28,31 @@ const moxfieldPayload = {
 }
 
 describe('deck import proxy wiring', () => {
+  it('keeps browser proof generation opt-in so imports stay on the cheap graph-build path', () => {
+    const cards = [{
+      qty: 1,
+      card: {
+        name: 'Sol Ring',
+        type_line: 'Artifact',
+        oracle_text: 'Add two colorless mana.',
+        mana_cost: '{1}',
+        cmc: 1,
+        edhrec_rank: null,
+        color_identity: [],
+      },
+    }]
+    const buildGraph = createBrowserGraphBuilder(INTERACTION_MODEL as unknown as InteractionModelModule, DECK_METRICS as unknown as MetricsModule)
+    const graph = buildGraph(cards)
+    expect('interactionProofs' in graph).toBe(false)
+
+    const buildGraphWithProofs = createBrowserGraphBuilder(
+      INTERACTION_MODEL as unknown as InteractionModelModule,
+      DECK_METRICS as unknown as MetricsModule,
+      { includeInteractionProofs: true, buildInteractionProofPackages: () => [] },
+    )
+    expect(Array.isArray(buildGraphWithProofs(cards).interactionProofs)).toBe(true)
+  })
+
   it('reads the latest moxfieldProxy value at import time', async () => {
     let proxy = ''
     const urls: string[] = []
@@ -49,6 +74,7 @@ describe('deck import proxy wiring', () => {
     const result = await importer.importDeck({ kind: 'url', url: 'https://moxfield.com/decks/abc12345' })
 
     expect(result.ok).toBe(true)
+    if (result.ok) expect('interactionProofs' in result.value.graph).toBe(false)
     expect(urls).toContain('https://api2.moxfield.com/v3/decks/all/abc12345')
     expect(urls).toContain('https://proxy.example.test/abc12345')
     expect(urls).not.toContain('https://r.jina.ai/https://api2.moxfield.com/v3/decks/all/abc12345')

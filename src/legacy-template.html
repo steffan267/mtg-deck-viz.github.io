@@ -713,7 +713,7 @@ function renderSidebar(){
   const bandColor=m.cohesionScore>=70?"#54c98a":m.cohesionScore>=50?"#9ad17a":m.cohesionScore>=32?"#e0a85a":"#ff7a3d";
   // detected engine = densest MEANINGFUL family; combos surfaced separately
   const engine=topFamily(DECK);
-  const comboLine=m.hasCombo?`<div class="combobadge">⚡ combo detected · ${(m.comboCriticalPairs||[]).length} key pairs</div>`:"";
+  const comboLine=m.hasCombo?`<div class="combobadge">⚡ combo detected · ${(m.comboCriticalPairs||[]).length} key pairs · ${(m.comboCriticalTriples||[]).length} key triples</div>`:"";
   // second power axis: self-sufficiency (standalone, non-synergy strength)
   const ss=m.selfSufficiencyScore, sig=m.selfSufficiencySignals;
   const ssColor=ss>=70?"#54c98a":ss>=50?"#9ad17a":ss>=32?"#e0a85a":"#ff7a3d";

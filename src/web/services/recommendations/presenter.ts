@@ -1,6 +1,8 @@
 import type { CandidateCard, DeckGraph } from '../../types/deck'
 import type { RecommendationMode, RecommendationRow } from './types'
 
+export type RecommendationScoreTone = 'excellent' | 'good' | 'modest'
+
 export const recommendationModes: Array<{ id: RecommendationMode; label: string }> = [
   { id: 'total', label: 'Best overall' },
   { id: 'win', label: 'Win tuning' },
@@ -29,6 +31,14 @@ export function recommendationDetail(row: RecommendationRow, mode: Recommendatio
   return String(row.power)
 }
 
+export function recommendationScoreTone(row: RecommendationRow, mode: RecommendationMode): RecommendationScoreTone {
+  const value = sortValue(row, mode)
+  const [excellent, good] = recommendationToneThresholds(mode)
+  if (value >= excellent) return 'excellent'
+  if (value >= good) return 'good'
+  return 'modest'
+}
+
 export function deckSignature(graph: DeckGraph): string {
   return (graph.nodes || [])
     .filter(node => node.role !== 'zone')
@@ -48,4 +58,10 @@ export function shortText(text = '', max = 180): string {
 
 function signed(value: number): string {
   return `${value >= 0 ? '+' : ''}${value}`
+}
+
+function recommendationToneThresholds(mode: RecommendationMode): [excellent: number, good: number] {
+  if (mode === 'total') return [2, 1]
+  if (mode === 'self') return [8, 4]
+  return [8, 3]
 }

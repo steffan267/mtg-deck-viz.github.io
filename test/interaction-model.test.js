@@ -1,8 +1,8 @@
 const assert = require('node:assert/strict');
 const MODEL = require('../src/interaction-model');
 
-function node(name, type, text) {
-  const classified = MODEL.classify({ type_line: type, oracle_text: text });
+function node(name, type, text, cmc = undefined) {
+  const classified = MODEL.classify({ type_line: type, oracle_text: text, cmc });
   return {
     id: name,
     type,
@@ -242,6 +242,90 @@ When Gilded Goose enters, create a Food token.
   assertHasInteraction(genericRepeatableBlink, genericLandUntapEtb,
     it => it.family === 'blink→land-untap-etb' && it.strength === 'combo-critical' && it.evidence.blinkCost === 2 && it.evidence.untapCount === 3,
     'same rules text on non-famous card names should still detect repeatable blink/land-untap combo');
+
+  const libraryExiler = node('Library Exiling Tutor', 'Instant', 'Name a card. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal the named card. Put that card into your hand and exile all other cards revealed this way.');
+  const emptyLibraryWin = node('Empty Library Oracle', 'Creature — Merfolk Wizard', 'When this creature enters, look at the top X cards of your library, where X is your devotion to blue. If X is greater than or equal to the number of cards in your library, you win the game.');
+  assertHasCap(libraryExiler, 'is-library-exile-source');
+  assertHasCap(emptyLibraryWin, 'is-empty-library-win-payoff');
+  assertHasInteraction(libraryExiler, emptyLibraryWin,
+    it => it.family === 'library-exile→empty-library-win' && it.strength === 'combo-critical',
+    'generic library-exile source plus empty-library win payoff should be combo-critical');
+
+  const lifegainFromOppLoss = node('Loss Converts To Gain', 'Enchantment', 'Whenever an opponent loses life, you gain that much life.');
+  const oppLossFromLifeGain = node('Gain Converts To Loss', 'Enchantment', 'Whenever you gain life, target opponent loses that much life.');
+  assertHasCap(lifegainFromOppLoss, 'is-lifegain-from-opponent-lifeloss');
+  assertHasCap(oppLossFromLifeGain, 'is-lifeloss-from-your-lifegain');
+  assertHasInteraction(lifegainFromOppLoss, oppLossFromLifeGain,
+    it => it.family === 'lifeloss→lifegain-loop' && it.strength === 'combo-critical',
+    'reciprocal opponent-life-loss/lifegain text should be detected as a loop without card names');
+  assertHasInteraction(lifegainFromOppLoss, oppLossFromLifeGain,
+    it => it.family === 'lifegain→lifeloss-loop' && it.strength === 'combo-critical',
+    'reciprocal lifegain/opponent-life-loss text should emit the reverse loop family');
+
+  const impulseDraw = node('Impulse Draw', 'Artifact', '{3}: Exile the top card of your library. You may play that card this turn.');
+  assertNoCap(impulseDraw, 'is-library-exile-source');
+  assertNoEvent(impulseDraw, emptyLibraryWin, 'enable:library-exile→empty-library-win');
+  const exileWipe = node('Exile Wipe', 'Sorcery', 'Exile all creatures.');
+  assertNoCap(exileWipe, 'is-library-exile-source');
+  assertNoEvent(exileWipe, emptyLibraryWin, 'enable:library-exile→empty-library-win');
+
+  const massNonlandUntap = node('Mass Nonland Untap', 'Instant', 'Untap all nonland permanents you control.', 2);
+  const repeatableImprinter = node('Repeatable Imprinter', 'Artifact', 'Imprint — When this artifact enters, you may exile an instant card with mana value 2 or less from your hand. {2}, {T}: You may copy the exiled card. If you do, you may cast the copy without paying its mana cost.');
+  assertHasCap(massNonlandUntap, 'is-cheap-instant-nonland-permanent-untap-spell');
+  assertHasCap(repeatableImprinter, 'is-repeatable-cheap-instant-caster');
+  assertHasInteraction(massNonlandUntap, repeatableImprinter,
+    it => it.family === 'imprint-untap-spell-loop' && it.strength === 'combo-critical',
+    'repeatable cheap instant caster plus mass nonland untap spell should be combo-critical');
+  const nonImprintableUntapper = node('Nonimprintable Untapper', 'Artifact', 'Whenever you cast a spell, untap all nonland permanents you control.', 5);
+  assertNoCap(nonImprintableUntapper, 'is-cheap-instant-nonland-permanent-untap-spell');
+  assertNoEvent(nonImprintableUntapper, repeatableImprinter, 'enable:imprint-untap-spell-loop');
+  const expensiveUntapInstant = node('Expensive Untap Instant', 'Instant', 'Untap all nonland permanents you control.', 3);
+  assertNoCap(expensiveUntapInstant, 'is-cheap-instant-nonland-permanent-untap-spell');
+  assertNoEvent(expensiveUntapInstant, repeatableImprinter, 'enable:imprint-untap-spell-loop');
+
+  const selfUntapManaRock = node('Self Untapping Monolith', 'Artifact', '{T}: Add {C}{C}{C}. {3}: Untap this artifact.');
+  const activatedAbilityCopier = node('Activated Ability Copier', 'Artifact', 'Whenever you activate an ability, if it isn’t a mana ability, you may pay {2}. If you do, copy that ability. You may choose new targets for the copy.');
+  assertHasCap(selfUntapManaRock, 'is-self-untapper');
+  assertHasCap(selfUntapManaRock, 'self-untap-cost:3');
+  assertHasCap(selfUntapManaRock, 'mana-produced:3');
+  assertHasCap(activatedAbilityCopier, 'is-activated-ability-copier');
+  assertHasCap(activatedAbilityCopier, 'ability-copy-cost:2');
+  assertHasInteraction(activatedAbilityCopier, selfUntapManaRock,
+    it => it.family === 'self-untap-mana→ability-copy-loop' && it.strength === 'combo-critical' && it.evidence.copyCost === 2,
+    'ability copier plus self-untapping mana artifact should be detected generically');
+  const lowOutputSelfUntapper = node('Low Output Self Untapper', 'Artifact', '{T}: Add {C}. {3}: Untap this artifact.');
+  assertNoEvent(activatedAbilityCopier, lowOutputSelfUntapper, 'enable:self-untap-mana→ability-copy-loop');
+  const breakEvenSelfUntapper = node('Break Even Self Untapper', 'Artifact', '{T}: Add {C}{C}. {2}: Untap this artifact.');
+  assertNoEvent(activatedAbilityCopier, breakEvenSelfUntapper, 'enable:self-untap-mana→ability-copy-loop');
+
+  const repeatableHastyCopier = node('Repeatable Hasty Copier', 'Legendary Creature — Goblin Shaman', 'Haste. {T}: Create a token that’s a copy of target nonlegendary creature you control, except it has haste. Sacrifice it at the beginning of the next end step.');
+  const etbPermanentUntapper = node('ETB Permanent Untapper', 'Creature — Human Warrior', 'When this creature enters the battlefield, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn.');
+  assertHasCap(repeatableHastyCopier, 'is-repeatable-hasty-creature-copy');
+  assertHasCap(etbPermanentUntapper, 'etb-untaps-permanent');
+  assertHasInteraction(repeatableHastyCopier, etbPermanentUntapper,
+    it => it.family === 'hasty-copy→etb-untap-loop' && it.strength === 'combo-critical',
+    'repeatable hasty creature-copy text plus ETB permanent untap text should be combo-critical');
+
+  const etbSpellCopier = node('ETB Spell Copier', 'Creature — Human Wizard', 'Flash. When this creature enters the battlefield, copy target instant or sorcery spell. You may choose new targets for the copy.');
+  const hastyCreatureCopySpell = node('Hasty Creature Copy Spell', 'Sorcery', 'Choose any number of target creatures you control. For each of them, create a token that’s a copy of that creature, except it has haste. Exile those tokens at the beginning of the next end step.');
+  assertHasCap(etbSpellCopier, 'is-etb-spell-copier');
+  assertHasCap(hastyCreatureCopySpell, 'is-hasty-creature-copy-spell');
+  assertHasInteraction(etbSpellCopier, hastyCreatureCopySpell,
+    it => it.family === 'spell-copy-etb→creature-copy-spell-loop' && it.strength === 'combo-critical',
+    'ETB spell-copy creature plus hasty creature-copy spell should be combo-critical without names');
+
+  const topDrawArtifact = node('Self Top Draw Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.');
+  const artifactReducer = node('Artifact Spell Reducer', 'Artifact Creature — Vedalken Artificer', 'Artifact spells you cast cost {1} less to cast.');
+  const castFromTop = node('Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.');
+  assertHasCap(topDrawArtifact, 'is-self-top-draw-artifact');
+  assertHasCap(artifactReducer, 'is-artifact-spell-cost-reducer');
+  assertHasCap(castFromTop, 'is-artifact-cast-from-top-enabler');
+  assertHasInteraction(artifactReducer, topDrawArtifact,
+    it => it.family === 'artifact-cost-reduction→top-loop-piece' && it.strength === 'strong',
+    'artifact cost reducer should link to a self-top draw artifact as one half of a three-card loop');
+  assertHasInteraction(castFromTop, topDrawArtifact,
+    it => it.family === 'cast-from-top→top-loop-piece' && it.strength === 'strong',
+    'cast-from-top enabler should link to a self-top draw artifact as one half of a three-card loop');
 
   const profile = MODEL.interactionProfile({
     id: 'Heartstone',

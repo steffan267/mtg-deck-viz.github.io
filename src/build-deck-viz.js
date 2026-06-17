@@ -23,11 +23,15 @@ const fs = require("fs");
 const path = require("path");
 const MODEL = require("./interaction-model.js");
 const METRICS = require("./metrics.js");
+const PROOF_PACKAGES = require("./interaction-proof-packages.js");
 
 const ROOT = path.resolve(__dirname, "..");
 const COMPACT = path.join(ROOT, "data/out/commander-search.json");
 const ORACLE = path.join(ROOT, "data/out/oracle-cards.json");
 const NON_GAMEPLAY = /art_series|token|emblem|double_faced_token|planar|scheme|vanguard/;
+const DEFAULT_BUILD_OPTIONS = {
+  includeInteractionProofs: true,
+};
 
 // ---------------------------------------------------------------- load DB
 function loadCards() {
@@ -156,7 +160,8 @@ function isCommanderish(c) {
   return t.includes("legendary") && (t.includes("creature") || /planeswalker/.test(t));
 }
 
-function build(decklist, idx) {
+function build(decklist, idx, options = {}) {
+  const buildOptions = Object.assign({}, DEFAULT_BUILD_OPTIONS, options);
   const nodes = [], missing = [];
   let commanderAssigned = false;
   for (const { qty, name, resolved } of decklist) {
@@ -208,6 +213,7 @@ function build(decklist, idx) {
   });
 
   const graph = { nodes, edges, zoneEdges, zones: MODEL.ZONES, eventLabels: MODEL.EVENT_LABEL, missing };
+  if (buildOptions.includeInteractionProofs) graph.interactionProofs = PROOF_PACKAGES.buildInteractionProofPackages(nodes);
   graph.metrics = METRICS.compute(graph);
   return graph;
 }
@@ -260,7 +266,7 @@ async function main() {
     let resolved;
     try { resolved = await resolveSource(src, idx); }
     catch (e) { console.error("  ✗ " + e.message); continue; }
-    const graph = build(resolved.decklist, idx);
+    const graph = build(resolved.decklist, idx, { includeInteractionProofs: true });
     if (graph.missing.length) console.warn("  ⚠ skipped (not found): " + graph.missing.join(", "));
     decks.push({ title: resolved.title, graph });
     console.log(`  ✓ ${resolved.title}`);
@@ -285,5 +291,5 @@ async function main() {
 if (require.main === module) {
   main().catch(e => { console.error(e); process.exit(1); });
 } else {
-  module.exports = { loadCards, build, fetchMoxfield, resolveSource, parseDecklist, moxfieldId, candidateIndex };
+  module.exports = { DEFAULT_BUILD_OPTIONS, loadCards, build, fetchMoxfield, resolveSource, parseDecklist, moxfieldId, candidateIndex };
 }

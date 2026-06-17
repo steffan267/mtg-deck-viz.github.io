@@ -4,6 +4,11 @@ import type {
   DeckPayload,
   DeckPayloadEntry,
   GraphEdge,
+  InteractionProofContribution,
+  InteractionProofDelta,
+  InteractionProofEvidence,
+  InteractionProofPackage,
+  InteractionProofStep,
   GraphNode,
   Interaction,
   ZoneDescriptor,
@@ -103,6 +108,77 @@ export function normalizeGraphEdge(value: unknown): GraphEdge {
   }
 }
 
+function normalizeProofContribution(value: unknown): InteractionProofContribution {
+  const input = asRecord(value)
+  return {
+    ...input,
+    card: asString(input.card),
+    role: asString(input.role, 'piece'),
+    facts: asStringArray(input.facts),
+    text: typeof input.text === 'string' ? input.text : undefined,
+  }
+}
+
+function normalizeProofStep(value: unknown): InteractionProofStep {
+  const input = asRecord(value)
+  return {
+    ...input,
+    index: asNumber(input.index),
+    card: typeof input.card === 'string' ? input.card : undefined,
+    action: asString(input.action),
+    delta: input.delta,
+    cost: input.cost,
+  }
+}
+
+function normalizeProofDelta(value: unknown): InteractionProofDelta {
+  const input = asRecord(value)
+  return {
+    ...input,
+    resource: typeof input.resource === 'string' ? input.resource : undefined,
+    min: typeof input.min === 'number' || typeof input.min === 'string' ? input.min : undefined,
+    max: typeof input.max === 'number' || typeof input.max === 'string' ? input.max : undefined,
+    delta: typeof input.delta === 'string' ? input.delta : undefined,
+    confidence: typeof input.confidence === 'string' ? input.confidence : undefined,
+    source: typeof input.source === 'string' ? input.source : undefined,
+  }
+}
+
+function normalizeProofEvidence(value: unknown): InteractionProofEvidence {
+  const input = asRecord(value)
+  return {
+    ...input,
+    card: typeof input.card === 'string' ? input.card : undefined,
+    predicate: typeof input.predicate === 'string' ? input.predicate : undefined,
+    text: typeof input.text === 'string' ? input.text : undefined,
+  }
+}
+
+export function normalizeInteractionProof(value: unknown): InteractionProofPackage {
+  const input = asRecord(value)
+  return {
+    ...input,
+    schemaVersion: asString(input.schemaVersion, 'interaction-proof-package.v1'),
+    id: asString(input.id),
+    family: asString(input.family),
+    familyTitle: asString(input.familyTitle ?? input.family),
+    cards: asStringArray(input.cards),
+    cardCount: asNumber(input.cardCount, asStringArray(input.cards).length),
+    status: asString(input.status, 'proven'),
+    confidence: asString(input.confidence, 'pattern'),
+    strength: asString(input.strength, 'strong'),
+    result: asString(input.result),
+    repeatability: input.repeatability && typeof input.repeatability === 'object' ? input.repeatability as InteractionProofPackage['repeatability'] : null,
+    assumptions: asStringArray(input.assumptions),
+    limitingClauses: asStringArray(input.limitingClauses),
+    resourceDeltas: asArray(input.resourceDeltas, normalizeProofDelta),
+    sequence: asArray(input.sequence, normalizeProofStep),
+    contributions: asArray(input.contributions, normalizeProofContribution),
+    evidence: asArray(input.evidence, normalizeProofEvidence),
+    hyperedgeIds: asStringArray(input.hyperedgeIds),
+  }
+}
+
 export function normalizeZoneEdge(value: unknown): ZoneEdge {
   const input = asRecord(value)
   const rawTarget = input.target
@@ -115,7 +191,7 @@ export function normalizeZoneEdge(value: unknown): ZoneEdge {
 
 export function normalizeDeckGraph(value: unknown): DeckGraph {
   const input = asRecord(value)
-  return {
+  const graph: DeckGraph = {
     ...input,
     nodes: asArray(input.nodes, normalizeGraphNode),
     edges: asArray(input.edges, normalizeGraphEdge),
@@ -127,6 +203,8 @@ export function normalizeDeckGraph(value: unknown): DeckGraph {
     missing: asStringArray(input.missing),
     metrics: input.metrics as DeckGraph['metrics'],
   }
+  if ('interactionProofs' in input) graph.interactionProofs = asArray(input.interactionProofs, normalizeInteractionProof)
+  return graph
 }
 
 export function normalizeDeckPayloadEntry(value: unknown): DeckPayloadEntry {

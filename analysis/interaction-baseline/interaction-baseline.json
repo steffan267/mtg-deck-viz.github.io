@@ -1,0 +1,1524 @@
+{
+  "schemaVersion": "interaction-baseline.v1",
+  "purpose": "Phase-0 baseline for evolving MTG interaction detection from pairwise heuristic edges toward layered, bounded combo proof search.",
+  "generatedBy": "scripts/audit-interaction-baseline.js",
+  "deterministic": true,
+  "dataFingerprint": {
+    "data/out/commander-search.json": "fabedcc40580935457988afc91c0463685cfd2fcf3f7a8d614344a9d392831a0",
+    "data/out/oracle-cards.json": "be2b173f68cf8d5bd9f8e232ed641af58a98f88290b98f4b4aa84408ef5ce493",
+    "data/sample-decklist.txt": "553ac145fd894e5feb89f36e778b42abc51d1f67e28cddfcc85f4d34e152951c"
+  },
+  "thresholds": {
+    "goldenFixtureFailuresAllowed": 0,
+    "missingFixtureCardsAllowed": 0,
+    "weakInteractionShareWarnAt": 0.7,
+    "familyFanoutWarnAt": 18,
+    "weakFamilyFanoutWarnAt": 12,
+    "nodeDegreeWarnAt": 20,
+    "comboCriticalPairCountWarnAt": 6,
+    "edgeCountDeltaPctReviewAt": 5,
+    "comboCriticalCountDeltaReviewAt": 1
+  },
+  "qaGate": {
+    "phase": "G001-baseline-lock-and-audit-harness",
+    "requiredCommands": [
+      "node scripts/audit-interaction-baseline.js --check",
+      "node test/interaction-baseline.test.js",
+      "npm test",
+      "npm run check"
+    ],
+    "passCriteria": [
+      "baseline JSON and Markdown are deterministic and match the checked-in artifacts",
+      "all golden fixtures pass with zero missing cards and zero unexpected combo-class regressions",
+      "full repository tests and syntax/type checks pass, or unrelated pre-existing gaps are recorded in the checkpoint evidence"
+    ]
+  },
+  "aggregate": {
+    "deckCount": 3,
+    "totalEdges": 167,
+    "totalInteractions": 188,
+    "totalComboCriticalPairs": 5,
+    "totalComboCriticalTriples": 1,
+    "familyCounts": {
+      "artifact-cost-reduction→top-loop-piece": 1,
+      "attack": 1,
+      "blink→land-untap-etb": 2,
+      "cast": 3,
+      "cast-from-top→top-loop-piece": 1,
+      "combat→payoff": 6,
+      "cost-reduction→ability": 8,
+      "death→drain": 4,
+      "death→tokens": 2,
+      "destroy": 5,
+      "discard": 14,
+      "draw": 43,
+      "etb→blink": 2,
+      "exiled-card-access": 1,
+      "goad": 9,
+      "goad→punisher": 3,
+      "graveyard": 12,
+      "library-exile→empty-library-win": 1,
+      "lifegain": 3,
+      "lifegain→lifeloss-loop": 2,
+      "lifeloss": 2,
+      "lifeloss→lifegain-loop": 2,
+      "mill→graveyard-payoff": 1,
+      "ramp→sink": 42,
+      "sacrifice": 3,
+      "steal": 1,
+      "tap": 2,
+      "token-production→amplifier": 3,
+      "tokens": 6,
+      "treasure": 3
+    },
+    "eventCounts": {
+      "attack": 1,
+      "cast": 3,
+      "destroy": 5,
+      "discard": 14,
+      "draw": 43,
+      "enable:artifact-cost-reduction→top-loop-piece": 1,
+      "enable:blink→land-untap-etb": 2,
+      "enable:cast-from-top→top-loop-piece": 1,
+      "enable:combat→payoff": 6,
+      "enable:cost-reduction→ability": 8,
+      "enable:death→drain": 4,
+      "enable:death→tokens": 2,
+      "enable:etb→blink": 2,
+      "enable:exiled-card-access": 1,
+      "enable:goad→punisher": 3,
+      "enable:library-exile→empty-library-win": 1,
+      "enable:lifegain→lifeloss-loop": 2,
+      "enable:lifeloss→lifegain-loop": 2,
+      "enable:mill→graveyard-payoff": 1,
+      "enable:token-production→amplifier": 3,
+      "goad": 9,
+      "graveyard": 12,
+      "lifegain": 3,
+      "lifeloss": 2,
+      "mana": 42,
+      "sacrifice": 3,
+      "steal": 1,
+      "tap": 2,
+      "tokens": 6,
+      "treasure": 3
+    },
+    "goldenFixtureCount": 10,
+    "goldenFixtureFailures": [],
+    "missingFixtureCards": [],
+    "missingDeckCards": [
+      {
+        "deckId": "sample-xantcha",
+        "card": "Valley of Gorgoroth"
+      }
+    ],
+    "qaStatus": "ready"
+  },
+  "decks": [
+    {
+      "id": "sample-xantcha",
+      "title": "Sample Xantcha decklist",
+      "kind": "representative-local-deck",
+      "source": "data/sample-decklist.txt",
+      "cardCount": 92,
+      "nonlandCount": 63,
+      "missing": [
+        "Valley of Gorgoroth"
+      ],
+      "edgeCount": 148,
+      "zoneEdgeCount": 87,
+      "interactionCount": 159,
+      "familyCounts": {
+        "attack": 1,
+        "cast": 3,
+        "combat→payoff": 6,
+        "cost-reduction→ability": 6,
+        "death→drain": 4,
+        "death→tokens": 2,
+        "destroy": 5,
+        "discard": 14,
+        "draw": 42,
+        "goad": 9,
+        "goad→punisher": 3,
+        "graveyard": 12,
+        "mill→graveyard-payoff": 1,
+        "ramp→sink": 42,
+        "sacrifice": 3,
+        "steal": 1,
+        "tap": 2,
+        "treasure": 3
+      },
+      "eventCounts": {
+        "attack": 1,
+        "cast": 3,
+        "destroy": 5,
+        "discard": 14,
+        "draw": 42,
+        "enable:combat→payoff": 6,
+        "enable:cost-reduction→ability": 6,
+        "enable:death→drain": 4,
+        "enable:death→tokens": 2,
+        "enable:goad→punisher": 3,
+        "enable:mill→graveyard-payoff": 1,
+        "goad": 9,
+        "graveyard": 12,
+        "mana": 42,
+        "sacrifice": 3,
+        "steal": 1,
+        "tap": 2,
+        "treasure": 3
+      },
+      "strengthCounts": {
+        "moderate": 10,
+        "weak": 149
+      },
+      "kindCounts": {
+        "enablement": 6,
+        "reaction": 95,
+        "synergy": 58
+      },
+      "combos": {
+        "mutualEnablementLoops": [],
+        "comboCriticalPairCount": 0,
+        "comboCriticalPairs": [],
+        "comboCriticalTripleCount": 0,
+        "comboCriticalTriples": []
+      },
+      "topHubs": [
+        {
+          "id": "Sheoldred, the Apocalypse",
+          "role": "payoff",
+          "degree": 15,
+          "cmc": 4,
+          "topFamilies": [
+            {
+              "family": "draw",
+              "count": 15
+            }
+          ]
+        },
+        {
+          "id": "Descent into Avernus",
+          "role": "utility",
+          "degree": 14,
+          "cmc": 3,
+          "topFamilies": [
+            {
+              "family": "ramp→sink",
+              "count": 14
+            },
+            {
+              "family": "treasure",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Exsanguinate",
+          "role": "finisher",
+          "degree": 14,
+          "cmc": 2,
+          "topFamilies": [
+            {
+              "family": "ramp→sink",
+              "count": 14
+            }
+          ]
+        },
+        {
+          "id": "Fire Covenant",
+          "role": "utility",
+          "degree": 14,
+          "cmc": 3,
+          "topFamilies": [
+            {
+              "family": "ramp→sink",
+              "count": 14
+            }
+          ]
+        },
+        {
+          "id": "Waste Not",
+          "role": "draw",
+          "degree": 14,
+          "cmc": 2,
+          "topFamilies": [
+            {
+              "family": "discard",
+              "count": 6
+            },
+            {
+              "family": "combat→payoff",
+              "count": 3
+            },
+            {
+              "family": "ramp→sink",
+              "count": 3
+            },
+            {
+              "family": "death→drain",
+              "count": 2
+            },
+            {
+              "family": "death→tokens",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Necropotence",
+          "role": "utility",
+          "degree": 11,
+          "cmc": 3,
+          "topFamilies": [
+            {
+              "family": "discard",
+              "count": 8
+            },
+            {
+              "family": "graveyard",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "id": "Orcish Bowmasters",
+          "role": "payoff",
+          "degree": 11,
+          "cmc": 2,
+          "topFamilies": [
+            {
+              "family": "draw",
+              "count": 7
+            },
+            {
+              "family": "combat→payoff",
+              "count": 3
+            },
+            {
+              "family": "death→drain",
+              "count": 2
+            },
+            {
+              "family": "death→tokens",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Scrawling Crawler",
+          "role": "payoff",
+          "degree": 10,
+          "cmc": 3,
+          "topFamilies": [
+            {
+              "family": "draw",
+              "count": 10
+            }
+          ]
+        }
+      ],
+      "reviewWarnings": {
+        "weakInteractionShare": 0.937,
+        "weakInteractionShareExceedsThreshold": true,
+        "highDegreeNodes": [],
+        "highFamilyFanout": [
+          {
+            "family": "draw",
+            "count": 42
+          },
+          {
+            "family": "ramp→sink",
+            "count": 42
+          }
+        ],
+        "highWeakFamilyFanout": [
+          {
+            "family": "draw",
+            "count": 42
+          },
+          {
+            "family": "ramp→sink",
+            "count": 42
+          },
+          {
+            "family": "discard",
+            "count": 14
+          },
+          {
+            "family": "graveyard",
+            "count": 12
+          }
+        ],
+        "comboCriticalPairCountExceedsThreshold": false
+      },
+      "metricsSnapshot": {
+        "cohesionScore": 12,
+        "cohesionBand": "Pile of good-stuff",
+        "selfSufficiencyScore": 71,
+        "winTuningScore": 91,
+        "winTuningBand": "Highly tuned",
+        "bracketHint": 5,
+        "bracketLabel": "Bracket 5 · cEDH",
+        "pctInteractive": 90,
+        "pctMeaningful": 14,
+        "largestWebShare": 90,
+        "avgDegree": 4.59,
+        "satWeightedAvgDegree": 0.69,
+        "islandCount": 6
+      }
+    },
+    {
+      "id": "combo-and-false-positive-suite",
+      "title": "Combo and false-positive suite",
+      "kind": "synthetic-real-card-suite",
+      "source": "(inline synthetic decklist)",
+      "cardCount": 18,
+      "nonlandCount": 18,
+      "missing": [],
+      "edgeCount": 16,
+      "zoneEdgeCount": 18,
+      "interactionCount": 26,
+      "familyCounts": {
+        "blink→land-untap-etb": 2,
+        "cost-reduction→ability": 2,
+        "draw": 1,
+        "etb→blink": 2,
+        "exiled-card-access": 1,
+        "lifegain": 3,
+        "lifegain→lifeloss-loop": 2,
+        "lifeloss": 2,
+        "lifeloss→lifegain-loop": 2,
+        "token-production→amplifier": 3,
+        "tokens": 6
+      },
+      "eventCounts": {
+        "draw": 1,
+        "enable:blink→land-untap-etb": 2,
+        "enable:cost-reduction→ability": 2,
+        "enable:etb→blink": 2,
+        "enable:exiled-card-access": 1,
+        "enable:lifegain→lifeloss-loop": 2,
+        "enable:lifeloss→lifegain-loop": 2,
+        "enable:token-production→amplifier": 3,
+        "lifegain": 3,
+        "lifeloss": 2,
+        "tokens": 6
+      },
+      "strengthCounts": {
+        "combo-critical": 6,
+        "strong": 6,
+        "weak": 14
+      },
+      "kindCounts": {
+        "enablement": 10,
+        "reaction": 12,
+        "synergy": 4
+      },
+      "combos": {
+        "mutualEnablementLoops": [
+          [
+            "Exquisite Blood",
+            "Sanguine Bond"
+          ],
+          [
+            "Exquisite Blood",
+            "Vito, Thorn of the Dusk Rose"
+          ]
+        ],
+        "comboCriticalPairCount": 4,
+        "comboCriticalPairs": [
+          {
+            "cards": [
+              "Cloud of Faeries",
+              "Deadeye Navigator"
+            ],
+            "family": "blink→land-untap-etb",
+            "families": [
+              "blink→land-untap-etb"
+            ]
+          },
+          {
+            "cards": [
+              "Deadeye Navigator",
+              "Peregrine Drake"
+            ],
+            "family": "blink→land-untap-etb",
+            "families": [
+              "blink→land-untap-etb"
+            ]
+          },
+          {
+            "cards": [
+              "Exquisite Blood",
+              "Sanguine Bond"
+            ],
+            "family": "lifeloss→lifegain-loop + lifegain→lifeloss-loop",
+            "families": [
+              "lifegain→lifeloss-loop",
+              "lifeloss→lifegain-loop"
+            ]
+          },
+          {
+            "cards": [
+              "Exquisite Blood",
+              "Vito, Thorn of the Dusk Rose"
+            ],
+            "family": "lifeloss→lifegain-loop + lifegain→lifeloss-loop",
+            "families": [
+              "lifegain→lifeloss-loop",
+              "lifeloss→lifegain-loop"
+            ]
+          }
+        ],
+        "comboCriticalTripleCount": 0,
+        "comboCriticalTriples": []
+      },
+      "topHubs": [
+        {
+          "id": "Academy Manufactor",
+          "role": "creature",
+          "degree": 3,
+          "cmc": 3,
+          "topFamilies": [
+            {
+              "family": "tokens",
+              "count": 4
+            },
+            {
+              "family": "token-production→amplifier",
+              "count": 3
+            }
+          ]
+        },
+        {
+          "id": "Nuka-Cola Vending Machine",
+          "role": "ramp",
+          "degree": 3,
+          "cmc": 3,
+          "topFamilies": [
+            {
+              "family": "tokens",
+              "count": 4
+            },
+            {
+              "family": "token-production→amplifier",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Smothering Tithe",
+          "role": "payoff",
+          "degree": 3,
+          "cmc": 4,
+          "topFamilies": [
+            {
+              "family": "tokens",
+              "count": 2
+            },
+            {
+              "family": "draw",
+              "count": 1
+            },
+            {
+              "family": "token-production→amplifier",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Vito, Thorn of the Dusk Rose",
+          "role": "creature",
+          "degree": 3,
+          "cmc": 3,
+          "topFamilies": [
+            {
+              "family": "lifegain",
+              "count": 2
+            },
+            {
+              "family": "cost-reduction→ability",
+              "count": 1
+            },
+            {
+              "family": "lifegain→lifeloss-loop",
+              "count": 1
+            },
+            {
+              "family": "lifeloss",
+              "count": 1
+            },
+            {
+              "family": "lifeloss→lifegain-loop",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Cloud of Faeries",
+          "role": "draw",
+          "degree": 2,
+          "cmc": 2,
+          "topFamilies": [
+            {
+              "family": "blink→land-untap-etb",
+              "count": 1
+            },
+            {
+              "family": "etb→blink",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Deadeye Navigator",
+          "role": "creature",
+          "degree": 2,
+          "cmc": 6,
+          "topFamilies": [
+            {
+              "family": "blink→land-untap-etb",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "id": "Ephemerate",
+          "role": "removal",
+          "degree": 2,
+          "cmc": 1,
+          "topFamilies": [
+            {
+              "family": "etb→blink",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "id": "Exquisite Blood",
+          "role": "utility",
+          "degree": 2,
+          "cmc": 5,
+          "topFamilies": [
+            {
+              "family": "lifegain",
+              "count": 2
+            },
+            {
+              "family": "lifegain→lifeloss-loop",
+              "count": 2
+            },
+            {
+              "family": "lifeloss",
+              "count": 2
+            },
+            {
+              "family": "lifeloss→lifegain-loop",
+              "count": 2
+            }
+          ]
+        }
+      ],
+      "reviewWarnings": {
+        "weakInteractionShare": 0.538,
+        "weakInteractionShareExceedsThreshold": false,
+        "highDegreeNodes": [],
+        "highFamilyFanout": [],
+        "highWeakFamilyFanout": [],
+        "comboCriticalPairCountExceedsThreshold": false
+      },
+      "metricsSnapshot": {
+        "cohesionScore": 49,
+        "cohesionBand": "Loosely connected",
+        "selfSufficiencyScore": 30,
+        "winTuningScore": 34,
+        "winTuningBand": "Untuned",
+        "bracketHint": 3,
+        "bracketLabel": "Bracket 3 · Upgraded",
+        "pctInteractive": 89,
+        "pctMeaningful": 72,
+        "largestWebShare": 28,
+        "avgDegree": 1.78,
+        "satWeightedAvgDegree": 1.28,
+        "islandCount": 2
+      }
+    },
+    {
+      "id": "abstract-layered-combo-suite",
+      "title": "Abstract layered combo suite",
+      "kind": "synthetic-oracle-text-suite",
+      "source": "(inline synthetic decklist)",
+      "cardCount": 5,
+      "nonlandCount": 5,
+      "missing": [],
+      "edgeCount": 3,
+      "zoneEdgeCount": 8,
+      "interactionCount": 3,
+      "familyCounts": {
+        "artifact-cost-reduction→top-loop-piece": 1,
+        "cast-from-top→top-loop-piece": 1,
+        "library-exile→empty-library-win": 1
+      },
+      "eventCounts": {
+        "enable:artifact-cost-reduction→top-loop-piece": 1,
+        "enable:cast-from-top→top-loop-piece": 1,
+        "enable:library-exile→empty-library-win": 1
+      },
+      "strengthCounts": {
+        "combo-critical": 1,
+        "strong": 2
+      },
+      "kindCounts": {
+        "enablement": 3
+      },
+      "combos": {
+        "mutualEnablementLoops": [],
+        "comboCriticalPairCount": 1,
+        "comboCriticalPairs": [
+          {
+            "cards": [
+              "Empty Library Oracle",
+              "Library Exiling Tutor"
+            ],
+            "family": "library-exile→empty-library-win",
+            "families": [
+              "library-exile→empty-library-win"
+            ]
+          }
+        ],
+        "comboCriticalTripleCount": 1,
+        "comboCriticalTriples": [
+          {
+            "cards": [
+              "Artifact Spell Reducer",
+              "Artifact Top Caster",
+              "Self Top Draw Artifact"
+            ],
+            "family": "artifact-top-cost-reduction-loop"
+          }
+        ]
+      },
+      "topHubs": [
+        {
+          "id": "Self Top Draw Artifact",
+          "role": "draw",
+          "degree": 2,
+          "cmc": 1,
+          "topFamilies": [
+            {
+              "family": "artifact-cost-reduction→top-loop-piece",
+              "count": 1
+            },
+            {
+              "family": "cast-from-top→top-loop-piece",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Artifact Spell Reducer",
+          "role": "creature",
+          "degree": 1,
+          "cmc": 2,
+          "topFamilies": [
+            {
+              "family": "artifact-cost-reduction→top-loop-piece",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Artifact Top Caster",
+          "role": "utility",
+          "degree": 1,
+          "cmc": 4,
+          "topFamilies": [
+            {
+              "family": "cast-from-top→top-loop-piece",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Empty Library Oracle",
+          "role": "creature",
+          "degree": 1,
+          "cmc": 2,
+          "topFamilies": [
+            {
+              "family": "library-exile→empty-library-win",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Library Exiling Tutor",
+          "role": "utility",
+          "degree": 1,
+          "cmc": 1,
+          "topFamilies": [
+            {
+              "family": "library-exile→empty-library-win",
+              "count": 1
+            }
+          ]
+        }
+      ],
+      "reviewWarnings": {
+        "weakInteractionShare": 0,
+        "weakInteractionShareExceedsThreshold": false,
+        "highDegreeNodes": [],
+        "highFamilyFanout": [],
+        "highWeakFamilyFanout": [],
+        "comboCriticalPairCountExceedsThreshold": false
+      },
+      "metricsSnapshot": {
+        "cohesionScore": 72,
+        "cohesionBand": "Very cohesive",
+        "selfSufficiencyScore": 3,
+        "winTuningScore": 13,
+        "winTuningBand": "Untuned",
+        "bracketHint": 4,
+        "bracketLabel": "Bracket 4 · Optimized",
+        "pctInteractive": 100,
+        "pctMeaningful": 100,
+        "largestWebShare": 60,
+        "avgDegree": 1.2,
+        "satWeightedAvgDegree": 1.4,
+        "islandCount": 0
+      }
+    }
+  ],
+  "goldenFixtures": [
+    {
+      "id": "creature-cost-reducer-scope-negative",
+      "title": "Creature-scoped cost reducer does not fan out to mana rocks",
+      "cards": [
+        "Heartstone",
+        "Sol Ring"
+      ],
+      "status": "pass",
+      "rationale": "This is the canonical false-positive guard for reducer fan-out.",
+      "missing": [],
+      "expected": {
+        "edge": false,
+        "noComboPair": true
+      },
+      "observed": {
+        "edgeCount": 0,
+        "families": [],
+        "events": [],
+        "strengths": [],
+        "interactions": [],
+        "comboCriticalPairs": [],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=false, observed 0"
+        },
+        {
+          "name": "no-combo-pair",
+          "pass": true,
+          "detail": "observed 0"
+        }
+      ]
+    },
+    {
+      "id": "creature-cost-reducer-scope-positive",
+      "title": "Creature-scoped cost reducer links to creature activated ability",
+      "cards": [
+        "Heartstone",
+        "Xantcha, Sleeper Agent"
+      ],
+      "status": "pass",
+      "rationale": "Heartstone should not be flattened into generic tap-ability reduction, but it should still help Xantcha.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "cost-reduction→ability"
+        ],
+        "strengths": [
+          "weak"
+        ],
+        "noComboPair": true
+      },
+      "observed": {
+        "edgeCount": 1,
+        "families": [
+          "cost-reduction→ability"
+        ],
+        "events": [
+          "enable:cost-reduction→ability"
+        ],
+        "strengths": [
+          "weak"
+        ],
+        "interactions": [
+          {
+            "family": "cost-reduction→ability",
+            "event": "enable:cost-reduction→ability",
+            "kind": "enablement",
+            "strength": "weak",
+            "direction": "A→B"
+          }
+        ],
+        "comboCriticalPairs": [],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 1"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required cost-reduction→ability"
+        },
+        {
+          "name": "required-strengths",
+          "pass": true,
+          "detail": "required weak"
+        },
+        {
+          "name": "no-combo-pair",
+          "pass": true,
+          "detail": "observed 0"
+        }
+      ]
+    },
+    {
+      "id": "library-exile-empty-library-win",
+      "title": "Library exile can feed empty-library win condition",
+      "cards": [
+        "Empty Library Oracle",
+        "Library Exiling Tutor"
+      ],
+      "status": "pass",
+      "rationale": "Layered win-condition detection needs text-derived capability edges, not name dictionaries.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "library-exile→empty-library-win"
+        ],
+        "strengths": [
+          "combo-critical"
+        ],
+        "comboPairFamilies": [
+          "library-exile→empty-library-win"
+        ]
+      },
+      "observed": {
+        "edgeCount": 1,
+        "families": [
+          "library-exile→empty-library-win"
+        ],
+        "events": [
+          "enable:library-exile→empty-library-win"
+        ],
+        "strengths": [
+          "combo-critical"
+        ],
+        "interactions": [
+          {
+            "family": "library-exile→empty-library-win",
+            "event": "enable:library-exile→empty-library-win",
+            "kind": "enablement",
+            "strength": "combo-critical",
+            "direction": "A→B"
+          }
+        ],
+        "comboCriticalPairs": [
+          {
+            "cards": [
+              "Empty Library Oracle",
+              "Library Exiling Tutor"
+            ],
+            "family": "library-exile→empty-library-win",
+            "families": [
+              "library-exile→empty-library-win"
+            ]
+          }
+        ],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 1"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required library-exile→empty-library-win"
+        },
+        {
+          "name": "required-strengths",
+          "pass": true,
+          "detail": "required combo-critical"
+        },
+        {
+          "name": "combo-pair-families",
+          "pass": true,
+          "detail": "required library-exile→empty-library-win"
+        }
+      ]
+    },
+    {
+      "id": "lifegain-lifeloss-two-card-loop",
+      "title": "Reciprocal life gain/life loss loop is combo-critical",
+      "cards": [
+        "Exquisite Blood",
+        "Sanguine Bond"
+      ],
+      "status": "pass",
+      "rationale": "Bidirectional reaction loops must surface both directions for explainability.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "lifeloss→lifegain-loop",
+          "lifegain→lifeloss-loop"
+        ],
+        "strengths": [
+          "combo-critical"
+        ],
+        "comboPairFamilies": [
+          "lifeloss→lifegain-loop",
+          "lifegain→lifeloss-loop"
+        ]
+      },
+      "observed": {
+        "edgeCount": 1,
+        "families": [
+          "lifegain",
+          "lifegain→lifeloss-loop",
+          "lifeloss",
+          "lifeloss→lifegain-loop"
+        ],
+        "events": [
+          "enable:lifegain→lifeloss-loop",
+          "enable:lifeloss→lifegain-loop",
+          "lifegain",
+          "lifeloss"
+        ],
+        "strengths": [
+          "combo-critical",
+          "weak"
+        ],
+        "interactions": [
+          {
+            "family": "lifegain",
+            "event": "lifegain",
+            "kind": "reaction",
+            "strength": "weak",
+            "direction": "B→A"
+          },
+          {
+            "family": "lifegain→lifeloss-loop",
+            "event": "enable:lifegain→lifeloss-loop",
+            "kind": "enablement",
+            "strength": "combo-critical",
+            "direction": "A→B"
+          },
+          {
+            "family": "lifeloss",
+            "event": "lifeloss",
+            "kind": "reaction",
+            "strength": "weak",
+            "direction": "A→B"
+          },
+          {
+            "family": "lifeloss→lifegain-loop",
+            "event": "enable:lifeloss→lifegain-loop",
+            "kind": "enablement",
+            "strength": "combo-critical",
+            "direction": "B→A"
+          }
+        ],
+        "comboCriticalPairs": [
+          {
+            "cards": [
+              "Exquisite Blood",
+              "Sanguine Bond"
+            ],
+            "family": "lifeloss→lifegain-loop + lifegain→lifeloss-loop",
+            "families": [
+              "lifegain→lifeloss-loop",
+              "lifeloss→lifegain-loop"
+            ]
+          }
+        ],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 1"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required lifeloss→lifegain-loop, lifegain→lifeloss-loop"
+        },
+        {
+          "name": "required-strengths",
+          "pass": true,
+          "detail": "required combo-critical"
+        },
+        {
+          "name": "combo-pair-families",
+          "pass": true,
+          "detail": "required lifeloss→lifegain-loop, lifegain→lifeloss-loop"
+        }
+      ]
+    },
+    {
+      "id": "opponent-draw-feeds-smothering-tithe",
+      "title": "Wheel draw feeds Smothering Tithe as a weak reaction",
+      "cards": [
+        "Smothering Tithe",
+        "Wheel of Fortune"
+      ],
+      "status": "pass",
+      "rationale": "Opponent-draw triggers are useful context but should remain low-strength unless another layer closes a loop.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "draw"
+        ],
+        "strengths": [
+          "weak"
+        ],
+        "noComboPair": true
+      },
+      "observed": {
+        "edgeCount": 1,
+        "families": [
+          "draw"
+        ],
+        "events": [
+          "draw"
+        ],
+        "strengths": [
+          "weak"
+        ],
+        "interactions": [
+          {
+            "family": "draw",
+            "event": "draw",
+            "kind": "reaction",
+            "strength": "weak",
+            "direction": "B→A"
+          }
+        ],
+        "comboCriticalPairs": [],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 1"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required draw"
+        },
+        {
+          "name": "required-strengths",
+          "pass": true,
+          "detail": "required weak"
+        },
+        {
+          "name": "no-combo-pair",
+          "pass": true,
+          "detail": "observed 0"
+        }
+      ]
+    },
+    {
+      "id": "partner-exile-access",
+      "title": "Pako/Haldan style fetch-counter access is linked",
+      "cards": [
+        "Haldan, Avid Arcanist",
+        "Pako, Arcane Retriever"
+      ],
+      "status": "pass",
+      "rationale": "Cross-card access to exiled cards is a domain-specific interaction that generic exile detection misses.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "exiled-card-access"
+        ],
+        "strengths": [
+          "strong"
+        ],
+        "noComboPair": true
+      },
+      "observed": {
+        "edgeCount": 1,
+        "families": [
+          "exiled-card-access"
+        ],
+        "events": [
+          "enable:exiled-card-access"
+        ],
+        "strengths": [
+          "strong"
+        ],
+        "interactions": [
+          {
+            "family": "exiled-card-access",
+            "event": "enable:exiled-card-access",
+            "kind": "synergy",
+            "strength": "strong",
+            "direction": "B→A"
+          }
+        ],
+        "comboCriticalPairs": [],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 1"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required exiled-card-access"
+        },
+        {
+          "name": "required-strengths",
+          "pass": true,
+          "detail": "required strong"
+        },
+        {
+          "name": "no-combo-pair",
+          "pass": true,
+          "detail": "observed 0"
+        }
+      ]
+    },
+    {
+      "id": "repeatable-blink-land-untap-combo",
+      "title": "Repeatable blink plus land-untap ETB is combo-critical",
+      "cards": [
+        "Deadeye Navigator",
+        "Peregrine Drake"
+      ],
+      "status": "pass",
+      "rationale": "A one-two layered combo must be promoted from ordinary ETB synergy to combo-critical.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "blink→land-untap-etb"
+        ],
+        "strengths": [
+          "combo-critical"
+        ],
+        "comboPairFamilies": [
+          "blink→land-untap-etb"
+        ]
+      },
+      "observed": {
+        "edgeCount": 1,
+        "families": [
+          "blink→land-untap-etb"
+        ],
+        "events": [
+          "enable:blink→land-untap-etb"
+        ],
+        "strengths": [
+          "combo-critical"
+        ],
+        "interactions": [
+          {
+            "family": "blink→land-untap-etb",
+            "event": "enable:blink→land-untap-etb",
+            "kind": "enablement",
+            "strength": "combo-critical",
+            "direction": "A→B"
+          }
+        ],
+        "comboCriticalPairs": [
+          {
+            "cards": [
+              "Deadeye Navigator",
+              "Peregrine Drake"
+            ],
+            "family": "blink→land-untap-etb",
+            "families": [
+              "blink→land-untap-etb"
+            ]
+          }
+        ],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 1"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required blink→land-untap-etb"
+        },
+        {
+          "name": "required-strengths",
+          "pass": true,
+          "detail": "required combo-critical"
+        },
+        {
+          "name": "combo-pair-families",
+          "pass": true,
+          "detail": "required blink→land-untap-etb"
+        }
+      ]
+    },
+    {
+      "id": "single-shot-blink-is-not-infinite",
+      "title": "Single-shot blink plus land-untap ETB is not combo-critical",
+      "cards": [
+        "Ephemerate",
+        "Peregrine Drake"
+      ],
+      "status": "pass",
+      "rationale": "The audit distinguishes strong value synergy from repeatable combo closure.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "etb→blink"
+        ],
+        "strengths": [
+          "strong"
+        ],
+        "noComboPair": true
+      },
+      "observed": {
+        "edgeCount": 1,
+        "families": [
+          "etb→blink"
+        ],
+        "events": [
+          "enable:etb→blink"
+        ],
+        "strengths": [
+          "strong"
+        ],
+        "interactions": [
+          {
+            "family": "etb→blink",
+            "event": "enable:etb→blink",
+            "kind": "enablement",
+            "strength": "strong",
+            "direction": "A→B"
+          }
+        ],
+        "comboCriticalPairs": [],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 1"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required etb→blink"
+        },
+        {
+          "name": "required-strengths",
+          "pass": true,
+          "detail": "required strong"
+        },
+        {
+          "name": "no-combo-pair",
+          "pass": true,
+          "detail": "observed 0"
+        }
+      ]
+    },
+    {
+      "id": "three-card-artifact-top-loop",
+      "title": "Artifact top loop requires three pieces",
+      "cards": [
+        "Artifact Spell Reducer",
+        "Artifact Top Caster",
+        "Self Top Draw Artifact"
+      ],
+      "status": "pass",
+      "rationale": "A three-piece engine should be detected as a triple, not downgraded to a misleading two-card pair.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "artifact-cost-reduction→top-loop-piece",
+          "cast-from-top→top-loop-piece"
+        ],
+        "noComboPair": true,
+        "comboTripleFamily": "artifact-top-cost-reduction-loop"
+      },
+      "observed": {
+        "edgeCount": 2,
+        "families": [
+          "artifact-cost-reduction→top-loop-piece",
+          "cast-from-top→top-loop-piece"
+        ],
+        "events": [
+          "enable:artifact-cost-reduction→top-loop-piece",
+          "enable:cast-from-top→top-loop-piece"
+        ],
+        "strengths": [
+          "strong"
+        ],
+        "interactions": [
+          {
+            "family": "artifact-cost-reduction→top-loop-piece",
+            "event": "enable:artifact-cost-reduction→top-loop-piece",
+            "kind": "enablement",
+            "strength": "strong",
+            "direction": "B→A"
+          },
+          {
+            "family": "cast-from-top→top-loop-piece",
+            "event": "enable:cast-from-top→top-loop-piece",
+            "kind": "enablement",
+            "strength": "strong",
+            "direction": "B→A"
+          }
+        ],
+        "comboCriticalPairs": [],
+        "comboCriticalTriples": [
+          {
+            "cards": [
+              "Artifact Spell Reducer",
+              "Artifact Top Caster",
+              "Self Top Draw Artifact"
+            ],
+            "family": "artifact-top-cost-reduction-loop"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 2"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required artifact-cost-reduction→top-loop-piece, cast-from-top→top-loop-piece"
+        },
+        {
+          "name": "no-combo-pair",
+          "pass": true,
+          "detail": "observed 0"
+        },
+        {
+          "name": "combo-triple-family",
+          "pass": true,
+          "detail": "required artifact-top-cost-reduction-loop"
+        }
+      ]
+    },
+    {
+      "id": "token-amplifier-without-treasure-overreach",
+      "title": "Token amplifier links without treasure/mana overreach",
+      "cards": [
+        "Academy Manufactor",
+        "Smothering Tithe"
+      ],
+      "status": "pass",
+      "rationale": "Reminder text and artifact-token subtypes must not leak into broad mana/treasure false positives.",
+      "missing": [],
+      "expected": {
+        "edge": true,
+        "families": [
+          "token-production→amplifier"
+        ],
+        "forbiddenEvents": [
+          "treasure",
+          "mana"
+        ],
+        "noComboPair": true
+      },
+      "observed": {
+        "edgeCount": 1,
+        "families": [
+          "token-production→amplifier",
+          "tokens"
+        ],
+        "events": [
+          "enable:token-production→amplifier",
+          "tokens"
+        ],
+        "strengths": [
+          "strong",
+          "weak"
+        ],
+        "interactions": [
+          {
+            "family": "token-production→amplifier",
+            "event": "enable:token-production→amplifier",
+            "kind": "synergy",
+            "strength": "strong",
+            "direction": "A→B"
+          },
+          {
+            "family": "tokens",
+            "event": "tokens",
+            "kind": "reaction",
+            "strength": "weak",
+            "direction": "A→B"
+          }
+        ],
+        "comboCriticalPairs": [],
+        "comboCriticalTriples": []
+      },
+      "checks": [
+        {
+          "name": "edge-presence",
+          "pass": true,
+          "detail": "expected edge=true, observed 1"
+        },
+        {
+          "name": "required-families",
+          "pass": true,
+          "detail": "required token-production→amplifier"
+        },
+        {
+          "name": "forbidden-events",
+          "pass": true,
+          "detail": "forbidden treasure, mana"
+        },
+        {
+          "name": "no-combo-pair",
+          "pass": true,
+          "detail": "observed 0"
+        }
+      ]
+    }
+  ]
+}

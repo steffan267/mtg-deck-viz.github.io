@@ -645,6 +645,208 @@
     return out;
   }
 
+  // =========================== PIPELINE: SEMANTIC IR =======================
+  // A typed, audit-friendly wrapper around today's classify() output. This does
+  // not change matching behavior yet; it gives future proof search a stable
+  // fact surface with evidence and confidence instead of having to reason over
+  // flat string maps directly.
+  const FACT_KIND_ONTOLOGY = {
+    "ability": "One segmented Oracle ability with a structural kind, cost/trigger/effect slices, and exact evidence.",
+    "event.produces": "A regex-derived event/resource this card can produce for one or more subjects.",
+    "event.consumes": "A regex-derived event/resource this card reacts to, requires, or pays off.",
+    "capability": "A typed predicate converted from the legacy caps array; enablement families consume these predicates.",
+    "zone.reference": "A game zone mentioned by the card outside pure land mana text.",
+    "type.creature-subtype": "A creature subtype on this card.",
+    "type.tribal-reference": "A creature type or creature wildcard referenced by this card's rules text.",
+    "role": "The legacy card role classification used by graph coloring and scoring.",
+    "classification.fallback": "Fallback fact when no more specific semantic facts were extracted.",
+  };
+  const FAMILY_KIND_ONTOLOGY = {
+    reaction: "A produces/consumes event match between two cards.",
+    synergy: "A directional, non-infinite synergy from one capability predicate to another.",
+    enablement: "A directional predicate edge that can participate in loop or combo proof search.",
+  };
+  const CONFIDENCE_ONTOLOGY = {
+    exact: "Structurally recognized from ability shape or card type.",
+    pattern: "Regex-derived semantic cue with direct Oracle-text evidence.",
+    heuristic: "Broad inference retained for compatibility and review.",
+    unknown: "Fallback when the classifier could not extract a stronger signal.",
+  };
+  const ONTOLOGY = {
+    factKinds: FACT_KIND_ONTOLOGY,
+    familyKinds: FAMILY_KIND_ONTOLOGY,
+    confidence: CONFIDENCE_ONTOLOGY,
+  };
+
+  function typedPredicateForCap(cap) {
+    const raw = String(cap || "");
+    const i = raw.indexOf(":");
+    return {
+      predicate: i >= 0 ? raw.slice(0, i) : raw,
+      value: i >= 0 ? raw.slice(i + 1) : null,
+      raw,
+    };
+  }
+
+  function snippet(text) {
+    return String(text || "").replace(/\s+/g, " ").trim().slice(0, 240);
+  }
+
+  function evidenceForSegment(segment, abilityId) {
+    return { source: "oracle_text", abilityId, snippet: snippet(segment && segment.raw) };
+  }
+
+  function abilityIR(segment, index) {
+    const id = "ability:" + index;
+    return {
+      id,
+      kind: segment.kind,
+      cost: segment.cost || null,
+      trigger: segment.trigger || null,
+      effect: segment.effect || "",
+      confidence: "exact",
+      evidence: [evidenceForSegment(segment, id)],
+    };
+  }
+
+  function makeFact(kind, attrs) {
+    const base = attrs.event || attrs.predicate || attrs.zone || attrs.type || attrs.reference || attrs.role || "unknown";
+    const value = attrs.value == null ? "" : ":" + attrs.value;
+    const subjects = attrs.subjects && attrs.subjects.length ? ":" + attrs.subjects.join(",") : "";
+    return Object.assign({
+      id: [kind, base + value + subjects].join(":"),
+      kind,
+      confidence: attrs.confidence || "pattern",
+      evidence: attrs.evidence || [],
+    }, attrs);
+  }
+
+  function eventEvidence(eventId, mode, abilities) {
+    const ev = EVENTS.find(e => e.id === eventId);
+    if (!ev) return [];
+    const patterns = mode === "produces" ? ev.produce : ev.consume;
+    const out = [];
+    for (const ability of abilities) {
+      const text = mode === "produces" ? ability.effect : [ability.trigger, ability.effect].filter(Boolean).join(" ");
+      if (patterns.some(p => p.re.test(text))) out.push({ source: "oracle_text", abilityId: ability.id, snippet: snippet(text) });
+    }
+    return out.slice(0, 3);
+  }
+
+  function confidenceForCap(cap) {
+    const { predicate } = typedPredicateForCap(cap);
+    if (/^(has-tap-ability|has-nonmana-activated-ability|has-creature-activated-ability|has-trigger|has-etb|taps-for-mana|mana-produced|blink-cost|self-untap-cost|ability-copy-cost)$/.test(predicate))
+      return "exact";
+    if (/^(is-|uses-|untaps-|etb-untaps-|mana-from-|exile-access-source)/.test(predicate))
+      return "pattern";
+    return "heuristic";
+  }
+
+  function capEvidence(cap, abilities) {
+    const { predicate } = typedPredicateForCap(cap);
+    const checks = [
+      [/trigger|etb/, a => a.kind === "triggered" || a.kind === "etb"],
+      [/tap|activated|mana-produced|mana-from|self-untap|ability-copy/, a => a.kind === "activated"],
+      [/untap/, a => /\buntap\b/.test(a.effect + " " + a.cost)],
+      [/blink/, a => /\bexile\b/.test(a.effect) && /\breturn\b/.test(a.effect) && /\bbattlefield\b/.test(a.effect)],
+      [/cost-reducer|cost-reduction|spell-cost/, a => /cost.*less|activated abilities|spells?.*cost/.test(a.effect)],
+      [/token/, a => /\btoken/.test(a.effect + " " + a.trigger)],
+      [/counter|proliferate/, a => /\bcounter|proliferate/.test(a.effect + " " + a.trigger)],
+    ];
+    const matched = abilities.filter(ability => checks.some(([re, fn]) => re.test(predicate) && fn(ability)));
+    return (matched.length ? matched : abilities.slice(0, 1)).map(ability => evidenceForSegment({ raw: ability.evidence[0] && ability.evidence[0].snippet }, ability.id));
+  }
+
+  function addFact(facts, seen, fact) {
+    if (seen.has(fact.id)) return;
+    seen.add(fact.id);
+    facts.push(fact);
+  }
+
+  function semanticIR(card, classified) {
+    const abilities = (classified.segments || segmentOracle(card && card.oracle_text)).map(abilityIR);
+    const facts = [], seen = new Set();
+    for (const [event, subjects] of Object.entries(classified.produces || {})) {
+      addFact(facts, seen, makeFact("event.produces", {
+        event,
+        subjects: subjects.slice().sort(),
+        confidence: "pattern",
+        evidence: eventEvidence(event, "produces", abilities),
+      }));
+    }
+    for (const [event, subjects] of Object.entries(classified.consumes || {})) {
+      addFact(facts, seen, makeFact("event.consumes", {
+        event,
+        subjects: subjects.slice().sort(),
+        confidence: "pattern",
+        evidence: eventEvidence(event, "consumes", abilities),
+      }));
+    }
+    for (const cap of (classified.caps || []).slice().sort()) {
+      const parsed = typedPredicateForCap(cap);
+      addFact(facts, seen, makeFact("capability", {
+        predicate: parsed.predicate,
+        value: parsed.value,
+        raw: parsed.raw,
+        confidence: confidenceForCap(cap),
+        evidence: capEvidence(cap, abilities),
+      }));
+    }
+    for (const zone of (classified.zones || []).slice().sort()) {
+      addFact(facts, seen, makeFact("zone.reference", { zone, confidence: "pattern" }));
+    }
+    for (const type of (classified.myTypes || []).slice().sort()) {
+      addFact(facts, seen, makeFact("type.creature-subtype", { type, confidence: "exact" }));
+    }
+    for (const reference of (classified.tribalRefs || []).slice().sort()) {
+      addFact(facts, seen, makeFact("type.tribal-reference", { reference, confidence: "pattern" }));
+    }
+    if (classified.role) {
+      addFact(facts, seen, makeFact("role", {
+        role: classified.role,
+        confidence: classified.role === "utility" ? "heuristic" : "pattern",
+      }));
+    }
+    if (!facts.length) {
+      addFact(facts, seen, makeFact("classification.fallback", {
+        predicate: "unknown",
+        confidence: "unknown",
+        evidence: abilities.slice(0, 1).map(ability => ability.evidence[0]),
+      }));
+    }
+    facts.sort((a, b) => a.id.localeCompare(b.id));
+    return {
+      version: "semantic-ir.v1",
+      card: {
+        typeLine: card.type_line || "",
+        role: classified.role || "utility",
+      },
+      abilities,
+      facts,
+      predicates: facts.filter(f => f.kind === "capability").map(f => f.raw).sort(),
+      summary: {
+        abilityCount: abilities.length,
+        factCount: facts.length,
+        produces: Object.keys(classified.produces || {}).sort(),
+        consumes: Object.keys(classified.consumes || {}).sort(),
+        caps: (classified.caps || []).slice().sort(),
+      },
+    };
+  }
+
+  function attachSemanticIR(result, card) {
+    Object.defineProperty(result, "ir", {
+      enumerable: false,
+      configurable: true,
+      get() {
+        const value = semanticIR(card, result);
+        Object.defineProperty(result, "ir", { value, enumerable: false, configurable: true });
+        return value;
+      },
+    });
+    return result;
+  }
+
   // ============================ PIPELINE: TAG ===============================
   // Per-segment capability flags. These are the currency of the enablement
   // families (untap→tap, etb→blink, sac-fodder→outlet, …). Kept deliberately
@@ -679,6 +881,19 @@
     return total;
   }
 
+  function maxManaProduced(text) {
+    let best = 0;
+    const s = String(text || "").toLowerCase();
+    for (const m of s.matchAll(/\badd ((?:\{[wubrgc]\})+)/g)) {
+      best = Math.max(best, (m[1].match(/\{/g) || []).length);
+    }
+    for (const m of s.matchAll(/\badd (one|two|three|four|five|six|seven|eight|nine|ten|\d+|x) (?:mana|\{[wubrgc]\})/g)) {
+      const n = m[1] === "x" ? 0 : numberWordValue(m[1]);
+      best = Math.max(best, n);
+    }
+    return best;
+  }
+
   const NON_ACCESS_EXILE_COUNTERS = new Set([
     "age", "charge", "coin", "experience", "flying", "indestructible", "lifelink",
     "loyalty", "oil", "poison", "shield", "stun", "time", "verse", "vigilance"
@@ -695,6 +910,10 @@
 
   function capsOf(segments, classified, isLand) {
     const caps = new Set();
+    const allText = segments.map(s => s.raw).join(" ");
+    const hasCheapInstantImprint = /\bexile an? instant card\b.{0,80}\bmana value 2 or less\b/.test(allText);
+    const typeText = classified._type || "";
+    const cmc = Number.isFinite(classified._cmc) ? classified._cmc : null;
     // Lands tap for mana and some untap lands; counting them as combo pieces
     // makes every basic + fetchland a "combo" node. Exclude lands entirely from
     // the tap/untap/mana enablement families.
@@ -729,6 +948,7 @@
         // untapper can actually untap that type (untapping lands ≠ re-using a rock).
         if (s.kind === "activated" && /\{t\}|\{q\}/.test(c) && /\badd \{|\badd (one|two|three|x|an amount)/.test(e)) {
           caps.add("taps-for-mana");
+          caps.add("mana-produced:" + Math.max(1, maxManaProduced(e)));
           const mt = classified._type || "";
           if (/creature/.test(mt)) caps.add("mana-from-creature");
           else if (/artifact/.test(mt)) caps.add("mana-from-artifact");
@@ -738,6 +958,8 @@
         if (s.kind === "activated" && /\{t\}/.test(c)) caps.add("has-tap-ability");
         if (s.kind === "activated" && !/\badd \{|\badd (one|two|three|x|an amount)/.test(e))
           caps.add("has-nonmana-activated-ability");
+        if (s.kind === "activated" && /\bartifact\b/.test(classified._type || "") && /draw a card/.test(e) && /put .* on top of (its owner.?s|your) library/.test(e + " " + c))
+          caps.add("is-self-top-draw-artifact");
         // activated ability on a creature. Creature-scoped reducers must not
         // fan out to mana rocks merely because those artifacts have tap abilities.
         if (s.kind === "activated" && /\bcreature\b/.test(classified._type || "")) caps.add("has-creature-activated-ability");
@@ -757,12 +979,20 @@
             caps.add(tgt === "permanent" ? "untaps-any" : "untaps-" + tgt);  // untaps-creature / untaps-land / untaps-artifact / untaps-any
           }
         }
+        if (/\binstant\b/.test(typeText) && (cmc == null || cmc <= 2) && /untap all nonland permanents you control/.test(e))
+          caps.add("is-cheap-instant-nonland-permanent-untap-spell");
+        if (s.kind === "activated" && /\buntap (this|it|this artifact|this creature|this permanent)/.test(e)) {
+          caps.add("is-self-untapper");
+          caps.add("self-untap-cost:" + manaCostValue(c));
+        }
         if (s.kind === "etb") {
           const lm = e.match(/untap (?:up to )?(one|two|three|four|five|six|seven|eight|nine|ten|\d+)? ?(?:target )?lands?/);
           if (lm) {
             caps.add("etb-untaps-land");
             caps.add("etb-untaps-land:" + numberWordValue(lm[1]));
           }
+          if (/untap (target|up to one target|that) permanent/.test(e))
+            caps.add("etb-untaps-permanent");
         }
       }
       // ETB: a trigger that fires when this permanent enters
@@ -798,12 +1028,44 @@
         caps.add("is-cost-reducer");
       else if (/(spells?|creature spells?) .* cost \{?\d* ?[^ ]* ?less|costs? \{\d+\} less to cast/.test(e))
         caps.add("is-spell-cost-reducer");
+      if (/\bartifact spells? you cast cost \{?\d* ?[^ ]* ?less|artifact spells? cost \{?\d* ?[^ ]* ?less/.test(e))
+        caps.add("is-artifact-spell-cost-reducer");
       // copy effects. Split generic copy text from permanent-copy scope so
       // spell-copy/self-copy does not trigger arbitrary ETB cards.
       if (/copy (target|that)/.test(e) || /create a token that.?s a copy/.test(e) || /token that.?s a copy/.test(e) || /copy it/.test(e)) {
         caps.add("is-copy");
         if (/copy target (creature|permanent)|copy of (up to one )?(other )?target|copy of target creature|copy of (a|another) creature|copy of a permanent/.test(e))
           caps.add("is-permanent-copy");
+      }
+      if (s.kind === "activated" && /create .*token that.?s a copy of target .*creature/.test(e) && /haste/.test(e))
+        caps.add("is-repeatable-hasty-creature-copy");
+      if (/\bwhen\b.*enters\b.*copy target instant or sorcery spell/.test(s.raw))
+        caps.add("is-etb-spell-copier");
+      if (/target creatures? you control.*create .*tokens?.*copy of (that|those|it|them|the targeted|target) creatures?/.test(e) && /haste/.test(e))
+        caps.add("is-hasty-creature-copy-spell");
+      if (/when .* enters\b/.test(s.raw) && /if .*number of cards in your library.*you win the game/.test(e))
+        caps.add("is-empty-library-win-payoff");
+      if (/name a card[\s\S]{0,180}reveal cards? from the top of your library until/.test(allText)
+          || /exile (your library|the rest of your library|all other cards revealed this way|all cards revealed this way)/.test(effectAndRaw)
+          || /exile cards? from the top of your library until/.test(effectAndRaw))
+        caps.add("is-library-exile-source");
+      if (/whenever an opponent loses life/.test(s.trigger) && /you gain that much life/.test(e))
+        caps.add("is-lifegain-from-opponent-lifeloss");
+      if (/whenever you gain life/.test(s.trigger) && /(target opponent|each opponent).*loses that much life/.test(e))
+        caps.add("is-lifeloss-from-your-lifegain");
+      if (/whenever you activate an ability/.test(s.trigger) && /copy that ability/.test(e)) {
+        caps.add("is-activated-ability-copier");
+        const pay = e.match(/pay \{([^}]+)\}/);
+        caps.add("ability-copy-cost:" + (pay ? manaCostValue("{" + pay[1] + "}") : 0));
+      }
+      if (/\b(look at|play with) the top card of your library\b/.test(effectAndRaw)
+          && /\bcast artifact spells? (from|off) the top of your library\b|\bplay artifact cards? from the top of your library\b/.test(effectAndRaw))
+        caps.add("is-artifact-cast-from-top-enabler");
+      if (s.kind === "activated"
+          && (hasCheapInstantImprint || /exiled card|the exiled card|copy the exiled card/.test(effectAndRaw))
+          && /\bcast\b/.test(effectAndRaw)
+          && (hasCheapInstantImprint || /\binstant\b/.test(effectAndRaw) || /mana value 2 or less/.test(effectAndRaw))) {
+        caps.add("is-repeatable-cheap-instant-caster");
       }
 
       // --- Wave 2: directional payoff engines the audit found missing ---
@@ -1008,11 +1270,12 @@
       myTypes: creatureSubtypes(card.type_line),   // this card's own creature subtypes
       tribalRefs: tribalRefs(o),                    // creature types this card scales on
       _type: (card.type_line || "").toLowerCase(),
+      _cmc: typeof card.cmc === "number" ? card.cmc : null,
     };
     // pipeline layers: segment → capability tags (used by interactionsBetween)
     result.segments = segmentOracle(card.oracle_text);
     result.caps = capsOf(result.segments, result, isLand);
-    return result;
+    return attachSemanticIR(result, card);
   }
 
   // do produced-subjects overlap consumed-subjects?  any matches anything; each = {you,opp}
@@ -1097,6 +1360,18 @@
     // attack INTO your attack-punisher payoffs. A real directed build-around
     // (the pillowfort/group-slug archetype), so moderate — not a combo loop.
     { family: "goad→punisher",     from: "is-goad-source",    to: "is-attack-punisher", kind: "synergy", strength: "moderate" },
+    // EDHREC / Commander Spellbook combo archetypes. These remain capability-
+    // based: no card names, only text-derived roles that appear in the combo
+    // detail prerequisites/steps/results shape.
+    { family: "library-exile→empty-library-win", from: "is-library-exile-source", to: "is-empty-library-win-payoff", kind: "enablement", strength: "combo-critical" },
+    { family: "lifeloss→lifegain-loop", from: "is-lifegain-from-opponent-lifeloss", to: "is-lifeloss-from-your-lifegain", kind: "enablement", strength: "combo-critical" },
+    { family: "lifegain→lifeloss-loop", from: "is-lifeloss-from-your-lifegain", to: "is-lifegain-from-opponent-lifeloss", kind: "enablement", strength: "combo-critical" },
+    { family: "imprint-untap-spell-loop", from: "is-cheap-instant-nonland-permanent-untap-spell", to: "is-repeatable-cheap-instant-caster", kind: "enablement", strength: "combo-critical" },
+    { family: "self-untap-mana→ability-copy-loop", from: "is-activated-ability-copier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
+    { family: "hasty-copy→etb-untap-loop", from: "is-repeatable-hasty-creature-copy", to: "etb-untaps-permanent", kind: "enablement", strength: "combo-critical" },
+    { family: "spell-copy-etb→creature-copy-spell-loop", from: "is-etb-spell-copier", to: "is-hasty-creature-copy-spell", kind: "enablement", strength: "combo-critical" },
+    { family: "artifact-cost-reduction→top-loop-piece", from: "is-artifact-spell-cost-reducer", to: "is-self-top-draw-artifact", kind: "enablement", strength: "strong" },
+    { family: "cast-from-top→top-loop-piece", from: "is-artifact-cast-from-top-enabler", to: "is-self-top-draw-artifact", kind: "enablement", strength: "strong" },
   ];
   const hasCap = (node, cap) => (node.caps || []).includes(cap);
   const capSuffixes = (node, prefix) => (node.caps || [])
@@ -1182,6 +1457,13 @@
             family = "blink→land-untap-etb";
             evidence = { from: f.from, to: f.to, blinkCost, untapCount };
             if (untapCount >= blinkCost && blinkCost > 0) strength = "combo-critical";
+          }
+          if (f.family === "self-untap-mana→ability-copy-loop") {
+            const copyCost = maxCapNumber(src, "ability-copy-cost:");
+            const untapCost = maxCapNumber(dst, "self-untap-cost:");
+            const manaProduced = maxCapNumber(dst, "mana-produced:");
+            evidence = { from: f.from, to: f.to, copyCost, untapCost, manaProduced };
+            if (!hasCap(dst, "taps-for-mana") || (2 * manaProduced) <= (untapCost + copyCost)) continue;
           }
           out.push({ kind: f.kind, family, event: "enable:" + family, direction: dir,
             strength, loops: false, evidence });
@@ -1296,6 +1578,16 @@
   EVENT_LABEL["enable:combat-enabler"] = "evasion/extra-combat → combat payoff";
   EVENT_LABEL["enable:goad→punisher"] = "goad → punish forced attackers (political)";
   EVENT_LABEL["enable:exiled-card-access"] = "exiled card access";
+  EVENT_LABEL["enable:library-exile→empty-library-win"] = "library exile → empty-library win";
+  EVENT_LABEL["enable:lifeloss→lifegain-loop"] = "life loss → life gain loop";
+  EVENT_LABEL["enable:lifegain→lifeloss-loop"] = "life gain → life loss loop";
+  EVENT_LABEL["enable:imprint-untap-spell-loop"] = "repeatable imprinted untap spell loop";
+  EVENT_LABEL["enable:self-untap-mana→ability-copy-loop"] = "self-untap mana ability copy loop";
+  EVENT_LABEL["enable:hasty-copy→etb-untap-loop"] = "hasty copy → ETB untap loop";
+  EVENT_LABEL["enable:spell-copy-etb→creature-copy-spell-loop"] = "ETB spell copy → creature-copy spell loop";
+  EVENT_LABEL["enable:artifact-cost-reduction→top-loop-piece"] = "artifact cost reduction → top-loop piece";
+  EVENT_LABEL["enable:cast-from-top→top-loop-piece"] = "cast from top → top-loop piece";
+  EVENT_LABEL["artifact-top-cost-reduction-loop"] = "artifact top + cost reduction loop";
   EVENT_LABEL["copy→trigger"] = "copy → trigger";
   EVENT_LABEL["blink→land-untap-etb"] = "repeatable blink → land-untap ETB loop";
   EVENT_LABEL["lord→tribe"] = "tribal (creature-type synergy)";
@@ -1307,7 +1599,9 @@
   const STRENGTH_WEIGHT = { weak: 0.25, moderate: 0.6, strong: 1.0, "combo-critical": 1.5 };
 
   const API = { EVENTS, ZONE_RULES, ZONES, EVENT_LABEL, STRENGTH_WEIGHT,
-    classify, roleOf, isLandType, sharedEvents, interactionsBetween, eventsFromInteractions, subjectsOverlap, interactionProfile };
+    ONTOLOGY, ENABLEMENT,
+    classify, roleOf, isLandType, sharedEvents, interactionsBetween, eventsFromInteractions,
+    subjectsOverlap, interactionProfile, semanticIR, typedPredicateForCap };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.INTERACTION_MODEL = API;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -25,7 +25,7 @@ import { useRecommendations } from './composables/useRecommendations'
 import type { CandidateCard, DeckGraph, DeckPayloadEntry, DeckMetrics, GraphNode, MetricsModule, MetricItem, RankGroup, ScoreSection, SignalBar } from './types'
 import { normalizeInteractionModel, normalizeMetricsModule } from './services/adapters/legacyModules'
 import type { DeckImportSource } from './services/import'
-import type { GraphInteraction, RenderNode } from './types/graph'
+import type { GraphInteraction, InteractionProofPackage, RenderNode } from './types/graph'
 
 const ROLE_COLORS: Record<string, string> = {
   commander: '#f0c040', land: '#6b6478', ramp: '#54c98a', draw: '#5aa6ff', payoff: '#d9434f',
@@ -59,14 +59,21 @@ const currentPage = ref<'visualization' | 'breakdown'>('visualization')
 const selectedFamily = ref<string | null>(null)
 const showHelp = ref(false)
 const showCompare = ref(false)
+const showInteractionProofs = ref(false)
 const selectedBreakdownId = ref<string | null>(null)
 const selectedBreakdownCategoryId = ref<string | null>(null)
+const selectedProofFamily = ref<string | null>(null)
+const selectedProofCardCount = ref<number | null>(null)
+const selectedProofPackageId = ref<string | null>(null)
 const graphCanvasRef = ref<InstanceType<typeof GraphCanvas> | null>(null)
 
 const activeDeck = computed(() => decks.value[activeIndex.value] || null)
 const activeGraph = computed<DeckGraph | null>(() => activeDeck.value?.graph || null)
 const graphNodes = computed(() => activeGraph.value?.nodes || [])
 const cardNodes = computed(() => graphNodes.value.filter(node => node.role !== 'zone'))
+const interactionProofs = computed<InteractionProofPackage[]>(() => activeGraph.value?.interactionProofs || [])
+const interactionProofsMaterialized = computed(() => Array.isArray(activeGraph.value?.interactionProofs))
+const proofToolbarLabel = computed(() => interactionProofsMaterialized.value ? `Proofs: ${interactionProofs.value.length}` : 'Proofs')
 const activeMetrics = computed(() => activeGraph.value?.metrics || null)
 const baseScoreSections = computed(() => activeMetrics.value ? metricsToScoreSections(activeMetrics.value) : [])
 const scoreSections = computed<ScoreSection[]>(() => enrichScoreSections(baseScoreSections.value))
@@ -74,11 +81,15 @@ const layoutModeLabel = computed(() => layoutStrategies.find(strategy => strateg
 const saltReferences = computed(() => saltyCardReferences(cardNodes.value.map(node => node.id)))
 const deckGuideMetrics = computed(() => buildDeckGuideMetrics(cardNodes.value, activeMetrics.value))
 
-const browserGlobals = globalThis as typeof globalThis & { INTERACTION_MODEL?: unknown; DECK_METRICS?: unknown }
+const browserGlobals = globalThis as typeof globalThis & {
+  INTERACTION_MODEL?: unknown
+  DECK_METRICS?: unknown
+  __MTG_INTERACTION_PROOF_PACKAGES__?: { buildInteractionProofPackages?: (cards: GraphNode[]) => InteractionProofPackage[] }
+}
 const metricsNamespace = DECK_METRICS_NAMESPACE as unknown as MetricsModule
 const deckMetrics = normalizeMetricsModule(browserGlobals.DECK_METRICS || metricsNamespace)
 const interactionModel = normalizeInteractionModel(browserGlobals.INTERACTION_MODEL || INTERACTION_MODEL)
-const buildGraph = createBrowserGraphBuilder(interactionModel, deckMetrics)
+const buildGraph = createBrowserGraphBuilder(interactionModel, deckMetrics, { includeInteractionProofs: false })
 const deckImport = useDeckImport({
   buildGraph,
   fetch: globalThis.fetch?.bind(globalThis),
@@ -149,8 +160,28 @@ const scoreBreakdownCategories = computed(() => selectedBreakdownSection.value ?
 const activeBreakdownCategory = computed(() => scoreBreakdownCategories.value.find(category => category.id === selectedBreakdownCategoryId.value) || null)
 const activeBreakdownCards = computed(() => activeBreakdownCategory.value ? categoryCards(activeBreakdownCategory.value) : [])
 const selectedBreakdownNodeIds = computed(() => activeBreakdownCards.value.map(card => card.id))
+const selectedProofPackage = computed(() => selectedProofPackageId.value ? interactionProofs.value.find(pkg => pkg.id === selectedProofPackageId.value) || null : null)
+const selectedProofNodeIds = computed(() => selectedProofPackage.value?.cards || [])
+const highlightedNodeIds = computed(() => [...new Set([...selectedBreakdownNodeIds.value, ...selectedProofNodeIds.value])])
 const scoreModelCategories = computed(() => scoreBreakdownCategories.value.filter(category => category.group === 'score'))
 const graphExploreCategories = computed(() => scoreBreakdownCategories.value.filter(category => category.group !== 'score'))
+const proofFamilyFilters = computed(() => {
+  const counts = new Map<string, { family: string; label: string; count: number }>()
+  for (const proof of interactionProofs.value) {
+    const entry = counts.get(proof.family) || { family: proof.family, label: proof.familyTitle || labelEvent(activeGraph.value || { eventLabels: {} } as DeckGraph, proof.family), count: 0 }
+    entry.count += 1
+    counts.set(proof.family, entry)
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+})
+const proofCardCountFilters = computed(() => {
+  const counts = new Map<number, number>()
+  for (const proof of interactionProofs.value) counts.set(proof.cardCount, (counts.get(proof.cardCount) || 0) + 1)
+  return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([cardCount, count]) => ({ cardCount, count }))
+})
+const filteredInteractionProofs = computed(() => interactionProofs.value
+  .filter(proof => !selectedProofFamily.value || proof.family === selectedProofFamily.value)
+  .filter(proof => !selectedProofCardCount.value || proof.cardCount === selectedProofCardCount.value))
 
 watch(selectedBreakdownId, () => {
   selectedBreakdownCategoryId.value = null
@@ -158,6 +189,7 @@ watch(selectedBreakdownId, () => {
 
 const activeNodeFamilies = computed(() => activeNode.value && activeGraph.value ? nodeFamilies(activeNode.value, activeGraph.value) : [])
 const activeNodeLinks = computed(() => activeNode.value && activeGraph.value ? nodeLinks(activeNode.value, activeGraph.value) : [])
+const activeNodeProofs = computed(() => activeNode.value ? interactionProofs.value.filter(proof => proof.cards.includes(activeNode.value!.id)) : [])
 const activeNodeEvents = computed(() => activeNode.value && activeGraph.value ? eventSummary(activeNode.value, activeGraph.value) : '')
 const activeNodePills = computed(() => {
   const node = activeNode.value
@@ -296,6 +328,7 @@ function selectDeck(tabId: string) {
   activeIndex.value = Number(tabId)
   selectedNodeId.value = null
   selectedFamily.value = null
+  selectedProofPackageId.value = null
   refreshRecommendationsForDeckChange()
 }
 
@@ -320,6 +353,7 @@ function selectScoreSignal(signal: SignalBar) {
 }
 
 function openScoreBreakdown(section: ScoreSection) {
+  if (section.id === 'win') materializeInteractionProofs()
   selectedBreakdownId.value = section.id
 }
 
@@ -331,12 +365,22 @@ function selectBreakdownCategory(category: BreakdownTab) {
   selectedBreakdownCategoryId.value = selectedBreakdownCategoryId.value === category.id ? null : category.id
   selectedFamily.value = null
   selectedNodeId.value = null
+  selectedProofPackageId.value = null
 }
 
 function selectBreakdownRow(row: BreakdownListRow) {
+  if (row.proofId) {
+    const proof = interactionProofs.value.find(pkg => pkg.id === row.proofId)
+    if (proof) {
+      showInteractionProofs.value = true
+      selectProofPackage(proof)
+    }
+    return
+  }
   if (row.family) {
     selectedFamily.value = row.family
     selectedNodeId.value = null
+    selectedProofPackageId.value = null
     return
   }
   const card = row.cards?.[0]
@@ -352,12 +396,14 @@ function closeScoreBreakdown() {
 
 function selectCard(id: string) {
   selectedFamily.value = null
+  selectedProofPackageId.value = null
   selectedNodeId.value = id
 }
 
 function resetView() {
   selectedNodeId.value = null
   selectedFamily.value = null
+  selectedProofPackageId.value = null
   hoveredNodeId.value = null
   hoverPosition.value = null
   searchTerm.value = ''
@@ -385,6 +431,7 @@ async function importDeck(source: DeckImportSource) {
   activeIndex.value = decks.value.length - 1
   selectedNodeId.value = null
   selectedFamily.value = null
+  selectedProofPackageId.value = null
   searchTerm.value = ''
   refreshRecommendationsForDeckChange()
 }
@@ -400,6 +447,73 @@ function dropDeck(event: DragEvent) {
   if (file) void importDeck({ kind: 'file', file })
 }
 
+function clearSelectedProofPackage() {
+  selectedProofPackageId.value = null
+  selectedFamily.value = null
+}
+
+function selectProofFamily(family: string | null) {
+  selectedProofFamily.value = selectedProofFamily.value === family ? null : family
+  clearSelectedProofPackage()
+}
+
+function selectProofCardCount(cardCount: number | null) {
+  selectedProofCardCount.value = selectedProofCardCount.value === cardCount ? null : cardCount
+  clearSelectedProofPackage()
+}
+
+function resetProofFilters() {
+  selectedProofFamily.value = null
+  selectedProofCardCount.value = null
+  clearSelectedProofPackage()
+}
+
+function selectProofPackage(proof: InteractionProofPackage) {
+  const selecting = selectedProofPackageId.value !== proof.id
+  selectedProofPackageId.value = selecting ? proof.id : null
+  selectedFamily.value = selecting ? proof.family : null
+  selectedNodeId.value = null
+  selectedBreakdownCategoryId.value = null
+}
+
+function materializeInteractionProofs() {
+  const deck = activeDeck.value
+  const graph = deck?.graph
+  if (!deck || !graph) return []
+  if (Array.isArray(graph.interactionProofs)) return graph.interactionProofs
+  const packages = browserGlobals.__MTG_INTERACTION_PROOF_PACKAGES__?.buildInteractionProofPackages?.(cardNodes.value) || []
+  decks.value.splice(activeIndex.value, 1, { ...deck, graph: { ...graph, interactionProofs: packages } })
+  return packages
+}
+
+function toggleInteractionProofs() {
+  if (!showInteractionProofs.value) materializeInteractionProofs()
+  showInteractionProofs.value = !showInteractionProofs.value
+}
+
+function proofCardNames(proof: InteractionProofPackage) {
+  return proof.cards.map(shortName).join(' + ')
+}
+
+function proofDeltaText(delta: unknown) {
+  const value = delta && typeof delta === 'object' ? delta as Record<string, unknown> : {}
+  if (value.delta) return `${value.resource || 'resource'} ${value.delta}`
+  if (value.min === value.max) return `${value.resource || 'resource'} ${value.min}`
+  if (value.min != null || value.max != null) return `${value.resource || 'resource'} ${value.min ?? '?'}..${value.max ?? '?'}`
+  return String(delta || '')
+}
+
+function proofStepText(step: { card?: string; action?: string; delta?: unknown; cost?: unknown }) {
+  const suffixes = []
+  if (step.cost) suffixes.push(`cost ${JSON.stringify(step.cost)}`)
+  if (step.delta) suffixes.push(`delta ${JSON.stringify(step.delta)}`)
+  return `${step.card ? `${shortName(step.card)} — ` : ''}${step.action || 'step'}${suffixes.length ? ` (${suffixes.join('; ')})` : ''}`
+}
+
+function proofContributionFacts(contribution: { facts?: string[] }) {
+  return (contribution.facts || []).map(titleCase).join(', ') || 'Inferred from card text'
+}
+
 interface BreakdownListRow {
   id: string
   label: string
@@ -407,6 +521,7 @@ interface BreakdownListRow {
   note?: string
   cards?: string[]
   family?: string
+  proofId?: string
 }
 
 interface BreakdownList {
@@ -436,6 +551,8 @@ function breakdownMetrics(section: ScoreSection, metrics: DeckMetrics): MetricIt
       { id: 'game-changers', label: 'Game Changers', value: metrics.gameChangerCount },
       { id: 'combos', label: 'Detected combos', value: metrics.combos?.length || 0 },
       { id: 'combo-critical', label: 'Combo-critical pairs', value: metrics.comboCriticalPairs?.length || 0 },
+      { id: 'combo-critical-triples', label: 'Combo-critical triples', value: metrics.comboCriticalTriples?.length || 0 },
+      { id: 'interaction-proofs', label: 'Proof packages', value: interactionProofs.value.length },
     )
   } else if (section.id === 'cohesion') {
     rows.push(
@@ -500,6 +617,8 @@ function countLabelForBreakdown(list: BreakdownList): string {
     'game-changers': 'cards',
     combos: 'combos',
     'combo-critical-pairs': 'pairs',
+    'combo-critical-triples': 'triples',
+    'interaction-proofs': 'proofs',
     'top-self-sufficient': 'cards',
     'standalone-signals': 'signals',
   }
@@ -557,6 +676,18 @@ function breakdownLists(section: ScoreSection, metrics: DeckMetrics, graph: Deck
         title: 'Combo-critical pairs',
         description: 'Pairs whose interaction family is considered combo-critical by the graph model.',
         rows: (metrics.comboCriticalPairs || []).map(pair => ({ id: `${pair.a}-${pair.b}-${pair.family}`, label: `${shortName(pair.a)} ↔ ${shortName(pair.b)}`, value: labelEvent(graph, pair.family), cards: [pair.a, pair.b], family: pair.family })),
+      },
+      {
+        id: 'combo-critical-triples',
+        title: 'Combo-critical triples',
+        description: 'Three-card packages assembled from multiple strong interaction families.',
+        rows: (metrics.comboCriticalTriples || []).map((triple, index) => ({ id: `combo-triple-${index}-${triple.family}`, label: triple.cards.map(shortName).join(' + '), value: labelEvent(graph, triple.family), cards: triple.cards, family: triple.family })),
+      },
+      {
+        id: 'interaction-proofs',
+        title: 'Interaction proof packages',
+        description: 'Bounded proof-search packages with cards, sequence, confidence, assumptions, and result.',
+        rows: interactionProofs.value.map(proof => ({ id: proof.id, label: proofCardNames(proof), value: `${proof.cardCount}-card · ${proof.confidence}`, cards: proof.cards, family: proof.family, proofId: proof.id })),
       },
     ].filter(list => list.rows.length)
   }
@@ -770,6 +901,7 @@ function formatBreakdownValue(value: unknown): string | number {
           <ToolbarButton :label="`Gravity: ${layoutModeLabel}`" @click="cycleLayoutMode" />
           <ToolbarButton :label="`Hide isolated: ${hideIsolated ? 'on' : 'off'}`" :active="hideIsolated" @click="hideIsolated = !hideIsolated" />
           <ToolbarButton label="Compare" :active="showCompare" @click="showCompare = true" />
+          <ToolbarButton :label="proofToolbarLabel" :active="showInteractionProofs" @click="toggleInteractionProofs" />
           <ToolbarButton label="Help" :active="showHelp" @click="showHelp = true" />
           <ToolbarButton label="Recommendations" :active="showRecommendations" @click="showRecommendations = !showRecommendations" />
         </div>
@@ -781,7 +913,7 @@ function formatBreakdownValue(value: unknown): string | number {
           :hide-isolated="hideIsolated"
           :search-term="searchTerm"
           :selected-node-id="selectedNodeId"
-          :selected-node-ids="selectedBreakdownNodeIds"
+          :selected-node-ids="highlightedNodeIds"
           :selected-family="selectedFamily"
           :frozen="frozen"
           :role-colors="ROLE_COLORS"
@@ -821,6 +953,69 @@ function formatBreakdownValue(value: unknown): string | number {
           <p v-else class="category-card-drawer__empty">This category has counts but no direct card list.</p>
         </aside>
 
+        <aside v-if="showInteractionProofs" class="proof-drawer" aria-label="Interaction proof packages">
+          <header>
+            <div>
+              <p>Interaction proofs</p>
+              <h2>Proof packages <small>{{ interactionProofs.length }}</small></h2>
+            </div>
+            <button type="button" aria-label="Close interaction proofs" @click="showInteractionProofs = false">×</button>
+          </header>
+          <p>Bounded proof search groups the exact cards, contribution roles, sequence, result, assumptions, confidence, and repeatability notes. Selecting a package highlights all pieces in the graph.</p>
+
+          <div v-if="interactionProofs.length" class="proof-filters" aria-label="Proof filters">
+            <button type="button" :class="{ active: !selectedProofFamily }" @click="selectProofFamily(null)">All families</button>
+            <button v-for="family in proofFamilyFilters" :key="family.family" type="button" :class="{ active: selectedProofFamily === family.family }" @click="selectProofFamily(family.family)">
+              {{ family.label }} <b>{{ family.count }}</b>
+            </button>
+            <button type="button" :class="{ active: !selectedProofCardCount }" @click="selectProofCardCount(null)">All sizes</button>
+            <button v-for="filter in proofCardCountFilters" :key="filter.cardCount" type="button" :class="{ active: selectedProofCardCount === filter.cardCount }" @click="selectProofCardCount(filter.cardCount)">
+              {{ filter.cardCount }} cards <b>{{ filter.count }}</b>
+            </button>
+            <button type="button" @click="resetProofFilters">Reset</button>
+          </div>
+
+          <p v-if="!interactionProofs.length" class="proof-drawer__empty">No bounded proof packages were found for this deck yet. Pair edges and score breakdowns are still available.</p>
+          <p v-else-if="!filteredInteractionProofs.length" class="proof-drawer__empty">No proof packages match the current filters.</p>
+
+          <article
+            v-for="proof in filteredInteractionProofs"
+            :key="proof.id"
+            class="proof-card"
+            :class="{ active: selectedProofPackageId === proof.id }"
+          >
+            <button type="button" class="proof-card__summary" @click="selectProofPackage(proof)">
+              <span>{{ proof.familyTitle }}</span>
+              <strong>{{ proofCardNames(proof) }}</strong>
+              <small>{{ proof.cardCount }} cards · {{ proof.confidence }} confidence · {{ proof.strength }}</small>
+            </button>
+            <div class="proof-card__body">
+              <p><b>Result:</b> {{ proof.result }}</p>
+              <p v-if="proof.repeatability?.reason"><b>Repeatability:</b> {{ proof.repeatability.status || 'candidate' }} — {{ proof.repeatability.reason }}</p>
+              <div v-if="proof.resourceDeltas.length" class="proof-card__chips">
+                <span v-for="delta in proof.resourceDeltas" :key="`${proof.id}-${proofDeltaText(delta)}`">{{ proofDeltaText(delta) }}</span>
+              </div>
+              <h3>Contributions</h3>
+              <ul>
+                <li v-for="contribution in proof.contributions" :key="`${proof.id}-${contribution.card}`">
+                  <button type="button" @click="selectCard(contribution.card)">
+                    <strong>{{ shortName(contribution.card) }}</strong>
+                    <span>{{ titleCase(contribution.role) }} · {{ proofContributionFacts(contribution) }}</span>
+                  </button>
+                </li>
+              </ul>
+              <h3>Sequence</h3>
+              <ol>
+                <li v-for="step in proof.sequence" :key="`${proof.id}-step-${step.index}`">{{ proofStepText(step) }}</li>
+              </ol>
+              <div v-if="proof.assumptions.length || proof.limitingClauses.length" class="proof-card__notes">
+                <p v-if="proof.assumptions.length"><b>Assumptions:</b> {{ proof.assumptions.join('; ') }}</p>
+                <p v-if="proof.limitingClauses.length"><b>Limits:</b> {{ proof.limitingClauses.join('; ') }}</p>
+              </div>
+            </div>
+          </article>
+        </aside>
+
 
         <div v-if="selectedNodeId && activeNode" class="detail-card" role="dialog" aria-label="Card detail">
           <button class="detail-card__close" type="button" aria-label="Close card detail" @click="selectedNodeId = null">×</button>
@@ -838,6 +1033,13 @@ function formatBreakdownValue(value: unknown): string | number {
             <button v-for="link in activeNodeLinks" :key="`${link.card}-${link.family}`" type="button" @click="selectCard(link.card)">
               <span>{{ shortName(link.card) }}</span>
               <small>{{ link.family }}</small>
+            </button>
+          </div>
+          <div v-if="activeNodeProofs.length" class="detail-card__proofs">
+            <h3>Proof packages</h3>
+            <button v-for="proof in activeNodeProofs" :key="proof.id" type="button" @click="showInteractionProofs = true; selectProofPackage(proof)">
+              <span>{{ proof.familyTitle }}</span>
+              <small>{{ proof.cards.length }} cards · {{ proof.confidence }}</small>
             </button>
           </div>
         </div>
@@ -905,4 +1107,7 @@ function formatBreakdownValue(value: unknown): string | number {
 <style scoped>
 :global(*){box-sizing:border-box}:global(html),:global(body),:global(#app){height:100%;margin:0}:global(body){background:#0e0d12;color:#e8e4f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}:global(:root){--bg:#0e0d12;--panel:#17151d;--panel2:#1f1c28;--line:#2c2838;--text:#e8e4f0;--dim:#9a93ac;--accent:#d9434f}.app-shell{display:flex;flex-direction:column;height:100vh;width:100vw}.app-header{align-items:center;background:rgba(14,13,18,.92);border-bottom:1px solid var(--line);display:flex;justify-content:center;min-height:52px;padding:8px 16px;z-index:10}.app-nav{background:var(--panel);border:1px solid var(--line);border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.24);display:flex;gap:4px;padding:4px}.app-nav__item{background:transparent;border:0;border-radius:999px;color:var(--dim);cursor:pointer;font:inherit;font-size:13px;font-weight:700;padding:8px 15px}.app-nav__item:hover,.app-nav__item.active{background:var(--panel2);color:var(--text)}.app-nav__item.active{box-shadow:inset 0 0 0 1px rgba(217,67,79,.55);color:#fff}.app{display:flex;flex:1;min-height:0;width:100vw}.main{flex:1;min-width:0;position:relative}.breakdown-page{align-items:center;display:grid;flex:1;justify-content:center;padding:32px}.breakdown-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 16px 48px rgba(0,0,0,.34);max-width:620px;padding:32px;text-align:center}.breakdown-card__eyebrow{color:var(--accent);font-size:12px;font-weight:800;letter-spacing:.08em;margin:0 0 8px;text-transform:uppercase}.breakdown-card h1{font-size:34px;margin:0 0 10px}.breakdown-card p:last-child{color:var(--dim);line-height:1.5;margin:0}.loading-state{align-items:center;background:rgba(8,7,11,.78);display:grid;gap:9px;inset:0;justify-content:center;place-content:center;position:absolute;text-align:center;z-index:7}.loading-state>div:not(.spinner){background:rgba(23,21,29,.95);border:1px solid var(--line);border-radius:10px;padding:8px 14px}.loading-state__count{color:var(--dim);font-size:12px}.spinner{animation:spin .8s linear infinite;border:3px solid #44394f;border-top-color:var(--accent);border-radius:50%;height:34px;margin:auto;width:34px}.drop-overlay{align-items:center;background:rgba(14,13,18,.78);border:2px dashed var(--accent);display:flex;inset:0;justify-content:center;position:absolute;z-index:9}.drop-overlay div{background:var(--panel);border:1px solid var(--line);border-radius:14px;font-size:18px;padding:20px 28px}.topbar{align-items:center;display:flex;flex-wrap:wrap;gap:8px;left:14px;max-width:68%;position:absolute;top:14px;z-index:5}.hint{bottom:12px;color:var(--dim);font-size:11px;left:50%;pointer-events:none;position:absolute;transform:translateX(-50%);z-index:4}.search-box{border-top:1px solid var(--line);display:grid;gap:6px;font-size:11px;margin:8px -16px 0;padding:10px 16px;text-transform:uppercase;color:var(--dim)}.search-box input,:global(input),:global(select),:global(textarea){background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);font:inherit;font-size:12px;padding:7px 9px}.search-box input:focus,:global(input:focus),:global(select:focus),:global(textarea:focus){border-color:var(--accent);outline:none}.deck-tabs-add{background:rgba(255,255,255,.025);border:1px dashed var(--line);border-radius:10px;color:var(--text);display:grid;gap:8px;grid-template-columns:auto 1fr;padding:8px}.deck-tabs-add:hover{border-color:rgba(217,67,79,.55)}.deck-tabs-add__index{align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:999px;color:var(--dim);display:inline-flex;font-size:11px;font-weight:800;height:22px;justify-content:center;line-height:1;width:22px}.deck-tabs-add__body{display:grid;gap:7px;min-width:0}:global(.deck-tabs-add .import-controls){align-items:stretch;display:grid;gap:6px;grid-template-columns:1fr}:global(.deck-tabs-add .import-controls__url input),:global(.deck-tabs-add textarea){min-width:0;width:100%}:global(.deck-tabs-add .btn){justify-content:center;text-align:center;width:100%}.score-breakdown-button{font-size:11px;justify-content:center;margin-top:8px;width:100%}.breakdown-drawer{background:rgba(23,21,29,.97);border-right:1px solid var(--line);box-shadow:10px 0 30px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:12px;max-width:380px;min-width:340px;overflow:auto;padding:14px;width:26vw;z-index:4}.breakdown-drawer__header{align-items:flex-start;display:flex;gap:10px;justify-content:space-between}.breakdown-drawer__header p{color:var(--dim);font-size:11px;font-weight:800;letter-spacing:.08em;margin:0;text-transform:uppercase}.breakdown-drawer__header h2{font-size:28px;line-height:1;margin:4px 0 0}.breakdown-drawer__header small{color:var(--dim);font-size:12px;letter-spacing:.08em;text-transform:uppercase}.breakdown-drawer__header button,.category-card-drawer header button{background:transparent;border:0;color:var(--dim);cursor:pointer;font-size:24px;line-height:1}.breakdown-drawer__header button:hover,.category-card-drawer header button:hover{color:var(--text)}.breakdown-drawer__summary,.breakdown-drawer__section>p,.category-card-drawer>p{color:var(--dim);font-size:12px;line-height:1.4;margin:0}.breakdown-drawer__section{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:12px;padding:12px}.breakdown-drawer__section h3{font-size:12px;letter-spacing:.08em;margin:0 0 6px;text-transform:uppercase}.breakdown-drawer__definitions{border-top:1px solid var(--line);display:grid;gap:8px;margin:10px 0 0;padding-top:10px}.breakdown-drawer__definitions dt{color:var(--text);font-size:11px;font-weight:800;text-transform:uppercase}.breakdown-drawer__definitions dd{color:var(--dim);font-size:12px;line-height:1.35;margin:2px 0 0}.breakdown-category{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:10px;color:var(--text);cursor:pointer;display:grid;font:inherit;gap:4px;grid-template-columns:minmax(0,1fr) auto;margin-top:7px;padding:9px;text-align:left;width:100%}.breakdown-category:hover,.breakdown-category.active{border-color:rgba(90,166,255,.45)}.breakdown-category b{background:rgba(90,166,255,.14);border-radius:999px;color:#9cc8ff;font-size:11px;padding:2px 7px}.breakdown-category small{color:var(--dim);font-size:11px;grid-column:1 / -1;line-height:1.35}.breakdown-row-list{display:grid;gap:6px;list-style:none;margin:8px 0 0;padding:0}.breakdown-row-list button{background:rgba(255,255,255,.035);border:1px solid transparent;border-radius:8px;color:var(--text);cursor:pointer;display:grid;font:inherit;font-size:12px;gap:2px 8px;grid-template-columns:minmax(0,1fr) auto;padding:7px 9px;text-align:left;width:100%}.breakdown-row-list button:hover{border-color:var(--accent)}.breakdown-row-list strong{color:#9cc8ff}.breakdown-row-list small{color:var(--dim);grid-column:1 / -1}.category-card-drawer{background:rgba(23,21,29,.96);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 48px rgba(0,0,0,.5);display:grid;gap:10px;max-height:calc(100vh - 96px);max-width:360px;overflow:auto;padding:14px;position:absolute;right:14px;top:64px;width:360px;z-index:6}.category-card-drawer header{align-items:flex-start;display:flex;gap:10px;justify-content:space-between}.category-card-drawer header p{color:var(--dim);font-size:11px;font-weight:800;letter-spacing:.08em;margin:0;text-transform:uppercase}.category-card-drawer h2{font-size:17px;line-height:1.2;margin:3px 0 0}.category-card-drawer h2 small{color:#9cc8ff;font-size:12px}.category-card-drawer__cards{display:grid;gap:7px}.category-card-drawer__cards button{background:rgba(255,255,255,.035);border:1px solid transparent;border-radius:9px;color:var(--text);cursor:pointer;display:grid;gap:3px;padding:9px;text-align:left}.category-card-drawer__cards button:hover{border-color:var(--accent)}.category-card-drawer__cards span,.category-card-drawer__cards small,.category-card-drawer__empty{color:var(--dim);font-size:11px;line-height:1.35}.score-breakdown{display:grid;gap:14px}.score-breakdown__hero{align-items:start;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;display:grid;gap:12px;grid-template-columns:auto 1fr;padding:14px}.score-breakdown__eyebrow{color:var(--dim);font-size:11px;font-weight:800;letter-spacing:.08em;margin:0;text-transform:uppercase}.score-breakdown__hero h3{font-size:42px;line-height:1;margin:4px 0 0}.score-breakdown__hero h3 small{color:var(--dim);font-size:13px;letter-spacing:.08em;text-transform:uppercase}.score-breakdown__hero p{color:#cfc8dc;line-height:1.45;margin:0}.score-breakdown__section{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:12px;padding:12px}.score-breakdown__section h4{font-size:13px;margin:0 0 4px;text-transform:uppercase}.score-breakdown__section p{color:var(--dim);font-size:12px;margin:0}.score-breakdown__definitions{border-top:1px solid var(--line);display:grid;gap:8px;margin:10px 0 0;padding-top:10px}.score-breakdown__definitions div{display:grid;gap:2px}.score-breakdown__definitions dt{color:var(--text);font-size:11px;font-weight:800;text-transform:uppercase}.score-breakdown__definitions dd{color:var(--dim);font-size:12px;line-height:1.35;margin:0}.score-breakdown__tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.score-breakdown__tab{align-items:center;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:999px;color:var(--dim);cursor:pointer;display:inline-flex;font:inherit;font-size:12px;font-weight:800;gap:7px;padding:6px 10px}.score-breakdown__tab[aria-selected=true]{background:rgba(90,166,255,.13);border-color:rgba(90,166,255,.35);color:var(--text)}.score-breakdown__tab b{background:rgba(255,255,255,.1);border-radius:999px;color:#9cc8ff;font-size:11px;line-height:1;padding:3px 6px}.score-breakdown__tabpanel{margin-top:10px}.score-breakdown__list{display:grid;gap:6px;list-style:none;margin:10px 0 0;padding:0}.score-breakdown__list li{align-items:center;background:rgba(255,255,255,.035);border-radius:8px;display:grid;gap:2px 8px;grid-template-columns:minmax(0,1fr) auto;padding:7px 9px}.score-breakdown__list strong{color:#9cc8ff;font-size:12px;text-align:right}.score-breakdown__list small{color:var(--dim);font-size:11px;grid-column:1 / -1}.node-tip{background:rgba(23,21,29,.96);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.45);max-width:320px;padding:10px 12px;pointer-events:none;position:absolute;z-index:8}.node-tip__role{font-size:9px;font-weight:700;text-transform:uppercase}.node-tip strong{display:block;font-size:13px;margin-top:2px}.node-tip small{color:var(--dim);display:block;font-size:11px}.node-tip p{color:#cfc8dc;font-size:11px;line-height:1.35;margin:7px 0 0;white-space:pre-line}.detail-card{background:rgba(23,21,29,.95);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);max-width:380px;padding:14px;position:absolute;right:14px;top:64px;z-index:6}.detail-card__close{background:transparent;border:0;color:var(--dim);cursor:pointer;float:right;font-size:20px}.detail-card h2{font-size:16px;margin:0 24px 8px 0}.detail-card__pills,.detail-card__families,.family-chips{display:flex;flex-wrap:wrap;gap:6px}.detail-card__pills span,.family-chip{border-radius:999px;font-size:10px;padding:2px 7px}.family-chip{background:rgba(90,166,255,.14);color:#9cc8ff}.detail-card__events{color:#cfc8dc;font-size:11px;line-height:1.35;margin:8px 0;white-space:pre-line}.detail-card__text{font-size:12px;line-height:1.4;margin:8px 0;max-height:150px;overflow:auto}.detail-card__links{border-top:1px solid var(--line);display:grid;gap:5px;margin-top:10px;padding-top:8px}.detail-card__links h3{color:var(--dim);font-size:11px;letter-spacing:.04em;margin:0;text-transform:uppercase}.detail-card__links button{align-items:center;background:rgba(255,255,255,.04);border:1px solid transparent;border-radius:7px;color:var(--text);cursor:pointer;display:flex;justify-content:space-between;padding:6px 8px;text-align:left}.detail-card__links button:hover{border-color:var(--accent)}.detail-card__links small{color:var(--dim);margin-left:8px}.compare-table{border-collapse:collapse;margin-top:12px;width:100%}.compare-table th,.compare-table td{border-top:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}.compare-table th{color:var(--dim);font-size:11px;text-transform:uppercase}.compare-table td{font-variant-numeric:tabular-nums}.compare-table td.active,.compare-table tr.active td{color:#f0c040}.compare-table__section th{background:var(--panel2);color:var(--text);letter-spacing:.04em}.help-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.help-grid section{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:12px}.help-grid h3{margin:0 0 6px}.help-grid p{color:#cfc8dc;font-size:13px;line-height:1.45;margin:0}.btn,:global(.btn){align-items:center;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:8px;color:var(--text);cursor:pointer;display:inline-flex;font-size:12px;font-weight:700;gap:6px;padding:7px 12px;text-decoration:none}.btn:hover,.btn.active,:global(.btn:hover),:global(.btn.active){border-color:var(--accent);box-shadow:0 0 0 1px rgba(217,67,79,.22)}.btn:disabled,:global(.btn:disabled){cursor:not-allowed;opacity:.55}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:860px){:global(body){overflow:auto;overscroll-behavior:none}.app-shell{height:auto;min-height:100dvh;width:100%;overflow-x:hidden}.app-header{justify-content:flex-start;min-height:50px;padding:7px 10px;position:sticky;top:0}.app-nav{max-width:100%;overflow:auto}.app-nav__item{white-space:nowrap}.app{display:flex;flex-direction:column;min-height:calc(100dvh - 50px);width:100%}.main{display:flex;flex:1;flex-direction:column;min-height:56dvh;overflow:hidden}.topbar{background:rgba(14,13,18,.86);border-bottom:1px solid var(--line);display:grid;gap:6px;grid-template-columns:repeat(2,minmax(0,1fr));left:auto;max-width:none;order:0;padding:8px;position:relative;top:auto;width:100%;z-index:6}.topbar :global(.toolbar-button){justify-content:center;min-height:36px;width:100%}:global(.graph-canvas-shell){flex:1;height:auto;min-height:360px;order:1}.hint{background:rgba(14,13,18,.78);bottom:6px;border-radius:999px;font-size:10px;max-width:calc(100% - 20px);overflow:hidden;padding:4px 8px;text-overflow:ellipsis;white-space:nowrap}.breakdown-drawer{border-bottom:1px solid var(--line);border-right:0;box-shadow:0 10px 30px rgba(0,0,0,.25);max-height:46dvh;max-width:none;min-width:0;width:100%}.category-card-drawer,.detail-card{border-radius:14px 14px 0 0;bottom:0;left:8px;max-height:48dvh;max-width:none;overflow:auto;position:fixed;right:8px;top:auto;width:auto}.node-tip{display:none}.compare-table{display:block;max-width:100%;overflow-x:auto;white-space:nowrap}.breakdown-page{min-height:calc(100dvh - 50px);padding:18px}.breakdown-card{padding:22px}.score-breakdown__hero{grid-template-columns:1fr}}
 @media(max-width:520px){.app-nav{border-radius:14px;width:100%}.app-nav__item{flex:1;padding:8px 10px}.topbar{grid-template-columns:1fr}.deck-tabs-add{grid-template-columns:1fr}.deck-tabs-add__index{display:none}.search-box{margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px}.breakdown-drawer{max-height:52dvh;padding:10px}.breakdown-category{grid-template-columns:1fr}.breakdown-category b{justify-self:start}.category-card-drawer,.detail-card{left:0;right:0}.detail-card__links button{align-items:flex-start;display:grid;gap:2px}.detail-card__links small{margin-left:0}.help-grid{grid-template-columns:1fr}.drop-overlay div{font-size:15px;margin:12px;text-align:center}.breakdown-card h1{font-size:28px}}
+.proof-drawer{background:rgba(17,15,23,.97);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 48px rgba(0,0,0,.52);display:grid;gap:10px;max-height:calc(100vh - 96px);max-width:430px;overflow:auto;padding:14px;position:absolute;right:14px;top:64px;width:430px;z-index:7}.proof-drawer header{align-items:flex-start;display:flex;gap:10px;justify-content:space-between}.proof-drawer header p{color:var(--dim);font-size:11px;font-weight:800;letter-spacing:.08em;margin:0;text-transform:uppercase}.proof-drawer h2{font-size:18px;line-height:1.2;margin:3px 0 0}.proof-drawer h2 small{color:#ffbf7a;font-size:12px}.proof-drawer header button{background:transparent;border:0;color:var(--dim);cursor:pointer;font-size:24px;line-height:1}.proof-drawer header button:hover{color:var(--text)}.proof-drawer>p,.proof-drawer__empty{color:var(--dim);font-size:12px;line-height:1.4;margin:0}.proof-filters{display:flex;flex-wrap:wrap;gap:6px}.proof-filters button{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:999px;color:var(--dim);cursor:pointer;font:inherit;font-size:11px;font-weight:800;padding:5px 8px}.proof-filters button.active,.proof-filters button:hover{border-color:#ffbf7a;color:var(--text)}.proof-filters b{color:#ffbf7a}.proof-card{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:12px;display:grid;overflow:hidden}.proof-card.active{border-color:#ffbf7a;box-shadow:0 0 0 1px rgba(255,191,122,.18)}.proof-card__summary{background:rgba(255,255,255,.035);border:0;color:var(--text);cursor:pointer;display:grid;font:inherit;gap:3px;padding:10px;text-align:left;width:100%}.proof-card__summary span{color:#ffbf7a;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.proof-card__summary strong{font-size:13px}.proof-card__summary small{color:var(--dim);font-size:11px}.proof-card__body{display:grid;gap:8px;padding:10px}.proof-card__body p{color:#cfc8dc;font-size:12px;line-height:1.35;margin:0}.proof-card__body h3{color:var(--dim);font-size:11px;letter-spacing:.06em;margin:4px 0 0;text-transform:uppercase}.proof-card__body ul,.proof-card__body ol{display:grid;gap:5px;margin:0;padding-left:18px}.proof-card__body li{color:#cfc8dc;font-size:12px;line-height:1.35}.proof-card__body li button{background:rgba(255,255,255,.035);border:1px solid transparent;border-radius:8px;color:var(--text);cursor:pointer;display:grid;font:inherit;gap:2px;padding:7px;text-align:left;width:100%}.proof-card__body li button:hover{border-color:var(--accent)}.proof-card__body li span{color:var(--dim);font-size:11px}.proof-card__chips{display:flex;flex-wrap:wrap;gap:5px}.proof-card__chips span{background:rgba(255,191,122,.13);border-radius:999px;color:#ffcf9b;font-size:10px;font-weight:800;padding:3px 7px}.proof-card__notes{border-top:1px solid var(--line);display:grid;gap:5px;padding-top:8px}.detail-card__proofs{border-top:1px solid var(--line);display:grid;gap:5px;margin-top:10px;padding-top:8px}.detail-card__proofs h3{color:var(--dim);font-size:11px;letter-spacing:.04em;margin:0;text-transform:uppercase}.detail-card__proofs button{align-items:center;background:rgba(255,255,255,.04);border:1px solid transparent;border-radius:7px;color:var(--text);cursor:pointer;display:flex;justify-content:space-between;padding:6px 8px;text-align:left}.detail-card__proofs button:hover{border-color:var(--accent)}.detail-card__proofs small{color:var(--dim);margin-left:8px}
+@media(max-width:860px){.proof-drawer{border-radius:14px 14px 0 0;bottom:0;left:8px;max-height:60dvh;max-width:none;overflow:auto;position:fixed;right:8px;top:auto;width:auto}}
+@media(max-width:520px){.proof-drawer{left:0;right:0}.detail-card__proofs button{align-items:flex-start;display:grid;gap:2px}.detail-card__proofs small{margin-left:0}}
 </style>

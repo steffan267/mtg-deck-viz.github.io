@@ -3,12 +3,17 @@ import type { InteractionModelModule } from './adapters/interactionModel'
 import type { MetricsModule } from '../types'
 import { graphNodeFromResolvedCard, interactionEvents } from './adapters/interactionModel'
 
+export interface BrowserGraphBuilderOptions {
+  includeInteractionProofs?: boolean
+  buildInteractionProofPackages?: (cards: GraphNode[]) => DeckGraph['interactionProofs']
+}
+
 function isCommanderish(node: GraphNode): boolean {
   const type = node.type.toLowerCase()
   return type.includes('legendary') && (type.includes('creature') || type.includes('planeswalker'))
 }
 
-export function createBrowserGraphBuilder(model: InteractionModelModule, metrics: MetricsModule) {
+export function createBrowserGraphBuilder(model: InteractionModelModule, metrics: MetricsModule, options: BrowserGraphBuilderOptions = {}) {
   return function buildGraph(cards: ResolvedDeckCard[], onProgress?: (done: number, total: number) => void): DeckGraph {
     const nodes: GraphNode[] = []
     const missing: string[] = []
@@ -68,6 +73,7 @@ export function createBrowserGraphBuilder(model: InteractionModelModule, metrics
 
     const zoneEdges = nodes.flatMap(node => (node.zones || []).map(zone => ({ source: node.id, target: zone })))
     const graph: DeckGraph = { nodes: [...nodes, ...zoneNodes], edges, zoneEdges, zones: model.ZONES, eventLabels: model.EVENT_LABEL, missing }
+    if (options.includeInteractionProofs) graph.interactionProofs = options.buildInteractionProofPackages?.(nodes) || []
     graph.metrics = metrics.compute(graph)
     return graph
   }

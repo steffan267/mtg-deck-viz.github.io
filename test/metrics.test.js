@@ -195,6 +195,36 @@ function main() {
   assert.equal(earlyCombo.bracketHint, 4, 'cheap two-card infinites are above the Bracket 3 late-game exception');
   assert.deepEqual(earlyCombo.commanderBracket.flags.earlyComboPairs[0].cards, ['Cheap Engine A', 'Cheap Engine B']);
 
+  const topLoopCombo = METRICS.compute(graph([
+    card({ id: 'Self Top Draw Artifact', cmc: 1, text: '{1}: Draw a card, then put this artifact on top of its owner’s library.', edh: null }),
+    card({ id: 'Artifact Spell Reducer', cmc: 2, text: 'Artifact spells you cast cost {1} less to cast.', edh: null }),
+    card({ id: 'Artifact Top Caster', cmc: 4, text: 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', edh: null }),
+    card({ id: 'Island', role: 'land', qty: 97, edh: null }),
+  ], [
+    { source: 'Artifact Spell Reducer', target: 'Self Top Draw Artifact', interactions: [{ kind: 'enablement', direction: 'A→B', strength: 'strong', family: 'artifact-cost-reduction→top-loop-piece' }] },
+    { source: 'Artifact Top Caster', target: 'Self Top Draw Artifact', interactions: [{ kind: 'enablement', direction: 'A→B', strength: 'strong', family: 'cast-from-top→top-loop-piece' }] },
+  ]));
+  assert.equal(topLoopCombo.hasCombo, true, 'three-card artifact top loop should count as a combo');
+  assert.deepEqual(topLoopCombo.comboCriticalTriples[0].cards, ['Artifact Spell Reducer', 'Artifact Top Caster', 'Self Top Draw Artifact']);
+  assert.equal(topLoopCombo.comboCriticalTriples[0].family, 'artifact-top-cost-reduction-loop');
+  assert.deepEqual(topLoopCombo.commanderBracket.flags.comboPairs, [], 'three-card combos must not be reclassified as two-card pairs');
+  assert.deepEqual(topLoopCombo.commanderBracket.flags.comboTriples[0].cards, ['Artifact Spell Reducer', 'Artifact Top Caster', 'Self Top Draw Artifact']);
+  assert.equal(topLoopCombo.bracketHint, 3, 'three-card combo should not trigger the early two-card Bracket 4 rule');
+  assert.ok(!topLoopCombo.commanderBracket.ruleBreaks.includes('early two-card infinite combo'));
+
+  const reciprocalLoop = METRICS.compute(graph([
+    card({ id: 'Loss Converts To Gain', cmc: 5, text: 'Whenever an opponent loses life, you gain that much life.', edh: null }),
+    card({ id: 'Gain Converts To Loss', cmc: 5, text: 'Whenever you gain life, target opponent loses that much life.', edh: null }),
+    card({ id: 'Swamp', role: 'land', qty: 98, edh: null }),
+  ], [
+    { source: 'Loss Converts To Gain', target: 'Gain Converts To Loss', interactions: [
+      { kind: 'enablement', direction: 'A→B', strength: 'combo-critical', family: 'lifeloss→lifegain-loop' },
+      { kind: 'enablement', direction: 'B→A', strength: 'combo-critical', family: 'lifegain→lifeloss-loop' },
+    ] },
+  ]));
+  assert.equal(reciprocalLoop.comboCriticalPairs.length, 1, 'reciprocal families should count as one unique combo pair');
+  assert.deepEqual(reciprocalLoop.comboCriticalPairs[0].families, ['lifeloss→lifegain-loop', 'lifegain→lifeloss-loop']);
+
   // --- plain-English summary names the win path so the score reads as a story
   assert.match(tuned.winSummary, /finisher|combo/i, `summary should describe the win path: "${tuned.winSummary}"`);
   assert.match(combat.winSummary, /combat/i, `combat deck summary should mention combat: "${combat.winSummary}"`);

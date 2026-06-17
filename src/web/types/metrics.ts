@@ -1,4 +1,4 @@
-import type { ComboCriticalPair, CommanderBracketResult } from './graph'
+import type { ComboCriticalPair, ComboCriticalTriple, CommanderBracketResult } from './graph'
 
 export interface WeightedCardRef {
   id: string
@@ -57,6 +57,7 @@ export interface DeckMetrics {
   eventCounts: Record<string, number>
   combos: string[][]
   comboCriticalPairs: ComboCriticalPair[]
+  comboCriticalTriples: ComboCriticalTriple[]
   hasCombo: boolean
   cohesionScore: number
   cohesionBand: string

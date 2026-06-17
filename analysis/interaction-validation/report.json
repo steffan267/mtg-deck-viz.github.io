@@ -1,0 +1,325 @@
+{
+  "schemaVersion": "interaction-validation-report.v1",
+  "corpusVersion": "interaction-validation-corpus.v1",
+  "runtime": {
+    "measuredSeparately": true,
+    "budgetMs": 250
+  },
+  "summary": {
+    "caseCount": 11,
+    "positiveCount": 7,
+    "negativeCount": 4,
+    "truePositives": 6,
+    "falseNegatives": 1,
+    "falsePositives": 0,
+    "recall": 0.857,
+    "twoCardRecall": 0.667,
+    "threeCardRecall": 1,
+    "sampledPrecision": 1,
+    "falsePositiveHubRate": 0,
+    "unexplainedRate": 0.091,
+    "averageProofConfidence": 0.75
+  },
+  "rows": [
+    {
+      "id": "known-combo-aristocrats-token",
+      "sourceType": "known-combo-seed",
+      "cardCount": 3,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "aristocrats-body-outlet-payoff"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "aristocrats-body-outlet-payoff"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-token-modifier-payoff",
+      "sourceType": "known-combo-seed",
+      "cardCount": 3,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "token-source-modifier-payoff"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "token-source-modifier-payoff"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-gap-library-exile-win",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "library-exile-empty-library-win"
+      ],
+      "actualStatus": "no-proof",
+      "actualFamilies": [],
+      "pass": false,
+      "confidence": 0,
+      "rejectionReasons": []
+    },
+    {
+      "id": "negative-one-shot-blink",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "blink effect is not repeatable"
+      ]
+    },
+    {
+      "id": "negative-reducer-scope-rock",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "no-proof",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": []
+    },
+    {
+      "id": "negative-token-reminder-overreach",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "no-proof",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": []
+    },
+    {
+      "id": "negative-unreplenished-aristocrats",
+      "sourceType": "negative-near-miss",
+      "cardCount": 3,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "body is not replenished by the package"
+      ]
+    },
+    {
+      "id": "spellbook-seed-artifact-top-loop",
+      "sourceType": "commander-spellbook-seed",
+      "cardCount": 3,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "artifact-top-cost-reduction-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "artifact-top-cost-reduction-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "spellbook-seed-deadeye-drake",
+      "sourceType": "commander-spellbook-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "blink-etb-land-untap-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "blink-etb-land-untap-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "spellbook-seed-lifegain-lifeloss",
+      "sourceType": "commander-spellbook-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "lifegain-lifeloss-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "lifegain-lifeloss-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "spellbook-seed-self-untap-mana",
+      "sourceType": "commander-spellbook-seed",
+      "cardCount": 1,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "self-untap-mana-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "self-untap-mana-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    }
+  ],
+  "sourceCoverage": [
+    {
+      "id": "commander-spellbook-seeds",
+      "type": "combo-database-seed",
+      "status": "local-fixtures",
+      "purpose": "Positive recall seeds for canonical 1-card, 2-card, and 3-card combo families.",
+      "caseSourceType": "commander-spellbook-seed",
+      "caseCount": 4
+    },
+    {
+      "id": "known-combo-seeds",
+      "type": "known-combo-deck-seed",
+      "status": "local-fixtures",
+      "purpose": "Known combo-deck packages and an explicit known gap for regression tracking.",
+      "caseSourceType": "known-combo-seed",
+      "caseCount": 3
+    },
+    {
+      "id": "negative-near-misses",
+      "type": "negative-corpus",
+      "status": "local-fixtures",
+      "purpose": "Precision guards for one-shot effects, scoped reducers, unreplenished bodies, and token reminder overreach.",
+      "caseSourceType": "negative-near-miss",
+      "caseCount": 4
+    },
+    {
+      "id": "precon-sample-100",
+      "type": "precon-sample",
+      "status": "checked-in-summary",
+      "purpose": "Precon hub/false-positive smoke source with combo-pair and top-family summaries.",
+      "source": "data/precon-results.json",
+      "sourceStatus": "ok",
+      "deckCount": 100,
+      "comboDeckCount": 1,
+      "comboPairCount": 4,
+      "topFamilies": [
+        {
+          "family": "ramp→sink",
+          "count": 5449
+        },
+        {
+          "family": "lord→tribe",
+          "count": 4052
+        },
+        {
+          "family": "tribal-count→payoff",
+          "count": 3284
+        },
+        {
+          "family": "graveyard",
+          "count": 3106
+        },
+        {
+          "family": "sac-fodder→outlet",
+          "count": 2990
+        }
+      ]
+    },
+    {
+      "id": "moxfield-bracket-464",
+      "type": "moxfield-bracket-sample",
+      "status": "checked-in-summary",
+      "purpose": "Moxfield bracket calibration source for runtime/precision sampling across power bands.",
+      "source": "analysis/bracket/moxfield-bracket-corpus.json",
+      "sourceStatus": "ok",
+      "deckCount": 464,
+      "failedDeckCount": 0,
+      "complete": true,
+      "brackets": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "casual-synergy-audit-96",
+      "type": "casual-synergy-audit",
+      "status": "checked-in-summary",
+      "purpose": "Casual/precon evaluator audit that records false-positive hubs and missed mechanic families.",
+      "source": "data/AUDIT-100-decks-round5-FINAL.json",
+      "sourceStatus": "ok",
+      "evaluationCount": 96,
+      "verdictCounts": {
+        "accurate": 67,
+        "too-high": 9,
+        "too-low": 20
+      },
+      "topFalsePositivePatterns": [
+        "ramp→sink combinatorial blowup: every mana rock/dork is edged to every X-spell or mana-using card, producing a near-complete bipartite fan that is present in essentially every Commander deck and is not deck-specific synergy. It is the single most frequently-cited false positive and dominates edge counts (e.g. 198 of 358 edges in Eldrazi Incursion, 605 family-instances in Divine Convocation, 170 in Token Triumph, 126 in Hail Caesar).",
+        "lord→tribe fires without checking the lord's actual buff condition or whether the card is a lord at all: legendary-only anthems (Bastion Protector), single-type lords (Cat/Dog/Knight/Spirit lords), global combat anthems (Beastmaster Ascension, Skyhunter Strike Force), and token-making planeswalkers/creatures (Elspeth Sun's Champion, Vivien Reid, Esika) get wired to the entire creature base. Often the deck's highest-degree false hub.",
+        "Undirected 'graveyard' mega-clique: every card that touches the yard (self-mill cantrips, recursion, reanimation, graveyard-hate) is edged to every other, conflating fuel↔fuel, enabler↔payoff, and incidental text. Inflates edge count massively (702 in Sultai Arisen, 485/530 in Revenant Recon, 245 in Death Toll, 215 in Desert Bloom) while hiding the real mill→reanimate / mill→size-payoff direction."
+      ]
+    }
+  ],
+  "deckSmoke": [
+    {
+      "id": "sample-xantcha",
+      "status": "ok",
+      "source": "analysis/interaction-baseline/interaction-baseline.json",
+      "baselineDeckId": "sample-xantcha",
+      "edgeCount": 148,
+      "comboCriticalPairCount": 0,
+      "comboCriticalTripleCount": 0,
+      "highFanoutFamilies": [
+        {
+          "family": "draw",
+          "count": 42
+        },
+        {
+          "family": "ramp→sink",
+          "count": 42
+        }
+      ],
+      "weakInteractionShare": 0.937
+    }
+  ],
+  "manualAudit": {
+    "topMissedCombos": [
+      "known-gap-library-exile-win"
+    ],
+    "topFalsePositives": [],
+    "suspiciousHubs": [
+      {
+        "deckId": "sample-xantcha",
+        "family": "draw",
+        "count": 42
+      },
+      {
+        "deckId": "sample-xantcha",
+        "family": "ramp→sink",
+        "count": 42
+      }
+    ],
+    "lowConfidenceProofs": [],
+    "cardsWithUnknownClauses": []
+  }
+}

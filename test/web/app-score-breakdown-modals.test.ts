@@ -18,6 +18,33 @@ function deck() {
       edges: [
         { source: 'Sol Ring', target: 'Xantcha, Sleeper Agent', interactions: [{ family: 'mana→activated-ability', strength: 'moderate' }], events: ['mana→activated-ability'] },
       ],
+      interactionProofs: [
+        {
+          id: 'proof:mana-xantcha',
+          family: 'mana→activated-ability',
+          familyTitle: 'Mana into activated ability',
+          cards: ['Sol Ring', 'Xantcha, Sleeper Agent'],
+          cardCount: 2,
+          status: 'proven',
+          confidence: 'pattern',
+          strength: 'strong',
+          result: 'cards 1; opponentLife -2',
+          repeatability: { status: 'repeatable-candidate', reason: 'Sol Ring can help pay Xantcha activations.' },
+          assumptions: ['Xantcha remains under an opponent’s control.'],
+          limitingClauses: ['Mana payment is bounded by available untaps.'],
+          resourceDeltas: [{ resource: 'cards', min: 1, max: 1 }],
+          sequence: [
+            { index: 1, card: 'Sol Ring', action: 'adds mana', delta: { mana: 2 } },
+            { index: 2, card: 'Xantcha, Sleeper Agent', action: 'spends mana on the activated ability', delta: { cards: 1 } },
+          ],
+          contributions: [
+            { card: 'Sol Ring', role: 'mana source', facts: ['taps-for-mana'], text: 'Add two colorless mana.' },
+            { card: 'Xantcha, Sleeper Agent', role: 'payoff', facts: ['has-creature-activated-ability'], text: 'Any player may activate this ability.' },
+          ],
+          evidence: [],
+          hyperedgeIds: [],
+        },
+      ],
       eventLabels: { 'mana→activated-ability': 'Mana enables activated abilities' },
       metrics: {
         nonlandCount: 3,
@@ -114,10 +141,11 @@ describe('App score breakdown drawers', () => {
     expect(wrapper.find('.breakdown-drawer').text()).not.toContain('Fast mana, ramp, and low setup cost')
     expect(wrapper.findAll('.breakdown-drawer .signal-row--button').find(button => button.text().includes('Speed'))!.attributes('title')).toContain('Fast mana, ramp, and low setup cost')
     expect(wrapper.findAll('.breakdown-category').map(button => button.text())).toEqual(expect.arrayContaining([
-      expect.stringMatching(/Win tuning score factors\s*8 metrics/i),
+      expect.stringMatching(/Win tuning score factors\s*10 metrics/i),
       expect.stringMatching(/Win-tuning signal cards\s*4 cards/i),
       expect.stringMatching(/Game Changers\s*1 cards/i),
       expect.stringMatching(/Detected combos\s*1 combos/i),
+      expect.stringMatching(/Interaction proof packages\s*1 proofs/i),
     ]))
 
     await wrapper.findAll('.breakdown-category').find(button => button.text().includes('Detected combos'))!.trigger('click')
@@ -186,6 +214,70 @@ describe('App score breakdown drawers', () => {
     await nextTick()
     expect((wrapper.vm as any).selectedFamily).toBe('mana→activated-ability')
     expect(wrapper.find('.breakdown-drawer').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('opens proof packages with filters, sequence, assumptions, and card contribution links', async () => {
+    const { default: App } = await import('../../src/web/App.vue')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flush()
+    await nextTick()
+
+    await wrapper.findAll('.toolbar-button').find(button => button.text().includes('Proofs: 1'))!.trigger('click')
+    await nextTick()
+
+    const drawer = wrapper.find('.proof-drawer')
+    expect(drawer.exists()).toBe(true)
+    expect(drawer.text()).toContain('Mana into activated ability')
+    expect(drawer.text()).toContain('cards 1; opponentLife -2')
+    expect(drawer.text()).toContain('Sol Ring can help pay Xantcha activations')
+    expect(drawer.text()).toContain('Mana payment is bounded')
+    expect(drawer.text()).toContain('adds mana')
+    expect(drawer.text()).toContain('Mana Source')
+    expect(wrapper.findAll('.proof-filters button').map(button => button.text())).toEqual(expect.arrayContaining([
+      expect.stringMatching(/All families/i),
+      expect.stringMatching(/Mana into activated ability\s*1/i),
+      expect.stringMatching(/2 cards\s*1/i),
+    ]))
+
+    await wrapper.find('.proof-card__summary').trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedProofPackageId).toBe('proof:mana-xantcha')
+    expect((wrapper.vm as any).selectedFamily).toBe('mana→activated-ability')
+
+    await wrapper.find('.proof-card__summary').trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedProofPackageId).toBe(null)
+    expect((wrapper.vm as any).selectedFamily).toBe(null)
+
+    await wrapper.find('.proof-card__summary').trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedProofPackageId).toBe('proof:mana-xantcha')
+
+    await wrapper.findAll('.proof-filters button').find(button => /2 cards/i.test(button.text()))!.trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedProofPackageId).toBe(null)
+    expect((wrapper.vm as any).selectedFamily).toBe(null)
+
+    await wrapper.find('.proof-card__summary').trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedProofPackageId).toBe('proof:mana-xantcha')
+    expect((wrapper.vm as any).selectedFamily).toBe('mana→activated-ability')
+
+    await wrapper.findAll('.proof-filters button').find(button => button.text() === 'Reset')!.trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedProofPackageId).toBe(null)
+    expect((wrapper.vm as any).selectedFamily).toBe(null)
+
+    await wrapper.find('.proof-card__summary').trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedProofPackageId).toBe('proof:mana-xantcha')
+
+    await wrapper.findAll('.proof-card__body li button').find(button => button.text().includes('Xantcha'))!.trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedNodeId).toBe('Xantcha, Sleeper Agent')
+    expect(wrapper.find('.detail-card__proofs').text()).toContain('Mana into activated ability')
 
     wrapper.unmount()
   })

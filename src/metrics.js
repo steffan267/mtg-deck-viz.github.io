@@ -90,7 +90,16 @@
   function detectCombos(real, edges) {
     const idset = new Set(real.map(n => n.id));
     const dir = {}; real.forEach(n => dir[n.id] = []);
-    const comboPairs = [];
+    const comboPairMap = new Map();
+    const addComboPair = (a, b, family) => {
+      const cards = [a, b].sort();
+      const key = cards.join("\u0000");
+      const cur = comboPairMap.get(key) || { a: cards[0], b: cards[1], family, families: [] };
+      if (!cur.families.includes(family)) cur.families.push(family);
+      cur.family = cur.families.join(" + ");
+      comboPairMap.set(key, cur);
+    };
+    const topLoopPieces = {};
     for (const e of edges) {
       if (!idset.has(e.source) || !idset.has(e.target)) continue;
       for (const it of (e.interactions || [])) {
@@ -98,13 +107,28 @@
         // direction encoded as "A→B"/"B→A" relative to (source,target)
         const ab = it.direction === "B→A" ? [e.target, e.source] : [e.source, e.target];
         dir[ab[0]].push(ab[1]);
-        if (it.strength === "combo-critical") comboPairs.push({ a: e.source, b: e.target, family: it.family });
+        if (it.strength === "combo-critical") addComboPair(e.source, e.target, it.family);
+        if (it.family === "artifact-cost-reduction→top-loop-piece" || it.family === "cast-from-top→top-loop-piece") {
+          const entry = topLoopPieces[ab[1]] || (topLoopPieces[ab[1]] = { topPiece: ab[1], reducers: new Set(), topCasters: new Set() });
+          if (it.family === "artifact-cost-reduction→top-loop-piece") entry.reducers.add(ab[0]);
+          else entry.topCasters.add(ab[0]);
+        }
       }
     }
     // 2-cycles (mutual enablement) = simplest real loop
     const loops = [];
     for (const u of Object.keys(dir)) for (const v of dir[u]) if (u < v && dir[v] && dir[v].includes(u)) loops.push([u, v]);
-    return { loops, comboCriticalPairs: comboPairs };
+    const comboCriticalTriples = [];
+    for (const entry of Object.values(topLoopPieces)) {
+      for (const reducer of entry.reducers) for (const topCaster of entry.topCasters) {
+        if (reducer === topCaster) continue;
+        comboCriticalTriples.push({
+          cards: [entry.topPiece, reducer, topCaster].sort(),
+          family: "artifact-top-cost-reduction-loop",
+        });
+      }
+    }
+    return { loops, comboCriticalPairs: [...comboPairMap.values()], comboCriticalTriples };
   }
 
   // SELF-SUFFICIENCY: standalone (non-synergy) power, from oracle text + rank.
@@ -350,7 +374,7 @@
         closureCards.push({ id: n.id, w: round1(Math.max(w.compact, w.combat * 0.5)), kind: w.compact >= w.combat ? "compact" : "combat" });
     }
     closureCards.sort((a, b) => b.w - a.w);
-    const comboClosureRaw = Math.min(2, (combos.comboCriticalPairs || []).length * 0.8 + (combos.loops || []).length * 0.25);
+    const comboClosureRaw = Math.min(2, (combos.comboCriticalPairs || []).length * 0.8 + (combos.comboCriticalTriples || []).length * 0.8 + (combos.loops || []).length * 0.25);
     const closureRaw = compactClosureRaw + comboClosureRaw + Math.min(2.25, combatClosureRaw * 0.4);
 
     const ranks = real.map(n => n.edh).filter(Boolean);
@@ -398,7 +422,7 @@
     const summary = winSummary(signals, {
       compactClosureRaw,                                       // card-based compact closure ONLY (no combo mass)
       combatClosureRaw,
-      comboPairs: (combos.comboCriticalPairs || []).length,
+      comboPairs: (combos.comboCriticalPairs || []).length + (combos.comboCriticalTriples || []).length,
       loops: (combos.loops || []).length,
     });
     return { score, signals, summary };
@@ -465,12 +489,19 @@
     };
     for (const p of (combos.comboCriticalPairs || [])) addPair(p.a, p.b, p.family);
     for (const p of (combos.loops || [])) addPair(p[0], p[1], "mutual enablement loop");
+    const comboTriples = (combos.comboCriticalTriples || []).map(t => {
+      const cards = (t.cards || []).slice().sort();
+      const manaValue = cards.reduce((sum, id) => sum + (realById[id] ? mv(realById[id]) : 0), 0);
+      return { cards, family: t.family, manaValue };
+    });
 
     // Bracket 3 permits late-game two-card infinites. Without full turn-by-turn
     // simulation, total mana value is the most explainable proxy: cheap compact
     // pairs are optimized pressure; high-mana pairs are late-game finishers.
     const earlyComboPairs = comboPairs.filter(p => p.manaValue > 0 && p.manaValue <= 6);
     const lateComboPairs = comboPairs.filter(p => p.manaValue === 0 || p.manaValue > 6);
+    const earlyComboTriples = comboTriples.filter(t => t.manaValue > 0 && t.manaValue <= 8);
+    const lateComboTriples = comboTriples.filter(t => t.manaValue === 0 || t.manaValue > 8);
 
     const gameChangerCount = wt.signals.gameChangers.raw;
     const tutorRaw = wt.signals.consistency.raw;
@@ -492,8 +523,11 @@
       hasChainedExtraTurns,
       chainedExtraTurnCards: names(chainedExtraTurnCards),
       comboPairs: comboPairs.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
+      comboTriples: comboTriples.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
       earlyComboPairs: earlyComboPairs.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
       lateComboPairs: lateComboPairs.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
+      earlyComboTriples: earlyComboTriples.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
+      lateComboTriples: lateComboTriples.map(({ cards, family, manaValue }) => ({ cards, family, manaValue })),
       winTuningScore: wt.score,
       winTuningBand: wt.score >= 86 ? "Highly tuned" : wt.score >= 74 ? "Tuned to win"
         : wt.score >= 58 ? "Focused" : wt.score >= 42 ? "Casual" : "Untuned",
@@ -508,7 +542,7 @@
     let bracket;
     if (cedhTuned) bracket = 5;
     else if (ruleBreaks.length || highPower) bracket = 4;
-    else if (gameChangerCount >= 1 || lateComboPairs.length || tutorRaw > 3 || wt.score >= 58) bracket = 3;
+    else if (gameChangerCount >= 1 || lateComboPairs.length || comboTriples.length || tutorRaw > 3 || wt.score >= 58) bracket = 3;
     else if (extraTurnCards.length || wt.score >= 42) bracket = 2;
     else bracket = 1;
 
@@ -644,8 +678,8 @@
 
     // --- combo / engine detection ---
     const combos = detectCombos(real, edges);
-    const hasCombo = combos.comboCriticalPairs.length > 0;
-    const comboBonus = hasCombo ? Math.min(1, combos.comboCriticalPairs.length / 3) : 0;
+    const hasCombo = combos.comboCriticalPairs.length > 0 || (combos.comboCriticalTriples || []).length > 0;
+    const comboBonus = hasCombo ? Math.min(1, (combos.comboCriticalPairs.length + (combos.comboCriticalTriples || []).length) / 3) : 0;
 
     // --- SELF-SUFFICIENCY: the second power axis. Cohesion measures synergy
     // (winning through an engine); self-sufficiency measures the OTHER route to
@@ -696,6 +730,7 @@
       eventCounts,
       combos: combos.loops,
       comboCriticalPairs: combos.comboCriticalPairs,
+      comboCriticalTriples: combos.comboCriticalTriples || [],
       hasCombo,
       cohesionScore: score,
       cohesionBand: score >= 70 ? "Very cohesive" : score >= 50 ? "Cohesive"

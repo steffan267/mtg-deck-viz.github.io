@@ -73,6 +73,62 @@ export interface GraphEdge {
   [key: string]: unknown
 }
 
+export interface InteractionProofContribution {
+  card: string
+  role: string
+  facts: string[]
+  text?: string
+  [key: string]: unknown
+}
+
+export interface InteractionProofStep {
+  index: number
+  card?: string
+  action: string
+  delta?: unknown
+  cost?: unknown
+  [key: string]: unknown
+}
+
+export interface InteractionProofDelta {
+  resource?: string
+  min?: string | number
+  max?: string | number
+  delta?: string
+  confidence?: string
+  source?: string
+  [key: string]: unknown
+}
+
+export interface InteractionProofEvidence {
+  card?: string
+  predicate?: string
+  text?: string
+  [key: string]: unknown
+}
+
+export interface InteractionProofPackage {
+  schemaVersion: string
+  id: string
+  family: string
+  familyTitle: string
+  cards: string[]
+  cardCount: number
+  status: string
+  confidence: string
+  strength: InteractionStrength
+  result: string
+  repeatability?: { status?: string; reason?: string; [key: string]: unknown } | null
+  assumptions: string[]
+  limitingClauses: string[]
+  resourceDeltas: InteractionProofDelta[]
+  sequence: InteractionProofStep[]
+  contributions: InteractionProofContribution[]
+  evidence: InteractionProofEvidence[]
+  hyperedgeIds: string[]
+  [key: string]: unknown
+}
+
 export interface ZoneEdge {
   source: string
   target: string | ZoneDescriptor
@@ -83,18 +139,53 @@ export interface ComboCriticalPair {
   a: string
   b: string
   family: string
+  families?: string[]
+}
+
+export interface ComboCriticalTriple {
+  cards: string[]
+  family: string
+}
+
+export interface CommanderBracketComboPackage {
+  cards: string[]
+  family: string
+  manaValue: number
+}
+
+export interface CommanderBracketFlags {
+  gameChangerCount?: number
+  gameChangers?: string[]
+  tutorRaw?: number
+  tutorCards?: Array<{ id: string; w?: number }>
+  fewTutors?: boolean
+  massLandDenialCards?: string[]
+  extraTurnCards?: string[]
+  hasChainedExtraTurns?: boolean
+  chainedExtraTurnCards?: string[]
+  comboPairs?: CommanderBracketComboPackage[]
+  comboTriples?: CommanderBracketComboPackage[]
+  earlyComboPairs?: CommanderBracketComboPackage[]
+  lateComboPairs?: CommanderBracketComboPackage[]
+  earlyComboTriples?: CommanderBracketComboPackage[]
+  lateComboTriples?: CommanderBracketComboPackage[]
+  winTuningScore?: number
+  winTuningBand?: string
+  [key: string]: unknown
 }
 
 export interface CommanderBracketResult {
   bracket: number | string
   label: string
-  flags?: string[]
+  flags?: CommanderBracketFlags
+  ruleBreaks?: string[]
   [key: string]: unknown
 }
 
 export interface DeckGraph {
   nodes: GraphNode[]
   edges: GraphEdge[]
+  interactionProofs?: InteractionProofPackage[]
   zoneEdges?: ZoneEdge[]
   zones?: ZoneDescriptor[]
   eventLabels?: Record<string, string>

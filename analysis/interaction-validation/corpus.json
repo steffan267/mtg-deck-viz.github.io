@@ -1,0 +1,159 @@
+{
+  "schemaVersion": "interaction-validation-corpus.v1",
+  "description": "Local seed corpus for combo proof-search validation. Commander Spellbook-style entries are manually curated local fixtures until an external importer is added.",
+  "sourceCoverage": [
+    {
+      "id": "commander-spellbook-seeds",
+      "type": "combo-database-seed",
+      "status": "local-fixtures",
+      "caseSourceType": "commander-spellbook-seed",
+      "purpose": "Positive recall seeds for canonical 1-card, 2-card, and 3-card combo families."
+    },
+    {
+      "id": "known-combo-seeds",
+      "type": "known-combo-deck-seed",
+      "status": "local-fixtures",
+      "caseSourceType": "known-combo-seed",
+      "purpose": "Known combo-deck packages and an explicit known gap for regression tracking."
+    },
+    {
+      "id": "negative-near-misses",
+      "type": "negative-corpus",
+      "status": "local-fixtures",
+      "caseSourceType": "negative-near-miss",
+      "purpose": "Precision guards for one-shot effects, scoped reducers, unreplenished bodies, and token reminder overreach."
+    },
+    {
+      "id": "precon-sample-100",
+      "type": "precon-sample",
+      "status": "checked-in-summary",
+      "source": "data/precon-results.json",
+      "purpose": "Precon hub/false-positive smoke source with combo-pair and top-family summaries."
+    },
+    {
+      "id": "moxfield-bracket-464",
+      "type": "moxfield-bracket-sample",
+      "status": "checked-in-summary",
+      "source": "analysis/bracket/moxfield-bracket-corpus.json",
+      "purpose": "Moxfield bracket calibration source for runtime/precision sampling across power bands."
+    },
+    {
+      "id": "casual-synergy-audit-96",
+      "type": "casual-synergy-audit",
+      "status": "checked-in-summary",
+      "source": "data/AUDIT-100-decks-round5-FINAL.json",
+      "purpose": "Casual/precon evaluator audit that records false-positive hubs and missed mechanic families."
+    }
+  ],
+  "cases": [
+    {
+      "id": "spellbook-seed-self-untap-mana",
+      "sourceType": "commander-spellbook-seed",
+      "expect": { "status": "proven", "families": ["self-untap-mana-loop"] },
+      "cards": [
+        { "id": "Self Untap Dork", "type_line": "Creature — Elf Druid", "oracle_text": "{T}: Add {G}{G}. {0}: Untap this creature.", "cmc": 2 }
+      ]
+    },
+    {
+      "id": "spellbook-seed-deadeye-drake",
+      "sourceType": "commander-spellbook-seed",
+      "expect": { "status": "proven", "families": ["blink-etb-land-untap-loop"] },
+      "cards": [
+        { "id": "Deadeye Navigator", "type_line": "Creature — Spirit", "oracle_text": "{1}{U}: Exile another target creature you control, then return it to the battlefield under your control.", "cmc": 6 },
+        { "id": "Peregrine Drake", "type_line": "Creature — Drake", "oracle_text": "Flying When this creature enters, untap up to five lands.", "cmc": 5 }
+      ]
+    },
+    {
+      "id": "spellbook-seed-lifegain-lifeloss",
+      "sourceType": "commander-spellbook-seed",
+      "expect": { "status": "proven", "families": ["lifegain-lifeloss-loop"] },
+      "cards": [
+        { "id": "Sanguine Bond", "type_line": "Enchantment", "oracle_text": "Whenever you gain life, target opponent loses that much life.", "cmc": 5 },
+        { "id": "Exquisite Blood", "type_line": "Enchantment", "oracle_text": "Whenever an opponent loses life, you gain that much life.", "cmc": 5 }
+      ]
+    },
+    {
+      "id": "spellbook-seed-artifact-top-loop",
+      "sourceType": "commander-spellbook-seed",
+      "expect": { "status": "proven", "families": ["artifact-top-cost-reduction-loop"] },
+      "cards": [
+        { "id": "Self Top Draw Artifact", "type_line": "Artifact", "oracle_text": "{1}: Draw a card, then put this artifact on top of its owner’s library.", "cmc": 1 },
+        { "id": "Artifact Spell Reducer", "type_line": "Artifact Creature — Vedalken Artificer", "oracle_text": "Artifact spells you cast cost {1} less to cast.", "cmc": 2 },
+        { "id": "Artifact Top Caster", "type_line": "Artifact", "oracle_text": "You may look at the top card of your library any time. You may cast artifact spells from the top of your library.", "cmc": 4 }
+      ]
+    },
+    {
+      "id": "known-combo-token-modifier-payoff",
+      "sourceType": "known-combo-seed",
+      "expect": { "status": "proven", "families": ["token-source-modifier-payoff"] },
+      "cards": [
+        { "id": "Token Source", "type_line": "Creature", "oracle_text": "When this creature enters, create a 1/1 white Soldier creature token.", "cmc": 2 },
+        { "id": "Token Doubler", "type_line": "Enchantment", "oracle_text": "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.", "cmc": 4 },
+        { "id": "Token Payoff", "type_line": "Creature", "oracle_text": "Whenever one or more tokens you control enter, draw a card.", "cmc": 3 }
+      ]
+    },
+    {
+      "id": "known-combo-aristocrats-token",
+      "sourceType": "known-combo-seed",
+      "expect": { "status": "proven", "families": ["aristocrats-body-outlet-payoff"] },
+      "cards": [
+        { "id": "Token Fodder", "type_line": "Creature", "oracle_text": "When this creature enters, create a 1/1 white Soldier creature token.", "cmc": 2 },
+        { "id": "Sac Outlet", "type_line": "Creature", "oracle_text": "Sacrifice a creature: Add {C}.", "cmc": 1 },
+        { "id": "Death Payoff", "type_line": "Creature", "oracle_text": "Whenever another creature dies, each opponent loses 1 life.", "cmc": 2 }
+      ]
+    },
+    {
+      "id": "known-gap-library-exile-win",
+      "sourceType": "known-combo-seed",
+      "expect": { "status": "proven", "families": ["library-exile-empty-library-win"] },
+      "cards": [
+        { "id": "Library Exiling Tutor", "type_line": "Instant", "oracle_text": "Name a card. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal the named card. Put that card into your hand and exile all other cards revealed this way.", "cmc": 1 },
+        { "id": "Empty Library Oracle", "type_line": "Creature — Merfolk Wizard", "oracle_text": "When this creature enters, look at the top X cards of your library, where X is your devotion to blue. If X is greater than or equal to the number of cards in your library, you win the game.", "cmc": 2 }
+      ]
+    },
+    {
+      "id": "negative-one-shot-blink",
+      "sourceType": "negative-near-miss",
+      "expect": { "status": "not-proven" },
+      "cards": [
+        { "id": "Ephemerate", "type_line": "Instant", "oracle_text": "Exile target creature you control, then return it to the battlefield under its owner’s control.", "cmc": 1 },
+        { "id": "Peregrine Drake", "type_line": "Creature — Drake", "oracle_text": "Flying When this creature enters, untap up to five lands.", "cmc": 5 }
+      ]
+    },
+    {
+      "id": "negative-reducer-scope-rock",
+      "sourceType": "negative-near-miss",
+      "expect": { "status": "not-proven" },
+      "cards": [
+        { "id": "Heartstone", "type_line": "Artifact", "oracle_text": "Activated abilities of creatures cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.", "cmc": 3 },
+        { "id": "Sol Ring", "type_line": "Artifact", "oracle_text": "{T}: Add {C}{C}.", "cmc": 1 }
+      ]
+    },
+    {
+      "id": "negative-unreplenished-aristocrats",
+      "sourceType": "negative-near-miss",
+      "expect": { "status": "not-proven" },
+      "cards": [
+        { "id": "Free Body", "type_line": "Creature", "oracle_text": "When this creature dies, draw a card.", "cmc": 1 },
+        { "id": "Sac Outlet", "type_line": "Creature", "oracle_text": "Sacrifice a creature: Add {C}.", "cmc": 1 },
+        { "id": "Death Payoff", "type_line": "Creature", "oracle_text": "Whenever another creature dies, each opponent loses 1 life.", "cmc": 2 }
+      ]
+    },
+    {
+      "id": "negative-token-reminder-overreach",
+      "sourceType": "negative-near-miss",
+      "expect": { "status": "not-proven" },
+      "cards": [
+        { "id": "Smothering Tithe", "type_line": "Enchantment", "oracle_text": "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token.", "cmc": 4 },
+        { "id": "Academy Manufactor", "type_line": "Artifact Creature — Assembly-Worker", "oracle_text": "If you would create a Clue, Food, or Treasure token, instead create one of each.", "cmc": 3 }
+      ]
+    }
+  ],
+  "deckSmoke": [
+    {
+      "id": "sample-xantcha",
+      "source": "analysis/interaction-baseline/interaction-baseline.json",
+      "baselineDeckId": "sample-xantcha"
+    }
+  ]
+}

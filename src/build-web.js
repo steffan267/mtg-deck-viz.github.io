@@ -61,7 +61,7 @@ async function writeBootstrap() {
   const idx = loadCards();
   const candidates = candidateIndex(idx);
   const { decklist } = await resolveSource(SAMPLE, idx);
-  const graph = build(decklist, idx);
+  const graph = build(decklist, idx, { includeInteractionProofs: true });
   const title = "Sample deck — Xantcha";
   const bootstrap = {
     decks: [{ title, graph }],
