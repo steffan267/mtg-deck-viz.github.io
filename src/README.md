@@ -230,10 +230,9 @@ check` includes JavaScript syntax checks plus Vue/TypeScript typechecking.
 
 ## Publishing to GitHub Pages
 
-The map can be published as a static site. A **manually-triggered** GitHub
-Action (`.github/workflows/deploy-pages.yml`) rebuilds and deploys it — it runs
-only when you click **Run workflow** in the Actions tab, never automatically on
-push.
+The map can be published as a static site. The GitHub Action
+(`.github/workflows/deploy-pages.yml`) rebuilds and deploys it on every push to
+`main`, and can also be run manually with **Run workflow** in the Actions tab.
 
 What it does: install deps → `npm run build-data` (downloads the Scryfall bulk
 Oracle Cards DB, which is gitignored) → `npm run build-web` (builds the
@@ -257,8 +256,11 @@ add its URL as an Actions **repository variable** named `MOXFIELD_PROXY`
 
 1. Push the repo to GitHub.
 2. *Settings → Pages → Build and deployment → Source =* **GitHub Actions**.
+   Do not use branch publishing from `/` or `/docs`: `docs/` is a generated,
+   gitignored artifact, so branch publishing may show the repository README
+   instead of the Vue app.
 3. (Optional) Deploy the Worker and set the `MOXFIELD_PROXY` variable.
-4. *Actions → Deploy deck map to GitHub Pages → Run workflow.*
+4. Push to `main` or use *Actions → Deploy deck map to GitHub Pages → Run workflow.*
 
 To preview the exact published artifact locally:
 

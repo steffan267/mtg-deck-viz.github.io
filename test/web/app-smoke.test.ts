@@ -136,6 +136,8 @@ describe('Vue app browser smoke', () => {
     await nextTick()
     await wrapper.findAll('.breakdown-category').find(button => button.text().includes('Most connected cards'))!.trigger('click')
     await nextTick()
+    await wrapper.find('.category-card-drawer__cards button').trigger('click')
+    await nextTick()
     expect(wrapper.text()).toContain('Add two colorless mana.')
     expect((wrapper.find('input[type="search"]').element as HTMLInputElement).value).toBe('')
 

@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<{
   hideIsolated?: boolean
   searchTerm?: string
   selectedNodeId?: string | null
+  selectedNodeIds?: readonly string[]
   selectedFamily?: string | null
   spotlightCombos?: boolean
   frozen?: boolean
@@ -28,6 +29,7 @@ const props = withDefaults(defineProps<{
   hideIsolated: false,
   searchTerm: '',
   selectedNodeId: null,
+  selectedNodeIds: () => [],
   selectedFamily: null,
   spotlightCombos: false,
   frozen: false,
@@ -56,6 +58,7 @@ const renderInput = computed<GraphRenderInput>(() => markRaw({
   hideIsolated: props.hideIsolated,
   searchTerm: props.searchTerm,
   selectedNodeId: props.selectedNodeId,
+  selectedNodeIds: props.selectedNodeIds,
   selectedFamily: props.selectedFamily,
   spotlightCombos: props.spotlightCombos,
   frozen: props.frozen,

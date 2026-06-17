@@ -1,8 +1,9 @@
 name: Deploy deck map to GitHub Pages
 
-# Manual only — runs when you click "Run workflow" in the Actions tab.
-# Deliberately NOT triggered on push, so publishing is always an explicit choice.
+# Runs automatically when main changes and can also be run manually from Actions.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -42,6 +43,9 @@ jobs:
 
       - name: Add SPA 404 fallback
         run: cp docs/index.html docs/404.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

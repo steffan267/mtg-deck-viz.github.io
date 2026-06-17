@@ -53,6 +53,7 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
   const hoverNeighbors = new Set<string>()
   const selectedNeighbors = new Set<string>()
   const familyNodes = new Set<string>()
+  const categoryNodes = new Set<string>()
   let hoverNode: RenderNode | null = null
   const pointer: PointerState = { dragNode: null, panning: false, lastX: 0, lastY: 0 }
   const roleColors = { ...DEFAULT_ROLE_COLORS, ...(options.roleColors || {}) }
@@ -77,6 +78,7 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
         hoverNode = null
         hoverNeighbors.clear()
         selectedNeighbors.clear()
+        categoryNodes.clear()
         computeSelectionState()
         initPositions()
         settleAndFit()
@@ -363,8 +365,12 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
   function computeSelectionState() {
     selectedNeighbors.clear()
     familyNodes.clear()
+    categoryNodes.clear()
     const selected = input.selectedNodeId ? model.byId.get(input.selectedNodeId) || null : null
     computeNeighbors(selected, selectedNeighbors)
+    for (const id of input.selectedNodeIds || []) {
+      if (model.byId.has(id)) categoryNodes.add(id)
+    }
     if (input.selectedFamily) {
       for (const link of model.links) {
         if (edgeFamily(link) === input.selectedFamily) {
@@ -388,6 +394,7 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
     if (hoverNode) return node !== hoverNode && !hoverNeighbors.has(node.id)
     if (input.selectedNodeId) return node.id !== input.selectedNodeId && !selectedNeighbors.has(node.id)
     if (input.selectedFamily) return !familyNodes.has(node.id)
+    if (categoryNodes.size) return !categoryNodes.has(node.id)
     return false
   }
 

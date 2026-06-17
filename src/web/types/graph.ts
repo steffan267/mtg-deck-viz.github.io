@@ -208,6 +208,7 @@ export interface GraphRenderInput {
   hideIsolated?: boolean
   searchTerm?: string
   selectedNodeId?: string | null
+  selectedNodeIds?: readonly string[]
   selectedFamily?: string | null
   spotlightCombos?: boolean
   frozen?: boolean

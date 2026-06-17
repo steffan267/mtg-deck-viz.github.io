@@ -114,16 +114,19 @@ describe('App score breakdown drawers', () => {
     expect(wrapper.find('.breakdown-drawer').text()).not.toContain('Fast mana, ramp, and low setup cost')
     expect(wrapper.findAll('.breakdown-drawer .signal-row--button').find(button => button.text().includes('Speed'))!.attributes('title')).toContain('Fast mana, ramp, and low setup cost')
     expect(wrapper.findAll('.breakdown-category').map(button => button.text())).toEqual(expect.arrayContaining([
-      expect.stringMatching(/Score ingredients\s*8/i),
-      expect.stringMatching(/Win-tuning signal cards\s*4/i),
-      expect.stringMatching(/Game Changers\s*1/i),
-      expect.stringMatching(/Detected combos\s*1/i),
+      expect.stringMatching(/Win tuning score factors\s*8 metrics/i),
+      expect.stringMatching(/Win-tuning signal cards\s*4 cards/i),
+      expect.stringMatching(/Game Changers\s*1 cards/i),
+      expect.stringMatching(/Detected combos\s*1 combos/i),
     ]))
 
     await wrapper.findAll('.breakdown-category').find(button => button.text().includes('Detected combos'))!.trigger('click')
     await nextTick()
     expect(wrapper.find('.category-card-drawer').text()).toContain('Sol Ring')
     expect(wrapper.find('.category-card-drawer').text()).toContain('Xantcha')
+    expect((wrapper.vm as any).selectedNodeId).toBe(null)
+    await wrapper.find('.category-card-drawer__cards button').trigger('click')
+    await nextTick()
     expect((wrapper.vm as any).selectedNodeId).toBe('Sol Ring')
 
     await wrapper.find('[aria-label="Close score breakdown"]').trigger('click')
@@ -135,17 +138,20 @@ describe('App score breakdown drawers', () => {
     await nextTick()
     expect(wrapper.find('.breakdown-drawer').text()).toContain('Cohesion')
     expect(wrapper.findAll('.breakdown-category').map(button => button.text())).toEqual(expect.arrayContaining([
-      expect.stringMatching(/Score ingredients\s*14/i),
-      expect.stringMatching(/Interaction family counts\s*1/i),
-      expect.stringMatching(/Raw event counts\s*1/i),
-      expect.stringMatching(/Most connected cards\s*3/i),
-      expect.stringMatching(/Islands \(0 interactions\)\s*1/i),
+      expect.stringMatching(/Cohesion score factors\s*14 metrics/i),
+      expect.stringMatching(/Interaction families\s*1 families/i),
+      expect.stringMatching(/Raw interaction events\s*1 events/i),
+      expect.stringMatching(/Most connected cards\s*3 cards/i),
+      expect.stringMatching(/Unlinked cards\s*1 cards/i),
     ]))
 
-    await wrapper.findAll('.breakdown-category').find(button => button.text().includes('Interaction family counts'))!.trigger('click')
+    await wrapper.findAll('.breakdown-category').find(button => button.text().includes('Interaction families'))!.trigger('click')
+    await nextTick()
+    expect((wrapper.vm as any).selectedFamily).toBe(null)
+    expect(wrapper.find('.category-card-drawer').text()).toContain('Sol Ring')
+    await wrapper.find('.breakdown-row-list button').trigger('click')
     await nextTick()
     expect((wrapper.vm as any).selectedFamily).toBe('mana→activated-ability')
-    expect(wrapper.find('.category-card-drawer').text()).toContain('Sol Ring')
 
     await wrapper.find('[aria-label="Close score breakdown"]').trigger('click')
     await nextTick()
@@ -157,9 +163,9 @@ describe('App score breakdown drawers', () => {
     expect(wrapper.find('.breakdown-drawer').text()).not.toContain('standalone card-power score')
     expect(wrapper.findAll('.breakdown-drawer .signal-row--button')[0].attributes('title')).toContain('standalone card-power score')
     expect(wrapper.findAll('.breakdown-category').map(button => button.text())).toEqual(expect.arrayContaining([
-      expect.stringMatching(/Score ingredients\s*10/i),
-      expect.stringMatching(/Highest rated self-sufficient cards\s*3/i),
-      expect.stringMatching(/Standalone capability counts\s*7/i),
+      expect.stringMatching(/Self-sufficiency score factors\s*10 metrics/i),
+      expect.stringMatching(/Highest rated self-sufficient cards\s*3 cards/i),
+      expect.stringMatching(/Standalone capability counts\s*7 signals/i),
     ]))
 
     wrapper.unmount()

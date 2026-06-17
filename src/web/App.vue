@@ -152,6 +152,9 @@ const scoreBreakdownLists = computed(() => selectedBreakdownSection.value && act
 const scoreBreakdownCategories = computed(() => selectedBreakdownSection.value ? breakdownTabs(selectedBreakdownSection.value, scoreBreakdownMetrics.value, scoreBreakdownLists.value) : [])
 const activeBreakdownCategory = computed(() => scoreBreakdownCategories.value.find(category => category.id === selectedBreakdownCategoryId.value) || null)
 const activeBreakdownCards = computed(() => activeBreakdownCategory.value ? categoryCards(activeBreakdownCategory.value) : [])
+const selectedBreakdownNodeIds = computed(() => activeBreakdownCards.value.map(card => card.id))
+const scoreModelCategories = computed(() => scoreBreakdownCategories.value.filter(category => category.group === 'score'))
+const graphExploreCategories = computed(() => scoreBreakdownCategories.value.filter(category => category.group !== 'score'))
 
 watch(selectedBreakdownId, () => {
   selectedBreakdownCategoryId.value = null
@@ -334,15 +337,8 @@ function selectBreakdownSignal(signal: SignalBar) {
 
 function selectBreakdownCategory(category: BreakdownTab) {
   selectedBreakdownCategoryId.value = selectedBreakdownCategoryId.value === category.id ? null : category.id
-  const family = firstCategoryFamily(category)
-  const card = categoryCards(category)[0]?.id
-  if (family) {
-    selectedFamily.value = family
-    selectedNodeId.value = null
-  } else if (card) {
-    selectedFamily.value = null
-    selectedNodeId.value = card
-  }
+  selectedFamily.value = null
+  selectedNodeId.value = null
 }
 
 function selectBreakdownRow(row: BreakdownListRow) {
@@ -430,6 +426,8 @@ interface BreakdownList {
 
 interface BreakdownTab extends BreakdownList {
   count: number
+  countLabel: string
+  group?: 'score' | 'graph'
 }
 
 
@@ -478,9 +476,11 @@ function breakdownMetrics(section: ScoreSection, metrics: DeckMetrics): MetricIt
 function breakdownTabs(section: ScoreSection, metrics: MetricItem[], lists: BreakdownList[]): BreakdownTab[] {
   const ingredients: BreakdownTab = {
     id: 'score-ingredients',
-    title: 'Score ingredients',
+    title: `${section.label} score factors`,
     description: scoreIngredientsDescription(section.id),
     count: metrics.length,
+    countLabel: `${metrics.length} metrics`,
+    group: 'score',
     rows: metrics.map(metric => ({
       id: metric.id,
       label: metric.label,
@@ -488,7 +488,7 @@ function breakdownTabs(section: ScoreSection, metrics: MetricItem[], lists: Brea
       note: metric.title,
     })),
   }
-  return [ingredients, ...lists.map(list => ({ ...list, count: list.rows.length }))]
+  return [ingredients, ...lists.map(list => ({ ...list, count: list.rows.length, countLabel: countLabelForBreakdown(list), group: 'graph' as const }))]
 }
 
 function scoreIngredientsDescription(sectionId: string): string {
@@ -496,6 +496,22 @@ function scoreIngredientsDescription(sectionId: string): string {
   if (sectionId === 'cohesion') return 'The headline score divides the deck into interaction density, core web share, meaningful links, average degree, components, and isolated cards.'
   if (sectionId === 'self-sufficiency') return 'The headline score divides standalone card quality into answer density, card advantage, ramp, tutors, resilience, premium staples, and premium share.'
   return 'The headline score is divided into the ingredients below.'
+}
+
+function countLabelForBreakdown(list: BreakdownList): string {
+  const units: Record<string, string> = {
+    'family-counts': 'families',
+    'event-counts': 'events',
+    'connected-cards': 'cards',
+    islands: 'cards',
+    signals: 'cards',
+    'game-changers': 'cards',
+    combos: 'combos',
+    'combo-critical-pairs': 'pairs',
+    'top-self-sufficient': 'cards',
+    'standalone-signals': 'signals',
+  }
+  return `${list.rows.length} ${units[list.id] || 'items'}`
 }
 
 function withSignalTitle(signal: SignalBar, sectionId: string): SignalBar {
@@ -556,13 +572,13 @@ function breakdownLists(section: ScoreSection, metrics: DeckMetrics, graph: Deck
     return [
       {
         id: 'family-counts',
-        title: 'Interaction family counts',
+        title: 'Interaction families',
         description: 'Counts of meaningful mechanical interaction families. Clicking the signal bars above highlights the corresponding family in the graph.',
         rows: interactionFamilySignals.value.map(signal => ({ id: signal.id, label: signal.label, value: signal.value, family: signal.id, cards: cardsForFamily(graph, signal.id) })),
       },
       {
         id: 'event-counts',
-        title: 'Raw event counts',
+        title: 'Raw interaction events',
         description: 'Lower-level produced/reacted-to event counts used to build the interaction families.',
         rows: Object.entries(metrics.eventCounts || {})
           .sort((a, b) => Number(b[1]) - Number(a[1]) || labelEvent(graph, a[0]).localeCompare(labelEvent(graph, b[0])))
@@ -577,7 +593,7 @@ function breakdownLists(section: ScoreSection, metrics: DeckMetrics, graph: Deck
       },
       {
         id: 'islands',
-        title: 'Islands (0 interactions)',
+        title: 'Unlinked cards',
         description: 'Nonland cards with zero graph links. More islands reduce cohesion because they do not participate in the interaction web.',
         rows: (rankGroups.value.find(group => group.id === 'islands')?.rows || (metrics.islands || []).map(card => ({ id: card, label: shortName(card), value: 0 }))).map(row => ({ id: row.id, label: row.label, value: row.value, cards: [row.id] })),
       },
@@ -702,18 +718,37 @@ function formatBreakdownValue(value: unknown): string | number {
 
         <section class="breakdown-drawer__section">
           <h3>Categories</h3>
-          <button
-            v-for="category in scoreBreakdownCategories"
-            :key="category.id"
-            class="breakdown-category"
-            :class="{ active: activeBreakdownCategory?.id === category.id }"
-            type="button"
-            @click="selectBreakdownCategory(category)"
-          >
-            <span>{{ category.title }}</span>
-            <b>{{ category.count }}</b>
-            <small v-if="category.description">{{ category.description }}</small>
-          </button>
+          <p>Click a category to highlight matching graph cards and inspect its cards.</p>
+          <div v-if="scoreModelCategories.length" class="breakdown-category-group">
+            <h4>Score model</h4>
+            <button
+              v-for="category in scoreModelCategories"
+              :key="category.id"
+              class="breakdown-category"
+              :class="{ active: activeBreakdownCategory?.id === category.id }"
+              type="button"
+              @click="selectBreakdownCategory(category)"
+            >
+              <span>{{ category.title }}</span>
+              <b>{{ category.countLabel }}</b>
+              <small v-if="category.description">{{ category.description }}</small>
+            </button>
+          </div>
+          <div v-if="graphExploreCategories.length" class="breakdown-category-group">
+            <h4>Explore graph</h4>
+            <button
+              v-for="category in graphExploreCategories"
+              :key="category.id"
+              class="breakdown-category"
+              :class="{ active: activeBreakdownCategory?.id === category.id }"
+              type="button"
+              @click="selectBreakdownCategory(category)"
+            >
+              <span>{{ category.title }}</span>
+              <b>{{ category.countLabel }}</b>
+              <small v-if="category.description">{{ category.description }}</small>
+            </button>
+          </div>
         </section>
 
         <section v-if="activeBreakdownCategory" class="breakdown-drawer__section">
@@ -757,6 +792,7 @@ function formatBreakdownValue(value: unknown): string | number {
           :hide-isolated="hideIsolated"
           :search-term="searchTerm"
           :selected-node-id="selectedNodeId"
+          :selected-node-ids="selectedBreakdownNodeIds"
           :selected-family="selectedFamily"
           :frozen="frozen"
           :role-colors="ROLE_COLORS"
