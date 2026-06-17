@@ -5,6 +5,8 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '../..');
 const ROOT_INDEX = path.join(ROOT, 'index.html');
+const ROOT_BOOTSTRAP = path.join(ROOT, 'bootstrap-data.json');
+const ROOT_NOJEKYLL = path.join(ROOT, '.nojekyll');
 const DOCS_INDEX = path.join(ROOT, 'docs/index.html');
 const DOCS_BOOTSTRAP = path.join(ROOT, 'docs/bootstrap-data.json');
 const DOCS_NOJEKYLL = path.join(ROOT, 'docs/.nojekyll');
@@ -28,6 +30,9 @@ function readGeneratedHtml() {
 }
 
 const snapshots = new Map([
+  [ROOT_INDEX, snapshot(ROOT_INDEX)],
+  [ROOT_BOOTSTRAP, snapshot(ROOT_BOOTSTRAP)],
+  [ROOT_NOJEKYLL, snapshot(ROOT_NOJEKYLL)],
   [DOCS_INDEX, snapshot(DOCS_INDEX)],
   [DOCS_BOOTSTRAP, snapshot(DOCS_BOOTSTRAP)],
   [DOCS_NOJEKYLL, snapshot(DOCS_NOJEKYLL)],
@@ -54,23 +59,23 @@ try {
     assert.equal(fs.existsSync(DOCS_INDEX), true);
   });
 
-  test('keeps a root Pages fallback that redirects branch-root publishing to docs', () => {
+  test('keeps a root Pages entrypoint for branch-root publishing', () => {
     assert.equal(fs.existsSync(ROOT_INDEX), true);
     const rootHtml = fs.readFileSync(ROOT_INDEX, 'utf8');
-    assert.match(rootHtml, /url=\.\/docs\//);
-    assert.match(rootHtml, /window\.location\.replace\('\.\/docs\/'/);
+    assert.match(rootHtml, /<div id="app"><\/div>/);
+    assert.doesNotMatch(rootHtml, /url=\.\/docs\//);
   });
 
-  test('preserves the GitHub Pages .nojekyll marker under docs only', () => {
+  test('preserves the GitHub Pages .nojekyll marker under docs and root', () => {
     assert.equal(fs.existsSync(DOCS_NOJEKYLL), true);
-    assert.equal(fs.existsSync(path.join(ROOT, '.nojekyll')), false);
+    assert.equal(fs.existsSync(ROOT_NOJEKYLL), true);
   });
 
   test('embeds the sample deck bootstrap as the default active deck', () => {
     const bootstrap = JSON.parse(fs.readFileSync(DOCS_BOOTSTRAP, 'utf8'));
     assert.equal(bootstrap.decks[0].title, 'Sample deck — Xantcha');
     assert.equal(bootstrap.active, 0);
-    assert.equal(fs.existsSync(path.join(ROOT, 'bootstrap-data.json')), false);
+    assert.equal(fs.existsSync(ROOT_BOOTSTRAP), true);
   });
 
   test('writes candidate data to a cacheable bootstrap asset', () => {
@@ -97,7 +102,7 @@ try {
   test('copies bundled recommendation worker JavaScript next to the docs static HTML entrypoint', () => {
     const worker = fs.readdirSync(DOCS_INDEX.endsWith('index.html') ? path.dirname(DOCS_INDEX) : DOCS_INDEX).find(name => workerPattern.test(name));
     assert.ok(worker, 'expected bundled worker asset next to docs/index.html');
-    assert.equal(fs.existsSync(path.join(ROOT, worker)), false);
+    assert.equal(fs.existsSync(path.join(ROOT, worker)), true);
     const workerCode = fs.readFileSync(path.join(path.dirname(DOCS_INDEX), worker), 'utf8');
     assert.doesNotMatch(workerCode, /import\s+type\s/);
     assert.doesNotMatch(workerCode, /from ['\"]\.\.\/\.\.\//);

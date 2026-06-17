@@ -3,7 +3,8 @@
  * build-web.js — generate the Vue/Vite GitHub Pages site.
  *
  * Builds the bundled sample deck, writes browser bootstrap JSON, runs Vite,
- * then copies the static build to docs/ for GitHub Pages deployment.
+ * then copies the static build to docs/ for GitHub Actions Pages deployment
+ * and to the repository root for branch-root Pages publishing.
  */
 const fs = require("fs");
 const path = require("path");
@@ -15,6 +16,7 @@ const DOCS = path.join(ROOT, "docs");
 const DIST = path.join(ROOT, "dist/web");
 const SAMPLE = path.join(ROOT, "data/sample-decklist.txt");
 const GENERATED = path.join(ROOT, "src/web/generated");
+const ROOT_GENERATED_FILES = ["index.html", "bootstrap-data.json", ".nojekyll"];
 
 function rmrf(target) {
   fs.rmSync(target, { recursive: true, force: true });
@@ -27,6 +29,14 @@ function copyDir(src, dest) {
     const to = path.join(dest, entry.name);
     if (entry.isDirectory()) copyDir(from, to);
     else fs.copyFileSync(from, to);
+  }
+}
+
+function removeRootPagesArtifacts() {
+  for (const file of ROOT_GENERATED_FILES) rmrf(path.join(ROOT, file));
+  rmrf(path.join(ROOT, "assets"));
+  for (const file of fs.readdirSync(ROOT)) {
+    if (/^recommendation\.worker-.*\.js$/.test(file)) rmrf(path.join(ROOT, file));
   }
 }
 
@@ -79,7 +89,9 @@ async function main() {
     if (/^recommendation\.worker-.*\.js$/.test(asset)) fs.copyFileSync(path.join(DOCS, "assets", asset), path.join(DOCS, asset));
   }
   fs.writeFileSync(path.join(DOCS, ".nojekyll"), "");
-  console.log(`✓ Vue site built to docs/ (sample: ${bootstrap.title}, candidates: ${bootstrap.candidates.length})`);
+  removeRootPagesArtifacts();
+  copyDir(DOCS, ROOT);
+  console.log(`✓ Vue site built to docs/ and repository root (sample: ${bootstrap.title}, candidates: ${bootstrap.candidates.length})`);
   console.log(`  Moxfield proxy: ${process.env.MOXFIELD_PROXY || "(none — file/paste import only)"}`);
 }
 

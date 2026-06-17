@@ -8,9 +8,6 @@ data/out/*.json.gz
 .DS_Store
 **/.DS_Store
 deck-viz.zip
-/.nojekyll
-/bootstrap-data.json
-/recommendation.worker-*.js
 /recommendation.worker-*.ts
 
 # generated GitHub Pages output (the deploy workflow rebuilds it from source)
