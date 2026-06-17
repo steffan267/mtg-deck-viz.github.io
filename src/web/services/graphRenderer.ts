@@ -28,9 +28,13 @@ interface PointerState {
   panning: boolean
   lastX: number
   lastY: number
+  touchStartX: number
+  touchStartY: number
+  touchMoved: boolean
 }
 
 const EMPTY_GRAPH: DeckGraph = { nodes: [], edges: [] }
+const TOUCH_TAP_SLOP = 8
 const STR_BASE: Record<number, string> = {
   1: 'rgba(150,140,170,0.10)',
   2: 'rgba(120,150,210,0.28)',
@@ -55,7 +59,7 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
   const familyNodes = new Set<string>()
   const categoryNodes = new Set<string>()
   let hoverNode: RenderNode | null = null
-  const pointer: PointerState = { dragNode: null, panning: false, lastX: 0, lastY: 0 }
+  const pointer: PointerState = { dragNode: null, panning: false, lastX: 0, lastY: 0, touchStartX: 0, touchStartY: 0, touchMoved: false }
   const roleColors = { ...DEFAULT_ROLE_COLORS, ...(options.roleColors || {}) }
 
   const renderer: GraphRenderer = {
@@ -141,6 +145,10 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
     canvas.addEventListener('mousemove', onMouseMove)
     canvas.addEventListener('mouseleave', onMouseLeave)
     canvas.addEventListener('mousedown', onMouseDown)
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false })
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false })
+    canvas.addEventListener('touchend', onTouchEnd)
+    canvas.addEventListener('touchcancel', onTouchCancel)
     canvas.addEventListener('click', onClick)
     canvas.addEventListener('wheel', onWheel, { passive: false })
     window.addEventListener('mouseup', onMouseUp)
@@ -151,6 +159,10 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
     canvas.removeEventListener('mousemove', onMouseMove)
     canvas.removeEventListener('mouseleave', onMouseLeave)
     canvas.removeEventListener('mousedown', onMouseDown)
+    canvas.removeEventListener('touchstart', onTouchStart)
+    canvas.removeEventListener('touchmove', onTouchMove)
+    canvas.removeEventListener('touchend', onTouchEnd)
+    canvas.removeEventListener('touchcancel', onTouchCancel)
     canvas.removeEventListener('click', onClick)
     canvas.removeEventListener('wheel', onWheel)
     window.removeEventListener('mouseup', onMouseUp)
@@ -487,7 +499,12 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
 
   function onMouseDown(event: MouseEvent) {
     if (!canvas) return
-    const node = pick(event.offsetX, event.offsetY)
+    beginPointer(event.offsetX, event.offsetY)
+  }
+
+  function beginPointer(px: number, py: number) {
+    if (!canvas) return
+    const node = pick(px, py)
     if (node) {
       pointer.dragNode = node
       node.fx = node.x
@@ -495,8 +512,8 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
       canvas.classList.add('dragging')
     } else {
       pointer.panning = true
-      pointer.lastX = event.offsetX
-      pointer.lastY = event.offsetY
+      pointer.lastX = px
+      pointer.lastY = py
       canvas.classList.add('dragging')
     }
   }
@@ -509,7 +526,48 @@ export function createGraphRenderer(options: GraphRendererOptions = {}): GraphRe
     }
     pointer.dragNode = null
     pointer.panning = false
+    pointer.touchMoved = false
     canvas.classList.remove('dragging')
+  }
+
+  function touchPoint(event: TouchEvent) {
+    if (!canvas) return null
+    const touch = event.touches[0] || event.changedTouches[0]
+    if (!touch) return null
+    const rect = canvas.getBoundingClientRect()
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+  }
+
+  function onTouchStart(event: TouchEvent) {
+    if (event.touches.length !== 1) return
+    const point = touchPoint(event)
+    if (!point) return
+    event.preventDefault()
+    pointer.touchStartX = point.x
+    pointer.touchStartY = point.y
+    pointer.touchMoved = false
+    beginPointer(point.x, point.y)
+  }
+
+  function onTouchMove(event: TouchEvent) {
+    if (event.touches.length !== 1) return
+    const point = touchPoint(event)
+    if (!point) return
+    event.preventDefault()
+    const distance = Math.hypot(point.x - pointer.touchStartX, point.y - pointer.touchStartY)
+    if (distance < TOUCH_TAP_SLOP && !pointer.touchMoved) return
+    pointer.touchMoved = true
+    onMouseMove({ offsetX: point.x, offsetY: point.y } as MouseEvent)
+  }
+
+  function onTouchEnd(event: TouchEvent) {
+    const point = touchPoint(event)
+    if (point && !pointer.touchMoved) options.nodeSelect?.(pick(point.x, point.y))
+    onMouseUp()
+  }
+
+  function onTouchCancel() {
+    onMouseUp()
   }
 
   function onClick(event: MouseEvent) {

@@ -23,4 +23,6 @@ withDefaults(defineProps<{
 
 <style scoped>
 .sidebar-shell{border-bottom:0;border-left:0;border-top:0;height:100%;min-width:330px;width:330px}.sidebar-shell__header{border-bottom:1px solid var(--line,rgba(255,255,255,.12));padding:15px 16px 11px}.sidebar-shell__title{font-size:16px;letter-spacing:.02em;margin:0 0 2px}.sidebar-shell__subtitle{color:var(--dim,#8b98a8);font-size:11px;line-height:1.35;margin:0}.sidebar-shell__actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.sidebar-shell__body{height:calc(100% - 64px);overflow:auto;padding:12px 16px}
+@media(max-width:860px){.sidebar-shell{border-bottom:1px solid var(--line,rgba(255,255,255,.12));border-right:0;height:auto;max-height:44dvh;min-height:0;min-width:0;width:100%}.sidebar-shell__header{padding:11px 12px 8px}.sidebar-shell__body{height:auto;max-height:calc(44dvh - 58px);overflow:auto;padding:10px 12px}}
+@media(max-width:520px){.sidebar-shell{max-height:48dvh}.sidebar-shell__body{max-height:calc(48dvh - 54px)}.sidebar-shell__subtitle{display:none}}
 </style>

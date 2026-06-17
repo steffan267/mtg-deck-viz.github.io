@@ -89,6 +89,8 @@ defineExpose({
   width: 100%;
   height: 100%;
   cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .graph-canvas.dragging {

@@ -57,4 +57,5 @@ function barStyle(row: CardRankRow, max: number) {
 
 <style scoped>
 .card-ranks__group + .card-ranks__group{margin-top:10px}.card-ranks__heading{color:var(--text,#e7eef9);font-size:12px;margin:0 0 5px}.card-ranks__list{display:grid;gap:3px;list-style:none;margin:0;padding:0}.card-ranks__row{align-items:center;background:transparent;border:0;color:inherit;display:grid;font:inherit;font-size:11px;gap:7px;grid-template-columns:minmax(70px,1fr) 120px 28px;padding:1px 0;text-align:left;width:100%}.card-ranks__row--button{cursor:pointer}.card-ranks__row--button:hover .card-ranks__label{color:var(--text,#e7eef9)}.card-ranks__label{color:var(--dim,#8b98a8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.card-ranks__bar-track{background:rgba(255,255,255,.08);border-radius:3px;height:6px;overflow:hidden}.card-ranks__bar{border-radius:3px;display:block;height:100%;min-width:2px}.card-ranks__value{color:var(--text,#e7eef9);font-variant-numeric:tabular-nums;text-align:right}
+@media(max-width:520px){.card-ranks__row{grid-template-columns:minmax(52px,1fr) minmax(60px,.8fr) 24px}}
 </style>
