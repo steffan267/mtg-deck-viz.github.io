@@ -8,7 +8,6 @@ data/out/*.json.gz
 .DS_Store
 **/.DS_Store
 deck-viz.zip
-/index.html
 /.nojekyll
 /bootstrap-data.json
 /recommendation.worker-*.js

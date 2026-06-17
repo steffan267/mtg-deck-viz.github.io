@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '../..');
+const ROOT_INDEX = path.join(ROOT, 'index.html');
 const DOCS_INDEX = path.join(ROOT, 'docs/index.html');
 const DOCS_BOOTSTRAP = path.join(ROOT, 'docs/bootstrap-data.json');
 const DOCS_NOJEKYLL = path.join(ROOT, 'docs/.nojekyll');
@@ -49,9 +50,15 @@ try {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  test('writes the GitHub Pages static HTML artifact under docs only', () => {
+  test('writes the GitHub Pages static HTML artifact under docs', () => {
     assert.equal(fs.existsSync(DOCS_INDEX), true);
-    assert.equal(fs.existsSync(path.join(ROOT, 'index.html')), false);
+  });
+
+  test('keeps a root Pages fallback that redirects branch-root publishing to docs', () => {
+    assert.equal(fs.existsSync(ROOT_INDEX), true);
+    const rootHtml = fs.readFileSync(ROOT_INDEX, 'utf8');
+    assert.match(rootHtml, /url=\.\/docs\//);
+    assert.match(rootHtml, /window\.location\.replace\('\.\/docs\/'/);
   });
 
   test('preserves the GitHub Pages .nojekyll marker under docs only', () => {
