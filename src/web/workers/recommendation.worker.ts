@@ -2,6 +2,7 @@ import type { CandidateCard, DeckGraph, DeckNode, Interaction } from '../types/d
 import * as INTERACTION_MODEL from '../../interaction-model.js'
 import * as DECK_METRICS from '../../metrics.js'
 import type { RecommendationInput, RecommendationRow } from '../services/recommendations/types'
+import { normalizeInteractionModel, normalizeMetricsModule } from '../services/adapters/legacyModules'
 
 type LegacyModel = {
   classify(card: { type_line?: string; oracle_text?: string }): Partial<DeckNode>
@@ -18,6 +19,9 @@ const scope = self as unknown as Worker & typeof globalThis & {
   INTERACTION_MODEL?: LegacyModel
   DECK_METRICS?: LegacyMetrics
 }
+
+const interactionModel = normalizeInteractionModel(scope.INTERACTION_MODEL || INTERACTION_MODEL) as unknown as LegacyModel
+const deckMetrics = normalizeMetricsModule(scope.DECK_METRICS || DECK_METRICS) as unknown as LegacyMetrics
 
 const RANK: Record<string, number> = { weak: 1, moderate: 2, strong: 3, 'combo-critical': 4 }
 const TOTAL_VALUE_AXIS_SIGMA = { win: 6.94, cohesion: 16.59, self: 7.19 }
@@ -93,7 +97,7 @@ function tick(key: string, done: number, total: number): number {
 }
 
 function candidateNode(candidate: CandidateCard): DeckNode {
-  const classification = model().classify({ type_line: candidate.type, oracle_text: candidate.text })
+  const classification = interactionModel.classify({ type_line: candidate.type, oracle_text: candidate.text })
   return {
     id: candidate.name,
     qty: 1,
@@ -123,13 +127,13 @@ function cloneGraphWith(graph: DeckGraph, addedNode: DeckNode): DeckGraph {
 
   for (const node of nodes) {
     if (node.id === addedNode.id) continue
-    const interactions = model().interactionsBetween(addedNode, node)
+    const interactions = interactionModel.interactionsBetween(addedNode, node)
     if (interactions.length) {
       edges.push({
         source: addedNode.id,
         target: node.id,
         interactions,
-        events: model().eventsFromInteractions?.(interactions) || interactions.map(interaction => interaction.event || interaction.family || '').filter(Boolean),
+        events: interactionModel.eventsFromInteractions?.(interactions) || interactions.map(interaction => interaction.event || interaction.family || '').filter(Boolean),
       })
     }
   }

@@ -23,7 +23,7 @@ import * as INTERACTION_MODEL from '../interaction-model.js'
 import * as DECK_METRICS_NAMESPACE from '../metrics.js'
 import { useRecommendations } from './composables/useRecommendations'
 import type { CandidateCard, DeckGraph, DeckPayloadEntry, DeckMetrics, GraphNode, MetricsModule, MetricItem, RankGroup, ScoreSection, SignalBar } from './types'
-import type { InteractionModelModule } from './services/adapters/interactionModel'
+import { normalizeInteractionModel, normalizeMetricsModule } from './services/adapters/legacyModules'
 import type { DeckImportSource } from './services/import'
 import type { GraphInteraction, RenderNode } from './types/graph'
 
@@ -74,9 +74,10 @@ const layoutModeLabel = computed(() => layoutStrategies.find(strategy => strateg
 const saltReferences = computed(() => saltyCardReferences(cardNodes.value.map(node => node.id)))
 const deckGuideMetrics = computed(() => buildDeckGuideMetrics(cardNodes.value, activeMetrics.value))
 
-const metricsNamespace = DECK_METRICS_NAMESPACE as unknown as Record<string, unknown>
-const deckMetrics = ((globalThis as typeof globalThis & { DECK_METRICS?: unknown }).DECK_METRICS || metricsNamespace) as MetricsModule
-const buildGraph = createBrowserGraphBuilder(INTERACTION_MODEL as unknown as InteractionModelModule, deckMetrics)
+const metricsNamespace = DECK_METRICS_NAMESPACE as unknown as MetricsModule
+const deckMetrics = normalizeMetricsModule(((globalThis as typeof globalThis & { DECK_METRICS?: MetricsModule }).DECK_METRICS || metricsNamespace))
+const interactionModel = normalizeInteractionModel(INTERACTION_MODEL)
+const buildGraph = createBrowserGraphBuilder(interactionModel, deckMetrics)
 const deckImport = useDeckImport({
   buildGraph,
   fetch: globalThis.fetch?.bind(globalThis),
