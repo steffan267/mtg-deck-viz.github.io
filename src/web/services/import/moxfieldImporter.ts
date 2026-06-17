@@ -68,6 +68,7 @@ async function fetchMoxfieldDeck(id: string, context: Pick<DeckImportContext, 'f
   const api = `https://api2.moxfield.com/v3/decks/all/${id}`
   const sources = [api]
   if (context.moxfieldProxy) sources.push(`${context.moxfieldProxy.replace(/\/+$/, '')}/${id}`)
+  sources.push(`https://r.jina.ai/${api}`)
 
   let lastError: unknown
   for (const url of sources) {
@@ -85,7 +86,7 @@ async function fetchMoxfieldDeck(id: string, context: Pick<DeckImportContext, 'f
     }
   }
 
-  const suffix = context.moxfieldProxy ? '' : ' — configure a CORS proxy for live web import'
+  const suffix = context.moxfieldProxy ? '' : ' — configure a CORS proxy if the public fallback is unavailable'
   return err({ code: 'moxfield-failed', message: `Moxfield fetch failed${suffix}`, cause: lastError, retryable: true })
 }
 

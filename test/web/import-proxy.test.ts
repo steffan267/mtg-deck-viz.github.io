@@ -51,5 +51,31 @@ describe('deck import proxy wiring', () => {
     expect(result.ok).toBe(true)
     expect(urls).toContain('https://api2.moxfield.com/v3/decks/all/abc12345')
     expect(urls).toContain('https://proxy.example.test/abc12345')
+    expect(urls).not.toContain('https://r.jina.ai/https://api2.moxfield.com/v3/decks/all/abc12345')
+  })
+
+  it('falls back to the public reader when no configured proxy is available', async () => {
+    const urls: string[] = []
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      urls.push(url)
+      if (url.startsWith('https://api2.moxfield.com')) return new Response('blocked', { status: 403 })
+      if (url === 'https://r.jina.ai/https://api2.moxfield.com/v3/decks/all/abc12345') return new Response(`reader prefix\n${JSON.stringify(moxfieldPayload)}`, { status: 200 })
+      return new Response('not found', { status: 404 })
+    })
+    const buildGraph = createBrowserGraphBuilder(INTERACTION_MODEL as unknown as InteractionModelModule, DECK_METRICS as unknown as MetricsModule)
+    const importer = useDeckImport({
+      buildGraph,
+      fetch: fetcher as unknown as typeof fetch,
+      get moxfieldProxy() { return '' },
+    })
+
+    const result = await importer.importDeck({ kind: 'url', url: 'abc12345' })
+
+    expect(result.ok).toBe(true)
+    expect(urls).toEqual([
+      'https://api2.moxfield.com/v3/decks/all/abc12345',
+      'https://r.jina.ai/https://api2.moxfield.com/v3/decks/all/abc12345',
+    ])
   })
 })
