@@ -21,7 +21,7 @@ Candidate: Vue/Vite app under `src/web/` plus `src/build-web.js`.
 | Canvas graph: drag, pan, zoom, hover/select | Supported | `src/web/services/graphRenderer.ts`; app smoke covers detail selection and renderer lifecycle indirectly. |
 | Reset, relayout, freeze, hide isolated | Supported | `src/web/App.vue` toolbar controls and `GraphCanvas` renderer facade. |
 | Gravity modes | Supported | `src/web/services/graphLayoutStrategies.ts` preserves links+power, links/size=power, and power-weighted links modes. |
-| Role filtering | Supported | `RoleLegend.vue` toggles `roleVisibility` consumed by `GraphRenderer`. |
+| Role filtering | Renderer-supported, hidden in sidebar | `GraphRenderer` still honors `roleVisibility`; the visible sidebar role list was replaced by the current deck metrics guide. |
 | Tooltip and selected-card detail | Supported | Vue tooltip/detail restores role, event summary, family chips, pills, and interaction-web links. |
 | Deck tabs add/switch/remove | Supported | `DeckTabs.vue`; close now preserves the logical active deck when closing earlier tabs. |
 | Compare modal | Supported with richer parity | Uses `metricsToCompareRows()` for win summary, bracket, win tuning, Game Changers, cohesion, self-sufficiency, structure, and island counts. |
@@ -31,7 +31,7 @@ Candidate: Vue/Vite app under `src/web/` plus `src/build-web.js`.
 | Recommendations drawer | Supported | Worker-backed recommendation provider; drawer refreshes when the active deck changes while open. |
 | Help/onboarding | Supported | Help modal restores user-facing map/add/layout/recommendation guidance. |
 | Loading/drop affordances | Supported | Full-screen loading and drop overlays match the previous graph-side affordances. |
-| Styling parity | Mostly matched | Dark panel theme, red accent buttons/tabs, fixed right drawer, legacy modal chrome, input styling, bottom hint, and capped role scroll restored. |
+| Styling parity | Mostly matched | Dark panel theme, red accent buttons/tabs, fixed right drawer, legacy modal chrome, input styling, bottom hint, and deck metrics guide restored. |
 
 ## Intentional differences
 

@@ -49,6 +49,7 @@ export interface ScoreSection {
   evidence?: EvidenceBadge[]
   signals?: SignalBar[]
   metrics?: MetricItem[]
+  saltReferences?: { name: string; source: string }[]
   tone?: Tone
 }
 

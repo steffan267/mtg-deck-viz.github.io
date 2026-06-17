@@ -36,6 +36,17 @@ describe('ScoreCard color grading', () => {
     expect(wrapper.text()).toContain('Metric')
   })
 
+
+  it('shows salt references on the top-level score summary when provided', () => {
+    const salty = section('win', 91)
+    salty.saltReferences = [{ name: 'Rhystic Study', source: 'https://edhrec.com/top/salt' }]
+    const wrapper = mount(ScoreCard, { props: { section: salty } })
+
+    expect(wrapper.text()).toContain('EDHREC salt reference: Rhystic Study')
+    expect(wrapper.find('.score-card__salt').attributes('href')).toBe('https://edhrec.com/top/salt')
+    expect(wrapper.find('.score-card__salt').attributes('title')).toContain('Rhystic Study')
+  })
+
   it('emits signal-select when a selectable signal row is clicked', async () => {
     const wrapper = mount(ScoreCard, { props: { section: section('win', 91), selectableSignals: true } })
 

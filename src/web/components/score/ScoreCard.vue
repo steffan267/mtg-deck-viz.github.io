@@ -7,9 +7,20 @@
           <span class="score-card__label">{{ section.label }}:</span>
           <span class="score-card__value" :style="{ color: scoreColor(section) }">{{ section.value }}</span>
           <span v-if="section.band" class="score-card__band">- {{ section.band }}</span>
+          <a
+            v-if="section.saltReferences?.length"
+            class="score-card__salt"
+            :href="section.saltReferences[0].source"
+            target="_blank"
+            rel="noreferrer"
+            :title="saltTitle(section)"
+            aria-label="Win tuning includes cards on EDHREC's saltiest cards list"
+            @click.stop
+          >!</a>
         </span>
         <span class="score-card__chevron" aria-hidden="true">⌄</span>
         <span v-if="section.subtitle" class="score-card__subtitle">{{ section.subtitle }}</span>
+        <span v-if="section.saltReferences?.length" class="score-card__salt-reference">EDHREC salt reference: {{ section.saltReferences.map(card => card.name).join(', ') }}</span>
       </summary>
       <div class="score-card__details-card">
         <p v-if="section.summary" class="score-card__summary">{{ section.summary }}</p>
@@ -55,8 +66,12 @@ function scoreColor(section: ScoreSection): string | undefined {
   if (value >= 32) return '#e0a85a'
   return '#ff7a3d'
 }
+
+function saltTitle(section: ScoreSection): string {
+  return `Listed on EDHREC Top 100 Saltiest Cards: ${(section.saltReferences || []).map(card => card.name).join(', ')}`
+}
 </script>
 
 <style scoped>
-.score-card{display:grid;gap:8px}.score-card__summary-row{align-items:center;background:transparent;border:0;color:inherit;cursor:pointer;display:grid;gap:6px 8px;grid-template-columns:minmax(0,1fr) auto;list-style:none;padding:0}.score-card__summary-row::-webkit-details-marker{display:none}.score-card__headline{align-items:baseline;display:flex;flex-wrap:wrap;gap:6px;min-width:0}.score-card__label{color:var(--text,#e7eef9);font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.score-card__value{color:var(--text,#e7eef9);font-size:30px;font-weight:800;line-height:1}.score-card__band{color:var(--dim,#8b98a8);font-size:12px;letter-spacing:.1em;text-transform:uppercase}.score-card__subtitle{color:var(--dim,#8b98a8);font-size:12px;grid-column:1 / -1;line-height:1.35}.score-card__chevron{color:var(--dim,#8b98a8);font-size:16px;line-height:1;transition:transform .16s ease}.score-card[open] .score-card__chevron{transform:rotate(180deg)}.score-card__details-card{background:rgba(255,255,255,.035);border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px;display:grid;gap:8px;margin-top:8px;padding:10px}.score-card__summary{color:var(--text,#e7eef9);font-size:12px;line-height:1.4;margin:0}
+.score-card{display:grid;gap:8px}.score-card__summary-row{align-items:center;background:transparent;border:0;color:inherit;cursor:pointer;display:grid;gap:6px 8px;grid-template-columns:minmax(0,1fr) auto;list-style:none;padding:0}.score-card__summary-row::-webkit-details-marker{display:none}.score-card__headline{align-items:baseline;display:flex;flex-wrap:wrap;gap:6px;min-width:0}.score-card__label{color:var(--text,#e7eef9);font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.score-card__value{color:var(--text,#e7eef9);font-size:30px;font-weight:800;line-height:1}.score-card__band{color:var(--dim,#8b98a8);font-size:12px;letter-spacing:.1em;text-transform:uppercase}.score-card__salt{align-items:center;align-self:center;background:#d9434f;border-radius:999px;color:white;display:inline-flex;font-size:12px;font-weight:900;height:20px;justify-content:center;line-height:1;text-decoration:none;width:20px}.score-card__subtitle,.score-card__salt-reference{color:var(--dim,#8b98a8);font-size:12px;grid-column:1 / -1;line-height:1.35}.score-card__salt-reference{color:#f0c040}.score-card__chevron{color:var(--dim,#8b98a8);font-size:16px;line-height:1;transition:transform .16s ease}.score-card[open] .score-card__chevron{transform:rotate(180deg)}.score-card__details-card{background:rgba(255,255,255,.035);border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px;display:grid;gap:8px;margin-top:8px;padding:10px}.score-card__summary{color:var(--text,#e7eef9);font-size:12px;line-height:1.4;margin:0}
 </style>

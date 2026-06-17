@@ -14,6 +14,7 @@ function deck(title = 'Fixture deck'): DeckPayloadEntry {
       nodes: [
         { id: 'Sol Ring', role: 'ramp', degree: 2, qty: 1, text: 'Add two colorless mana.', type: 'Artifact', produces: { mana: ['you'] }, consumes: {}, zones: [], cmc: 1, mana: '{1}', ci: [], edh: null } as any,
         { id: 'Xantcha, Sleeper Agent', role: 'commander', degree: 1, qty: 1, text: 'Any player may activate this ability.', type: 'Legendary Creature', produces: {}, consumes: { mana: ['you'] }, zones: [], cmc: 3, mana: '{1}{B}{R}', ci: ['B', 'R'], edh: null } as any,
+        { id: 'Rhystic Study', role: 'draw', degree: 0, qty: 1, text: 'Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.', type: 'Enchantment', produces: { draw: ['you'] }, consumes: {}, zones: [], cmc: 3, mana: '{2}{U}', ci: ['U'], edh: null } as any,
         { id: 'Unlinked Card', role: 'utility', degree: 0, qty: 1, text: 'No direct interaction.', type: 'Artifact', produces: {}, consumes: {}, zones: [], cmc: 2, mana: '{2}', ci: [], edh: null } as any,
       ],
       edges: [
@@ -104,6 +105,14 @@ describe('Vue app browser smoke', () => {
     expect(wrapper.find('.deck-tabs-add').text()).toContain('2')
     expect(wrapper.findAll('details.score-card')).toHaveLength(3)
     expect(wrapper.text()).toContain('Fast mana and repeatable activated abilities.')
+    const guide = wrapper.find('.deck-metrics-guide')
+    expect(guide.text()).toContain('Current deck vs guidelines')
+    expect(guide.text()).toContain('Land / mana base')
+    expect(guide.text()).not.toContain('Commander')
+    expect(guide.text()).not.toContain('Win tuning')
+    expect(wrapper.text()).toContain('EDHREC salt reference: Rhystic Study')
+    expect(wrapper.find('.score-card__salt').attributes('href')).toBe('https://edhrec.com/top/salt')
+    expect(wrapper.find('.role-legend').exists()).toBe(false)
 
     await wrapper.findAll('button').find(button => button.text() === 'Deck breakdown')!.trigger('click')
     await nextTick()
