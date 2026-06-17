@@ -113,6 +113,12 @@ describe('Vue app browser smoke', () => {
     expect(wrapper.text()).toContain('EDHREC salt reference: Rhystic Study')
     expect(wrapper.find('.score-card__salt').attributes('href')).toBe('https://edhrec.com/top/salt')
     expect(wrapper.find('.role-legend').exists()).toBe(false)
+    const persistentDecklist = wrapper.get('[data-testid="persistent-decklist"]')
+    expect(persistentDecklist.text()).toContain('Decklist')
+    expect(persistentDecklist.text()).toContain('4 cards · 4 nonlands')
+    expect(persistentDecklist.text()).toContain('Sol Ring')
+    expect(persistentDecklist.text()).toContain('Rhystic Study')
+    expect(persistentDecklist.findAll('.deck-list__card')).toHaveLength(4)
 
     await wrapper.findAll('button').find(button => button.text() === 'Deck breakdown')!.trigger('click')
     await nextTick()
@@ -197,6 +203,7 @@ describe('Vue app browser smoke', () => {
     await nextTick()
     expect(wrapper.text()).toContain('Recommendations')
     expect(wrapper.text()).toContain('Deck cards')
+    expect(wrapper.get('[data-testid="persistent-decklist"]').text()).toContain('Arcane Signet')
 
     wrapper.unmount()
   })

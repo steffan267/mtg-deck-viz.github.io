@@ -3,6 +3,7 @@ import { createGraphRenderer } from '../../src/web/services/graphRenderer'
 import type { DeckGraph } from '../../src/web/types'
 import app from '../../src/web/App.vue?raw'
 import sidebar from '../../src/web/components/sidebar/SidebarShell.vue?raw'
+import deckList from '../../src/web/components/sidebar/DeckList.vue?raw'
 import imports from '../../src/web/components/import/ImportControls.vue?raw'
 import graphCanvas from '../../src/web/components/graph/GraphCanvas.vue?raw'
 import renderer from '../../src/web/services/graphRenderer.ts?raw'
@@ -26,6 +27,8 @@ describe('mobile browser responsive contracts', () => {
   it('keeps the sidebar and import dialog bounded on narrow screens', () => {
     expect(sidebar).toMatch(/@media\(max-width:860px\)/)
     expect(sidebar).toMatch(/\.sidebar-shell\{[^}]*max-height:44dvh[^}]*width:100%/)
+    expect(deckList).toMatch(/\.deck-list__cards\s*{[^}]*max-height:\s*min\(34vh,\s*260px\)/s)
+    expect(deckList).toMatch(/@media \(max-width: 860px\)[\s\S]*\.deck-list__cards\s*{[^}]*max-height:\s*26dvh/s)
     expect(imports).toMatch(/@media\(max-width:520px\)/)
     expect(imports).toMatch(/\.import-controls__paste-modal\{[^}]*max-height:calc\(100dvh - 20px\)[^}]*overflow:auto/)
   })

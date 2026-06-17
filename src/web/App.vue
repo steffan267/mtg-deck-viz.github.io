@@ -4,6 +4,7 @@ import GraphCanvas from './components/graph/GraphCanvas.vue'
 import ImportControls from './components/import/ImportControls.vue'
 import RecommendationsDrawer from './components/recommendations/RecommendationsDrawer.vue'
 import ModalShell from './components/common/ModalShell.vue'
+import DeckList from './components/sidebar/DeckList.vue'
 import DeckTabs from './components/sidebar/DeckTabs.vue'
 import SidebarShell from './components/sidebar/SidebarShell.vue'
 import DeckMetricsGuide from './components/sidebar/DeckMetricsGuide.vue'
@@ -809,6 +810,7 @@ function formatBreakdownValue(value: unknown): string | number {
             </div>
           </template>
         </DeckTabs>
+        <DeckList :nodes="cardNodes" :selected-id="selectedNodeId" :role-labels="ROLE_LABELS" @select-card="selectCard" />
         <label class="search-box">
           <span>Search cards</span>
           <input v-model.trim="searchTerm" type="search" placeholder="Search cards…" />
