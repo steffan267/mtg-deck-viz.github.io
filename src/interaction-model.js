@@ -1104,6 +1104,16 @@
         if (/sacrifice (a|an|another|two|three|x|that) creature|sacrifice x [a-z]+s?/.test(c)) caps.add("is-creature-sac-outlet");
         if (/sacrifice x [a-z]+s?/.test(c)) caps.add("is-creature-token-sac-outlet");
         if (/sacrifice (a|an|another|two|three|x|that) (artifact|token)/.test(c)) caps.add("is-artifact-sac-outlet");
+        if (/pay \d+ life/.test(c)
+            && /sacrifice (a|an|another|two|three|x|that) creature/.test(c)
+            && /create .*treasure/.test(e)) {
+          const lifeCost = c.match(/pay (\d+) life/);
+          const treasureCount = Math.max(1, tokenCountFor(e, "treasure"));
+          caps.add("is-life-paid-treasure-sac-outlet");
+          caps.add("life-sac-outlet-life-cost:" + (lifeCost ? lifeCost[1] : "1"));
+          caps.add("life-sac-outlet-mana-produced:" + treasureCount);
+          caps.add("life-sac-outlet-mana-any:" + treasureCount);
+        }
         if (/\badd \{|\badd (one|two|three|x|an amount)/.test(e)) {
           caps.add("is-mana-sac-outlet");
           addProducedManaCaps(caps, "sac-outlet", producedManaProfile(e));
@@ -1164,20 +1174,20 @@
         caps.add("is-lifeloss-from-your-lifegain");
       if (/whenever you gain life/.test(s.trigger) && /put (a|\d+) \+1\/\+1 counters? on target (creature|creature or enchantment)/.test(e))
         caps.add("is-lifegain-to-counter-payoff");
-      if (s.kind === "triggered"
-          && /\bwhenever (you|a player|an opponent) draws?\b/.test(s.trigger)
+      if ((s.kind === "triggered" || /\bwhenever\b/.test(s.trigger))
+          && /\bwhenever\b[^.]{0,100}\b(you|a player|an opponent) draws?\b/.test(s.trigger)
           && /\bdeals? (that much|\d+|x)? ?damage\b|\bdeals? damage equal\b/.test(e)) {
         caps.add("is-draw-to-damage-payoff");
-        if (/\bwhenever you draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:you");
-        else if (/\bwhenever a player draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:each");
-        else if (/\bwhenever an opponent draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:opp");
+        if (/\byou draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:you");
+        else if (/\ba player draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:each");
+        else if (/\ban opponent draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:opp");
       }
-      if (s.kind === "triggered"
-          && /\bdeals? (combat )?damage to (a player|an opponent|one of your opponents|that player|any target)\b/.test(s.trigger)
+      if ((s.kind === "triggered" || /\bwhenever\b/.test(s.trigger))
+          && /\bdeals? (noncombat |combat )?damage to (a player|an opponent|one of your opponents|that player|any target)\b/.test(s.trigger)
           && /draw (a card|two cards|three cards|that many cards?)/.test(e))
         caps.add("is-damage-to-draw-payoff");
-      if (s.kind === "triggered"
-          && /\bwhenever (an opponent|a player) draws?\b/.test(s.trigger)
+      if ((s.kind === "triggered" || /\bwhenever\b/.test(s.trigger))
+          && /\bwhenever\b[^.]{0,100}\b(an opponent|a player) draws?\b/.test(s.trigger)
           && /(loses? \d+ life|deals? \d+ damage|loses? that much life|deals? that much damage)/.test(e)) {
         caps.add("is-opponent-draw-punisher");
         if (/loses? \d+ life|deals? \d+ damage/.test(e)) {
@@ -1277,6 +1287,10 @@
       }
       if (/if one or more tokens? would be created under your control|if .* would create .* tokens?.* instead|tokens? plus .* token .* created instead|twice that many tokens|double .* tokens/.test(e))
         caps.add("is-token-doubler");
+      if (/if .*tokens? would be created under your control.*tokens?.*created instead/.test(e)
+          || /if .*would create .*tokens?.*instead create .*tokens?/.test(e)
+          || /tokens? plus .*tokens?.*created instead/.test(e))
+        caps.add("is-token-replacement-modifier");
       if (/tokens? plus that many .*creature tokens? .* created instead|tokens? plus .*creature tokens? .* created instead|create that many .*creature tokens? in addition/.test(e))
         caps.add("is-token-to-creature-token-replacer");
 
@@ -1509,6 +1523,7 @@
     { family: "copy→trigger",      from: "is-permanent-copy", to: "has-etb",     kind: "synergy",     strength: "moderate" },
     { family: "etb-doubler",       from: "is-etb-doubler", to: "has-etb",       kind: "synergy",     strength: "strong" },
     { family: "token-production→amplifier", from: "is-token-producer", to: "is-token-doubler", kind: "synergy", strength: "strong" },
+    { family: "token-production→replacement", from: "is-token-producer", to: "is-token-replacement-modifier", kind: "synergy", strength: "moderate" },
     { family: "vehicle→payoff",    from: "is-vehicle", to: "is-vehicle-payoff", kind: "synergy",     strength: "moderate" },
     { family: "land-recursion→landfall", from: "is-land-recursion", to: "is-landfall-payoff", kind: "synergy", strength: "moderate" },
     // --- Wave 2 payoff engines (the two biggest missed archetypes) ---
@@ -1925,6 +1940,7 @@
   EVENT_LABEL["enable:death→tokens"] = "death → token payoff";
   EVENT_LABEL["enable:go-wide→payoff"] = "tokens → go-wide payoff";
   EVENT_LABEL["enable:token-production→amplifier"] = "token production → token amplifier";
+  EVENT_LABEL["enable:token-production→replacement"] = "token production → token replacement";
   EVENT_LABEL["enable:proliferate→counters"] = "proliferate → counters";
   EVENT_LABEL["enable:counter-multiplier"] = "counter doubler → counters";
   EVENT_LABEL["enable:enchantress"] = "enchantment → enchantress payoff";

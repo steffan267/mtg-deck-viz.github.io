@@ -10,18 +10,23 @@ The full local/generated report is `analysis/edhrec-combos/edhrec-combo-evaluati
 - Unique combo summaries fetched: **54,714**
 - Evaluable combos: **54,710**
 - Local card resolution: **54,367/54,710** (99.4%)
-- Proven by bounded proof/package logic: **527/54,710** (1.0%), up from **508** before G003.
-- Combo-family detection: **1,997 signal hits** / **3.6%** combo-level detection.
-- Expected result-class coverage: **1,750/48,825** (3.6%); proof-only coverage: **1,747/48,825** (3.6%).
-- Unresolved buckets: **23,601** generic-edge-only, **17,620** bounded-out, **12,616** missed, **343** missing-card, **3** classified-not-proven.
+- Proven by bounded proof/package logic: **543/54,710** (1.0%), up from **527** at the previous pushed baseline and **508** before G003.
+- Combo-family detection: **2,013 signal hits** / **3.6%** combo-level detection.
+- Expected result-class coverage: **1,771/49,532** (3.6%); proof-only coverage: **1,768/49,532** (3.6%).
+- Result-label taxonomy gaps: **41,877** combos contain **61,236** unmapped label instances.
+- Unresolved buckets: **23,607** generic-edge-only, **17,620** bounded-out, **12,594** missed, **343** missing-card, **3** classified-not-proven.
 
-## Covered in G003
+## Covered in G003-G005
 
 These were previously in the hard-case list and are now covered by generalized rules, not card-name exceptions:
 
 - fixed lifegain→opponent-lifeloss paired with opponent-lifeloss→lifegain;
 - nonland-permanent mana amplifiers paired with compatible break-even colorless self-untappers;
 - lifelink + lifegain-to-counter + counter-to-damage creature loops with target-legality checks, reported as damage/life loops only because the counter is spent and restored rather than grown without bound.
+- replacement-only token modifiers now surface as non-combo token replacement edges without broadening token-replacement sacrifice loop proof semantics;
+- Niv-style noncombat damage→draw feedback now proves through generic draw/damage capabilities;
+- compound ETB/opponent-draw punishers now feed mass-draw threshold win packages;
+- Warren/Gravecrawler/Blood-Artist-style loops now prove through `life-paid-treasure-recursive-drain-loop`, with explicit life-payment, Treasure-mana, and controlled-type precondition gates.
 
 ## Highest-priority hard cases
 
@@ -41,7 +46,7 @@ These were previously in the hard-case list and are now covered by generalized r
 | The Gitrog Monster + Dakmor Salvage | Infinite self-mill; Near-infinite self-discard triggers | missed | result taxonomy + self-discard/graveyard fuel loop modeling |
 | Sensei's Divining Top + Aetherflux Reservoir + Bolas's Citadel | Infinite card draw; Infinite draw triggers; Near-infinite damage; Near-infinite lifegain; Near-infinite lifegain triggers; Near-infinite storm count | generic-edge-only | top-of-library plus life-payment and lifegain payoff accounting |
 | Teferi, Time Raveler + Displacer Kitten + Sol Ring | Infinite card draw; Infinite draw triggers; Near-infinite colorless mana; Near-infinite storm count | missed | noncreature-spell blink reset with mana-positive recast and draw permanent |
-| Orcish Bowmasters + Peer into the Abyss | Infinite +1/+1 counters on a creature; Near-infinite card draw for target opponent; Near-infinite damage; Near-infinite draw triggers for target opponent; Target opponent loses the game | missed | opponent-draw punisher variant with damage/counter results, not just life-loss threshold |
+| Razorkin Needlehead + Peer into the Abyss | Near-infinite damage to one opponent; Near-infinite draw triggers for target opponent; Near-infinite card draw for target opponent; Near-infinite lifeloss for target opponent | proved but result-class mismatch | finite opponent-draw threshold win is detected, but EDHREC near-infinite damage/draw/lifeloss labels need finite-vs-near-infinite result taxonomy |
 | The Reaver Cleaver + Aggravated Assault | Infinite colored mana; Infinite combat damage; Infinite combat phases; Infinite mana creatures you control can produce; Infinite Treasure tokens; Infinite untap of creatures you control | missed | extra-combat treasure/equipment engine with combat damage payment continuity |
 | Ghostly Flicker + Peregrine Drake + Archaeomancer | Infinite blinking; Infinite ETB; Infinite landfall triggers; Infinite LTB; Infinite magecraft triggers; Infinite mana lands you control can produce; Infinite storm count; Infinite untap of lands you control | generic-edge-only | spell-recursion blink loop with stack/spell-return and land mana positivity |
 | Skirk Prospector + Goblin Warchief + Krenko, Mob Boss | Infinite commander casts; Infinite creature tokens with haste; Infinite death triggers; Infinite ETB; Infinite LTB; Infinite red mana; Infinite sacrifice triggers; Infinite storm count | generic-edge-only | token factory + cost reduction + sacrifice mana; needs count-growth accounting |
@@ -65,7 +70,7 @@ These categories are not good candidates for quick permissive rules. They need e
 4. **Finite threshold wins/locks:** lock, infinite turns, alternate-win, protection/prevention, and library-access labels need evaluator taxonomy first, then separate finite-package proof semantics.
 5. **Variable-count engines:** creature-count or land-count mana sources should not be treated as positive without a conservative lower bound from package-local permanents.
 6. **Token subtype conversion:** Food, Clue, Treasure, land, and creature token loops need subtype-specific costs/results to avoid false positives.
-7. **Subject-sensitive feedback:** opponent-only, you-only, each-player, and target-player draw/life/damage triggers must remain distinct; G003 covered only the fixed-lifeloss and counter-neutral lifelink/counter/damage subset.
+7. **Subject-sensitive feedback:** opponent-only, you-only, each-player, and target-player draw/life/damage triggers must remain distinct; G003/G005 covered fixed-lifeloss, counter-neutral lifelink/counter/damage, noncombat damage→draw, and finite opponent-draw threshold subsets only.
 
 ## Regression expectations for any fix
 

@@ -13,21 +13,22 @@ Source artifacts are local/ignored because they are large:
 - Cache: `analysis/edhrec-combos/edhrec-combo-cache.json`
 - Evaluation report: `analysis/edhrec-combos/edhrec-combo-evaluation.{json,md}`
 
-Clean fetch/evaluation result after the first G003 classifier slice and final review corrections:
+Clean fetch/evaluation result after the current G005 coverage iteration:
 
 - EDHREC categories discovered: **34**
 - Unique combo summaries fetched: **54,714**
 - Fetch failures: **0**
 - Evaluable combos with card names and result labels: **54,710**
 - All cards resolved locally: **54,367/54,710** (99.4%)
-- Bounded proof/package successes: **527/54,710** (1.0%), up from **508** before G003.
-- Combo-family detection: **1,997 signal hits**, **3.6%** combo-level detection, up from **1,968** hits / **3.5%**.
-- Expected result-class coverage: **1,750/48,825** (3.6%), up from **1,721/48,825**.
-- Proof-only expected result-class coverage: **1,747/48,825** (3.6%).
+- Bounded proof/package successes: **543/54,710** (1.0%), up from **527** at the previous pushed baseline and **508** before G003.
+- Combo-family detection: **2,013 signal hits**, **3.6%** combo-level detection, up from **1,997** hits at the previous pushed baseline.
+- Expected result-class coverage: **1,771/49,532** (3.6%), up from **1,750** covered rows while using a stricter taxonomy denominator.
+- Proof-only expected result-class coverage: **1,768/49,532** (3.6%).
+- Result-label taxonomy gaps are now explicit: **41,877** combos contain **61,236** unmapped EDHREC label instances, led by `Infinite LTB`, `Infinite landfall triggers`, `Lock`, and `Infinite turns`.
 - Unresolved buckets:
-  - `generic-edge-only`: **23,601**
+  - `generic-edge-only`: **23,607**
   - `bounded-out`: **17,620**
-  - `missed`: **12,616**
+  - `missed`: **12,594**
   - `missing-card`: **343**
   - `classified-not-proven`: **3**
 
@@ -41,27 +42,38 @@ The first iteration intentionally targeted conservative, high-signal variants th
 
 Regression coverage added positive and negative unit tests, proof-package tests, evaluator fixtures, validation corpus rows, and hardening/no-hardcode checks. The validation corpus is now **46** cases (**24** positive, **22** negative) with 100% sampled recall/precision.
 
+### G004/G005 generalized slices completed
+
+The current iteration added only generalized text/capability/proof logic:
+
+- EDHREC result-label taxonomy now reports partially unmapped labels and adds safe aliases for `opponent/player loses the game` and `Infinite self-mill`.
+- Divine-Visitation-style replacement-only token modifiers now get `is-token-replacement-modifier` and a non-combo `token-production→replacement` edge without broadening creature-token replacement loop proofs.
+- Proven packages now contribute fact-gated result classes from their `positiveDeltas`, so a proof can expose demonstrated resources such as draw, damage, casts, deaths, sacrifices, lifegain, or opponent life loss without broadening a whole family globally. Delta-derived classes are now gated by both directional positivity and an explicit per-family `resultClasses`/`proofDeltaResultClasses` contract.
+- `aristocrats-body-outlet-payoff` now emits payoff-specific deltas for death-drain, death-draw, and death-token variants.
+- Draw/damage feedback recognizes source-controlled noncombat damage draw payoffs, and compound ETB/opponent-draw punisher triggers are preserved for threshold win packages.
+- Added `life-paid-treasure-recursive-drain-loop`, a bounded family for recursive cast bodies plus life-paid Treasure sacrifice outlets plus death-drain lifegain payoffs. It requires package-local mana coverage, life-payment replenishment, and any type-control recursion precondition; it does not treat life-paid Treasure outlets as free mana outlets.
+
 ## Missing result classes
 
 Counts below are EDHREC expected result-class instances still missed after all current model signals. One combo can contribute to multiple classes.
 
 | Missed expected result class | Missed class instances |
 | --- | ---: |
-| infinite-etb | 36,253 |
-| infinite-death | 24,372 |
-| infinite-sacrifice | 23,012 |
-| infinite-mana | 20,178 |
-| infinite-cast | 13,023 |
-| infinite-tokens | 13,021 |
+| infinite-etb | 36,240 |
+| infinite-death | 24,359 |
+| infinite-sacrifice | 22,999 |
+| infinite-mana | 20,137 |
+| infinite-cast | 13,001 |
+| infinite-tokens | 12,985 |
 | infinite-counters | 8,833 |
-| infinite-life | 7,082 |
-| infinite-draw | 6,017 |
+| infinite-life | 7,012 |
+| infinite-draw | 5,961 |
 | infinite-untap | 5,295 |
-| infinite-damage | 5,046 |
-| infinite-opponent-life-loss | 2,480 |
+| infinite-damage | 5,044 |
+| mill | 2,977 |
+| infinite-opponent-life-loss | 2,410 |
 | combat | 1,877 |
-| mill | 1,829 |
-| win | 653 |
+| win | 1,687 |
 | empty-library | 476 |
 | bounce-loop | 432 |
 | exile-loop | 205 |
@@ -76,7 +88,7 @@ Overlapping high-level clusters from the same unresolved rows:
 | Draw/untap/threshold engines | 10,536 | top-of-library draw loops; big-mana untap engines; noncreature-spell blink/draw loops |
 | Mill/exile/library/win mapping | 3,023 | self-mill fuel loops; finite mill thresholds; library-exile/play-until-end-of-turn loops |
 | Combat/extra-combat engines | 1,867 | extra-combat payment loops; combat-damage treasure engines; Helm-style combat token loops |
-| Unclassified EDHREC labels | 5,865 | lock, infinite turns, self-discard, protection/prevention, direct alternate-win labels |
+| Unmapped EDHREC labels | 41,877 combos / 61,236 label instances | LTB, landfall, lock, infinite turns, self-discard, scry/surveil/looting, protection/prevention |
 
 ## Ranked generalized opportunities
 
@@ -127,7 +139,7 @@ Overlapping high-level clusters from the same unresolved rows:
 
 ### 4. Recursive body + sacrifice/reanimation engines
 
-**Observed gap:** unresolved rows dominate `infinite-death`, `infinite-sacrifice`, and `infinite-etb`. Existing proof handles some recursive body/mana cases but misses body-fodder, reanimation-payment, and replacement variants.
+**Observed gap:** unresolved rows dominate `infinite-death`, `infinite-sacrifice`, and `infinite-etb`. Existing proof handles some recursive body/mana cases, and G005 now covers life-paid Treasure recursive-drain loops, but the engine still misses body-fodder, reanimation-payment, artifact-recursion, and replacement variants.
 
 **Example evidence:** recurring creature plus sacrifice outlet plus death/life/token/mana payoff; reanimation artifact/enchantment payment loops.
 
@@ -157,7 +169,7 @@ Overlapping high-level clusters from the same unresolved rows:
 
 ### 6. Life/loss/damage/counter feedback variants
 
-**Observed gap:** G003 now covers fixed lifegain→opponent-lifeloss, nonland mana amplification, and lifelink/counter/damage creature loops that restore the spent counter. Remaining rows are broader variants: life-payment damage loops, opponent-draw damage/counter punishers, true counter-growth variants, each-player subject mismatches, and finite kill packages that lack a repeatable resource cycle.
+**Observed gap:** G003 now covers fixed lifegain→opponent-lifeloss, nonland mana amplification, and lifelink/counter/damage creature loops that restore the spent counter. G005 also covers noncombat damage→draw feedback and compound opponent-draw threshold punishers. Remaining rows are broader variants: life-payment damage loops, opponent-draw damage/counter result accounting beyond threshold wins, true counter-growth variants, each-player subject mismatches, and finite kill packages that lack a repeatable resource cycle.
 
 **Example evidence:** life-payment damage that triggers lifegain, opponent draw creating damage/counters, and subject-sensitive draw/life/damage loops.
 

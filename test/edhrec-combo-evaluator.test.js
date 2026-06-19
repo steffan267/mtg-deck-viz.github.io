@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const {
   classifyResultLabels,
+  classifyResultLabelsDetailed,
+  classesForProofDeltas,
   evaluateCombo,
   resultCoverage,
   summarizeEvaluations,
@@ -60,6 +62,11 @@ const idx = {
   },
   'conditional recursive body': card('Conditional Recursive Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control another creature.', 1, '{B}'),
   'separate creature support': card('Separate Creature Support', 'Creature — Human', 'A separate creature permanent that remains on the battlefield.', 2),
+  'aristocrats token body': card('Aristocrats Token Body', 'Creature', 'When this creature enters the battlefield, create a 1/1 white Soldier creature token.', 2),
+  'free creature sac outlet': card('Free Creature Sac Outlet', 'Creature', 'Sacrifice a creature: Scry 1.', 1),
+  'death drain payoff': card('Death Drain Payoff', 'Creature', 'Whenever another creature you control dies, each opponent loses 1 life and you gain 1 life.', 2),
+  'typed recursive cast body': card('Typed Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control a Zombie.', 1, '{B}'),
+  'life-paid treasure outlet': card('Life-Paid Treasure Outlet', 'Creature — Zombie Advisor', 'Pay 1 life, Sacrifice another creature: Create a Treasure token.', 2),
   'artifact outlet // vanilla creature': {
     name: 'Artifact Outlet // Vanilla Creature',
     layout: 'modal_dfc',
@@ -82,7 +89,21 @@ const idx = {
 };
 
 assert.deepEqual(classifyResultLabels(['Infinite lifegain', 'Win the game', 'Exile your library']), ['empty-library', 'infinite-life', 'win']);
+assert.deepEqual(classifyResultLabels(['Each opponent loses the game', 'Target player loses the game', 'Infinite self-mill']), ['mill', 'win']);
+assert.deepEqual(classifyResultLabelsDetailed(['Infinite lifegain', 'Infinite LTB']), {
+  classes: ['infinite-life'],
+  unmappedLabels: ['Infinite LTB'],
+});
 assert.deepEqual(resultCoverage(['infinite-life', 'win'], ['infinite-life']).missed, ['win']);
+assert.deepEqual(classesForProofDeltas([
+  { family: 'blink-etb-land-untap-loop', positiveDeltas: [{ resource: 'mana', min: 0, max: 0 }] },
+]), []);
+assert.deepEqual(classesForProofDeltas([
+  { family: 'recursive-body-sacrifice-mana-loop', positiveDeltas: [{ resource: 'mana', min: 1, max: 1 }, { resource: 'casts', min: 1, max: Infinity }] },
+]), ['infinite-cast', 'infinite-mana']);
+assert.deepEqual(classesForProofDeltas([
+  { family: 'aristocrats-body-outlet-payoff', positiveDeltas: [{ resource: 'mana', min: 1, max: 1 }] },
+]), []);
 
 const lifeLoop = evaluateCombo({
   id: 'life-loop',
@@ -286,6 +307,37 @@ assert.equal(tokenReplacementSacLoop.bucket, 'proved');
 assert.ok(tokenReplacementSacLoop.familySignals.includes('token-replacement-sacrifice-mana-loop'));
 assert.equal(tokenReplacementSacLoop.resultCoverage.coveredAny, true);
 
+const aristocratsDrainLoop = evaluateCombo({
+  id: 'aristocrats-drain-loop',
+  detailPath: '/combos/test/aristocrats-drain-loop',
+  url: 'https://example.test/aristocrats-drain-loop',
+  cards: ['Aristocrats Token Body', 'Free Creature Sac Outlet', 'Death Drain Payoff'],
+  cardCount: 3,
+  results: ['Infinite death triggers', 'Infinite sacrifice triggers', 'Infinite lifegain', 'Infinite lifeloss'],
+  categories: ['test'],
+  metadata: { deckCount: 2 },
+}, idx);
+assert.equal(aristocratsDrainLoop.bucket, 'proved');
+assert.ok(aristocratsDrainLoop.familySignals.includes('aristocrats-body-outlet-payoff'));
+assert.ok(aristocratsDrainLoop.proofDeltaClasses.includes('infinite-life'));
+assert.ok(aristocratsDrainLoop.proofDeltaClasses.includes('infinite-opponent-life-loss'));
+assert.equal(aristocratsDrainLoop.resultCoverage.coveredAny, true);
+
+const lifePaidTreasureRecursiveDrainLoop = evaluateCombo({
+  id: 'life-paid-treasure-recursive-drain-loop',
+  detailPath: '/combos/test/life-paid-treasure-recursive-drain-loop',
+  url: 'https://example.test/life-paid-treasure-recursive-drain-loop',
+  cards: ['Typed Recursive Cast Body', 'Life-Paid Treasure Outlet', 'Death Drain Payoff'],
+  cardCount: 3,
+  results: ['Infinite death triggers', 'Infinite ETB', 'Infinite lifegain', 'Infinite lifeloss', 'Infinite sacrifice triggers', 'Infinite storm count'],
+  categories: ['test'],
+  metadata: { deckCount: 2 },
+}, idx);
+assert.equal(lifePaidTreasureRecursiveDrainLoop.bucket, 'proved');
+assert.ok(lifePaidTreasureRecursiveDrainLoop.familySignals.includes('life-paid-treasure-recursive-drain-loop'));
+assert.ok(!lifePaidTreasureRecursiveDrainLoop.proofDeltaClasses.includes('infinite-life'));
+assert.equal(lifePaidTreasureRecursiveDrainLoop.resultCoverage.coveredAny, true);
+
 const mutualEtbBlinkDfcNearMiss = evaluateCombo({
   id: 'mutual-etb-blink-dfc-near-miss',
   detailPath: '/combos/test/mutual-etb-blink-dfc-near-miss',
@@ -341,6 +393,19 @@ const miss = evaluateCombo({
 assert.equal(miss.bucket, 'missing-card');
 assert.deepEqual(miss.missing, ['Missing Card']);
 
+const unmappedOnly = evaluateCombo({
+  id: 'unmapped-only',
+  detailPath: '/combos/test/unmapped-only',
+  url: 'https://example.test/unmapped-only',
+  cards: ['Blank Rock'],
+  cardCount: 1,
+  results: ['Infinite LTB'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.deepEqual(unmappedOnly.expectedClasses, []);
+assert.deepEqual(unmappedOnly.unmappedLabels, ['Infinite LTB']);
+
 const summary = summarizeEvaluations([
   lifeLoop,
   fixedLifeLoop,
@@ -364,7 +429,12 @@ assert.equal(summary.byBucket['missing-card'], 1);
 assert.equal(summary.proofOnlyExpectedClassCoverage.considered, 15);
 assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAny, 13);
 assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAnyPct, 86.7);
+const taxonomyGapSummary = summarizeEvaluations([unmappedOnly], { source: 'fixture' });
+assert.equal(taxonomyGapSummary.unmappedResultLabels.combosWithAny, 1);
+assert.equal(taxonomyGapSummary.unmappedResultLabels.labelInstances, 1);
+assert.equal(taxonomyGapSummary.unmappedResultLabels.topLabels['Infinite LTB'], 1);
 assert.ok(renderMarkdown({ summary, edgeCases: [] }).includes('EDHREC combo model baseline'));
 assert.ok(renderMarkdown({ summary, edgeCases: [] }).includes('Proof-only expected result-class coverage'));
+assert.ok(renderMarkdown({ summary: taxonomyGapSummary, edgeCases: [] }).includes('Unmapped EDHREC result labels'));
 
 process.stdout.write('EDHREC combo evaluator tests passed\n');

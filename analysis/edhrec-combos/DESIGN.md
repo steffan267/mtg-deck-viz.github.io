@@ -59,7 +59,7 @@ Tracked tools/tests:
 
 ## Current full-corpus baseline
 
-As of the 2026-06-19 clean run, the scraper fetched 34 EDHREC combo categories, 54,714 unique combo summaries, and 54,710 evaluable rows. The local evaluator resolves 99.4% of those rows against the checked-in card index. After the first generalized classifier iteration, bounded proof/package logic proves 527 rows and detects 1,997 combo-family signals without runtime card-name branches.
+As of the 2026-06-19 G005 clean run, the scraper fetched 34 EDHREC combo categories, 54,714 unique combo summaries, and 54,710 evaluable rows. The local evaluator resolves 99.4% of those rows against the checked-in card index. After the current generalized coverage iteration, bounded proof/package logic proves 543 rows and detects 2,013 combo-family signals without runtime card-name branches. Expected result-class coverage is 1,771/49,532 (3.6%) with the stricter taxonomy denominator, and proof-only coverage is 1,768/49,532 (3.6%).
 
 ## Evaluation approach
 
@@ -70,8 +70,12 @@ For each cached combo record:
 3. Run bounded proof search (`provePackage`) and proof-package generation where
    card count is within current bounds.
 4. Compare model outputs to EDHREC result labels by family `resultClasses` from
-   `src/combo-family-library.js`, not by exact card names.
-5. Report detected/proven/no-proof/missing-data buckets and deduped edge-case
+   `src/combo-family-library.js` plus fact-gated bounded proof `positiveDeltas`.
+   Delta-derived classes must be directionally positive and explicitly allowed
+   by the family contract; they are never inferred from exact card names.
+5. Report partially unmapped EDHREC result labels so taxonomy gaps are visible
+   even when another label on the same combo is classified.
+6. Report detected/proven/no-proof/missing-data buckets and deduped edge-case
    shapes.
 
 ## Hardcoding guard

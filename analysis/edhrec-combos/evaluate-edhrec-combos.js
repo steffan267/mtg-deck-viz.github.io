@@ -21,7 +21,7 @@ const DEFAULT_MD_OUT = path.join(__dirname, 'edhrec-combo-evaluation.md');
 const MAX_EDGE_CASES = 40;
 
 const RESULT_CLASS_PATTERNS = [
-  { id: 'win', re: /\bwin the game\b|opponents? lose the game/i },
+  { id: 'win', re: /\bwin the game\b|(?:each |target |all )?(?:opponents?|players?) loses? the game/i },
   { id: 'empty-library', re: /exile your library|library.*empty|empty library/i },
   { id: 'infinite-mana', re: /infinite .*mana|infinite mana/i },
   { id: 'infinite-life', re: /infinite (life|lifegain)|infinite .*life gain/i },
@@ -35,7 +35,7 @@ const RESULT_CLASS_PATTERNS = [
   { id: 'infinite-cast', re: /infinite (storm|magecraft|cast|spell)/i },
   { id: 'infinite-untap', re: /infinite untap/i },
   { id: 'infinite-counters', re: /infinite .*counters?/i },
-  { id: 'mill', re: /mill (each|all|target|your opponent)|infinite mill/i },
+  { id: 'mill', re: /mill (each|all|target|your opponent)|infinite (?:self[- ]?)?mill/i },
   { id: 'exile-loop', re: /infinite exile|exile all/i },
   { id: 'bounce-loop', re: /infinite bounce|return .* to .*hand/i },
   { id: 'combat', re: /infinite combat|additional combat/i },
@@ -52,6 +52,11 @@ const FAMILY_CLASS_MAP = Object.assign(
   Object.fromEntries(Object.entries(FAMILY_CLASS_ALIASES)
     .map(([alias, familyId]) => [alias, (COMBO_FAMILIES.find(family => family.id === familyId) || {}).resultClasses || []])),
 );
+const FAMILY_PROOF_DELTA_CLASS_MAP = Object.fromEntries(COMBO_FAMILIES
+  .map(family => [
+    family.id,
+    sortedUnique([...(family.resultClasses || []), ...(family.proofDeltaResultClasses || [])]),
+  ]));
 
 function usage() {
   console.error('Usage: node analysis/edhrec-combos/evaluate-edhrec-combos.js [--cache file] [--json-out file] [--md-out file] [--max n]');
@@ -99,14 +104,24 @@ function detailedCombos(cache, max = Infinity) {
     .slice(0, max);
 }
 
-function classifyResultLabels(labels) {
+function classifyResultLabelsDetailed(labels) {
   const classes = new Set();
+  const unmappedLabels = [];
   for (const label of labels || []) {
+    let matched = false;
     for (const pattern of RESULT_CLASS_PATTERNS) {
-      if (pattern.re.test(label)) classes.add(pattern.id);
+      if (pattern.re.test(label)) {
+        classes.add(pattern.id);
+        matched = true;
+      }
     }
+    if (!matched) unmappedLabels.push(label);
   }
-  return sortedUnique([...classes]);
+  return { classes: sortedUnique([...classes]), unmappedLabels: sortedUnique(unmappedLabels) };
+}
+
+function classifyResultLabels(labels) {
+  return classifyResultLabelsDetailed(labels).classes;
 }
 
 function hasCap(card, cap) {
@@ -303,6 +318,42 @@ function classesForFamilies(families) {
   return sortedUnique((families || []).flatMap(family => FAMILY_CLASS_MAP[family] || []));
 }
 
+const PROOF_DELTA_CLASS_MAP = {
+  mana: 'infinite-mana',
+  life: 'infinite-life',
+  opponentLife: 'infinite-opponent-life-loss',
+  damage: 'infinite-damage',
+  cards: 'infinite-draw',
+  tokens: 'infinite-tokens',
+  mill: 'mill',
+  counters: 'infinite-counters',
+  deathTriggers: 'infinite-death',
+  sacrifices: 'infinite-sacrifice',
+  etbTriggers: 'infinite-etb',
+  casts: 'infinite-cast',
+  untaps: 'infinite-untap',
+};
+
+function classesForProofDeltas(proofs) {
+  const classes = new Set();
+  for (const proof of proofs || []) {
+    const familyId = FAMILY_CLASS_ALIASES[proof.family] || proof.family;
+    const allowedClasses = FAMILY_PROOF_DELTA_CLASS_MAP[familyId] || [];
+    for (const delta of proof.positiveDeltas || []) {
+      const cls = PROOF_DELTA_CLASS_MAP[delta.resource];
+      if (!cls) continue;
+      if (!allowedClasses.includes(cls)) continue;
+      if (delta.resource === 'opponentLife') {
+        if (!(delta.min === -Infinity || delta.max < 0)) continue;
+      } else if (!(delta.min > 0 || delta.max > 0)) {
+        continue;
+      }
+      classes.add(cls);
+    }
+  }
+  return sortedUnique([...classes]);
+}
+
 function resultCoverage(expectedClasses, modelClasses) {
   const expected = new Set(expectedClasses || []);
   const model = new Set(modelClasses || []);
@@ -332,7 +383,8 @@ function evaluateCombo(combo, idx) {
   const decklist = combo.cards.map(name => ({ qty: 1, name }));
   const graph = build(decklist, idx, { includeInteractionProofs: true });
   const nodes = (graph.nodes || []).filter(node => node.role !== 'zone');
-  const expectedClasses = classifyResultLabels(combo.results);
+  const resultClassification = classifyResultLabelsDetailed(combo.results);
+  const expectedClasses = resultClassification.classes;
   const proof = nodes.length ? provePackage(nodes, { limits: { maxCards: 3, maxBranches: 16, maxDepth: 6 } }) : { status: 'missing-card', proofs: [], rejections: [] };
   const indexes = buildInteractionIndexes(nodes);
   const proofFamilies = sortedUnique((proof.proofs || []).map(item => item.family));
@@ -345,8 +397,9 @@ function evaluateCombo(combo, idx) {
     ...edgeFamilies(graph).filter(family => FAMILY_CLASS_MAP[family]),
     ...detectCapabilityFamilies(nodes),
   ]);
-  const proofOnlyModelClasses = classesForFamilies(proofOnlyFamilies);
-  const modelClasses = classesForFamilies(familySignals);
+  const proofDeltaClasses = classesForProofDeltas(proof.proofs);
+  const proofOnlyModelClasses = sortedUnique([...classesForFamilies(proofOnlyFamilies), ...proofDeltaClasses]);
+  const modelClasses = sortedUnique([...classesForFamilies(familySignals), ...proofDeltaClasses]);
   const proofOnlyCoverage = resultCoverage(expectedClasses, proofOnlyModelClasses);
   const coverage = resultCoverage(expectedClasses, modelClasses);
   const resolvedAll = graph.missing.length === 0 && nodes.length === combo.cards.length;
@@ -370,6 +423,7 @@ function evaluateCombo(combo, idx) {
     cards: combo.cards,
     results: combo.results,
     expectedClasses,
+    unmappedLabels: resultClassification.unmappedLabels,
     resolvedAll,
     missing: graph.missing,
     nodeCount: nodes.length,
@@ -377,6 +431,7 @@ function evaluateCombo(combo, idx) {
     proofFamilies,
     packageFamilies,
     proofOnlyFamilies,
+    proofDeltaClasses,
     edgeFamilies: edgeFamilies(graph),
     capabilityFamilies: detectCapabilityFamilies(nodes),
     familySignals,
@@ -405,6 +460,7 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
     byExpectedClass: {},
     byModelClass: {},
     topFamilySignals: {},
+    unmappedResultLabels: { combosWithAny: 0, labelInstances: 0, topLabels: {} },
     expectedClassCoverage: { considered: 0, coveredAny: 0, missedAll: 0, unclassifiedExpected: 0 },
     proofOnlyExpectedClassCoverage: { considered: 0, coveredAny: 0, missedAll: 0, unclassifiedExpected: 0 },
   };
@@ -416,6 +472,11 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
     for (const cls of item.expectedClasses) increment(summary.byExpectedClass, cls);
     for (const cls of item.modelClasses) increment(summary.byModelClass, cls);
     for (const family of item.familySignals) increment(summary.topFamilySignals, family);
+    if ((item.unmappedLabels || []).length) {
+      summary.unmappedResultLabels.combosWithAny++;
+      summary.unmappedResultLabels.labelInstances += item.unmappedLabels.length;
+      for (const label of item.unmappedLabels) increment(summary.unmappedResultLabels.topLabels, label);
+    }
     if (item.expectedClasses.length) {
       summary.expectedClassCoverage.considered++;
       if (item.resultCoverage.coveredAny) summary.expectedClassCoverage.coveredAny++;
@@ -434,6 +495,7 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
   summary.expectedClassCoverage.coveredAnyPct = percent(summary.expectedClassCoverage.coveredAny, summary.expectedClassCoverage.considered);
   summary.proofOnlyExpectedClassCoverage.coveredAnyPct = percent(summary.proofOnlyExpectedClassCoverage.coveredAny, summary.proofOnlyExpectedClassCoverage.considered);
   summary.topFamilySignals = Object.fromEntries(Object.entries(summary.topFamilySignals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+  summary.unmappedResultLabels.topLabels = Object.fromEntries(Object.entries(summary.unmappedResultLabels.topLabels).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
   return summary;
 }
 
@@ -503,6 +565,7 @@ function renderMarkdown(payload) {
   lines.push(`- Combo-family signal detected (proof, package, edge, or capability family): **${Object.values(summary.topFamilySignals).reduce((a, b) => a + b, 0)} signal hits across ${summary.totalDetailed} combos**; combo-level detection **${summary.comboFamilyDetectedPct}%**`);
   lines.push(`- Expected result-class coverage (all signals): **${summary.expectedClassCoverage.coveredAny}/${summary.expectedClassCoverage.considered}** (${summary.expectedClassCoverage.coveredAnyPct}%) had at least one EDHREC result class matched by a model family class.`);
   lines.push(`- Proof-only expected result-class coverage: **${summary.proofOnlyExpectedClassCoverage.coveredAny}/${summary.proofOnlyExpectedClassCoverage.considered}** (${summary.proofOnlyExpectedClassCoverage.coveredAnyPct}%) had at least one EDHREC result class matched by a bounded proof/package family.`);
+  lines.push(`- Result-label taxonomy gaps: **${summary.unmappedResultLabels.combosWithAny}** combos contain **${summary.unmappedResultLabels.labelInstances}** unmapped EDHREC label instance(s).`);
   lines.push('');
   lines.push('Interpretation: card-name evidence is only used in this report/cache. The evaluated model behavior comes from generalized text-derived capabilities, edges, families, and proof search.');
   lines.push('');
@@ -521,6 +584,11 @@ function renderMarkdown(payload) {
   lines.push('## Expected EDHREC result classes');
   lines.push('');
   lines.push(markdownTable(countRows(summary.byExpectedClass), ['key', 'count']));
+  lines.push('');
+  lines.push('## Unmapped EDHREC result labels');
+  lines.push('');
+  const unmappedRows = countRows(summary.unmappedResultLabels.topLabels).slice(0, 30);
+  lines.push(unmappedRows.length ? markdownTable(unmappedRows, ['key', 'count']) : '_No unmapped labels in this run._');
   lines.push('');
   lines.push('## Model family signals');
   lines.push('');
@@ -575,6 +643,8 @@ if (require.main === module) main();
 else module.exports = {
   FAMILY_CLASS_MAP,
   classifyResultLabels,
+  classifyResultLabelsDetailed,
+  classesForProofDeltas,
   detectCapabilityFamilies,
   evaluateCombo,
   resultCoverage,

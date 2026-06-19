@@ -814,8 +814,8 @@
       "status": "ok",
       "source": "analysis/interaction-baseline/interaction-baseline.json",
       "baselineDeckId": "sample-xantcha",
-      "edgeCount": 153,
-      "comboCriticalPairCount": 4,
+      "edgeCount": 154,
+      "comboCriticalPairCount": 5,
       "comboCriticalTripleCount": 0,
       "highFanoutFamilies": [
         {
@@ -827,7 +827,7 @@
           "count": 42
         }
       ],
-      "weakInteractionShare": 0.915
+      "weakInteractionShare": 0.91
     }
   ],
   "manualAudit": {

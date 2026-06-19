@@ -34,12 +34,14 @@ assert.equal(getComboFamily('hasty-copy→etb-untap-loop').resultClasses.include
 assert.deepEqual(getComboFamily('draw-damage-feedback-loop').resultClasses, ['infinite-damage', 'infinite-draw']);
 assert.deepEqual(getComboFamily('lifelink-counter-damage-loop').resultClasses, ['infinite-damage', 'infinite-life']);
 assert.ok(getComboFamily('recursive-body-sacrifice-mana-loop').requiredFacts.some(fact => fact.predicate === 'is-mana-sac-outlet'));
+assert.deepEqual(getComboFamily('recursive-body-sacrifice-mana-loop').proofDeltaResultClasses, ['infinite-cast', 'infinite-mana']);
 assert.ok(getComboFamily('self-untap-mana-loop').optionalAccelerants.some(fact => fact.predicate === 'is-colorless-mana-amplifier'));
 assert.deepEqual(getComboFamily('mill-lifeloss-feedback-loop').resultClasses, ['mill', 'infinite-opponent-life-loss', 'infinite-life']);
 assert.deepEqual(getComboFamily('opponent-draw-punisher-win').resultClasses, ['win']);
 assert.deepEqual(getComboFamily('mill-multiplier-finite-mill').resultClasses, ['mill']);
 assert.deepEqual(getComboFamily('mutual-etb-blink-reset-loop').resultClasses, ['infinite-etb']);
 assert.ok(getComboFamily('token-replacement-sacrifice-mana-loop').requiredFacts.some(fact => fact.predicate === 'is-token-to-creature-token-replacer'));
+assert.deepEqual(getComboFamily('token-replacement-sacrifice-mana-loop').proofDeltaResultClasses, ['infinite-mana']);
 assert.equal(getComboFamily('missing-family'), null);
 
 const invalid = validateComboFamilyLibrary([

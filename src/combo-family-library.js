@@ -85,6 +85,7 @@ const COMBO_FAMILIES = [
     repeatability: { rule: 'requires body replenishment, recursive body, or a token-producing body source' },
     payoffCriteria: [{ event: 'death', comparator: 'triggers payoff' }],
     resultClasses: ['infinite-death', 'infinite-sacrifice'],
+    proofDeltaResultClasses: ['infinite-draw', 'infinite-life', 'infinite-opponent-life-loss', 'infinite-tokens'],
     examples: [{ name: 'token body + outlet + Blood Artist-style payoff', cards: ['Token Source', 'Sac Outlet', 'Death Payoff'] }],
     negativeFixtures: [{ name: 'single free body + outlet + payoff', cards: ['Free Body', 'Sac Outlet', 'Death Payoff'], reason: 'body not replenished' }],
     knownFalsePositives: ['ordinary creatures counted as infinite fodder', 'noncreature token creation feeding creature-death payoffs'],
@@ -113,6 +114,7 @@ const COMBO_FAMILIES = [
     repeatability: { rule: 'sacrifice the body for mana, spend that mana to recast or return the same body, and restore the starting state' },
     payoffCriteria: [{ event: 'death', comparator: 'repeats' }, { event: 'cast/etb', comparator: 'repeats' }],
     resultClasses: ['infinite-death', 'infinite-etb', 'infinite-sacrifice'],
+    proofDeltaResultClasses: ['infinite-cast', 'infinite-mana'],
     examples: [
       { name: 'recursive creature + mana sacrifice outlet', cards: ['Recursive Body', 'Mana Sac Outlet'] },
       { name: 'recursive creature + colorless sacrifice outlet + death-mana payoff', cards: ['Recursive Body', 'Colorless Mana Sac Outlet', 'Death Mana Payoff'] },
@@ -123,6 +125,34 @@ const COMBO_FAMILIES = [
     ],
     knownFalsePositives: ['ordinary bodies treated as replenished fodder', 'sacrifice outlets that create no mana or too little mana', 'assuming external colored mana instead of proving package-local mana', 'assuming another-creature recursion permission without proving a remaining creature'],
     uiExplanation: 'A recursive creature can be sacrificed for mana and then replayed or returned when the package covers the recursion cost.',
+  },
+  {
+    id: 'life-paid-treasure-recursive-drain-loop',
+    title: 'Recursive cast body plus life-paid Treasure sacrifice outlet and death drain',
+    maxCards: 3,
+    confidenceGate: 'pattern',
+    requiredFacts: [
+      { role: 'body', kind: 'capability', predicate: 'is-recursive-cast-body' },
+      { role: 'body', kind: 'capability', predicate: 'recursive-body-cost' },
+      { role: 'outlet', kind: 'capability', predicate: 'is-life-paid-treasure-sac-outlet' },
+      { role: 'outlet', kind: 'capability', predicate: 'life-sac-outlet-mana-produced' },
+      { role: 'payoff', kind: 'capability', predicate: 'is-death-drain-payoff' },
+    ],
+    optionalAccelerants: [{ kind: 'precondition', predicate: 'controls-type', note: 'recursive cast permission such as “control a type” must be package-local' }],
+    disqualifiers: [
+      { kind: 'cost', rule: 'Treasure mana cannot cover the recursive cast cost' },
+      { kind: 'life', rule: 'outlet life payment is not restored by a local death-drain lifegain payoff' },
+    ],
+    repeatability: { rule: 'sacrifice the recursive body for a Treasure while paying life, death-drain restores the life, and the Treasure recasts the body' },
+    payoffCriteria: [{ event: 'death', comparator: 'repeats' }, { event: 'cast/etb', comparator: 'repeats' }, { resource: 'life', comparator: '>=', threshold: 0 }],
+    resultClasses: ['infinite-cast', 'infinite-death', 'infinite-etb', 'infinite-opponent-life-loss', 'infinite-sacrifice'],
+    examples: [{ name: 'recursive cast creature + life-paid Treasure outlet + death-drain payoff', cards: ['Recursive Body', 'Life-Paid Treasure Outlet', 'Death Drain Payoff'] }],
+    negativeFixtures: [
+      { name: 'life-paid outlet without death-drain lifegain', cards: ['Recursive Body', 'Life-Paid Treasure Outlet'], reason: 'life payment is not replenished' },
+      { name: 'multi-life Treasure outlet with one-point death drain', cards: ['Recursive Body', 'Multi-Life Treasure Outlet', 'Death Drain Payoff'], reason: 'lifegain amount is not proven to replenish the outlet cost' },
+    ],
+    knownFalsePositives: ['treating life-paid Treasure outlets as free mana outlets', 'ignoring type-control recursion permissions'],
+    uiExplanation: 'The outlet converts the recursive body into Treasure at a life cost; the death-drain payoff restores that life while the Treasure recasts the body.',
   },
   {
     id: 'token-source-modifier-payoff',
@@ -159,6 +189,7 @@ const COMBO_FAMILIES = [
     repeatability: { rule: 'sacrificed creature token creates a mana token; the replacement effect creates replacement creature fodder with that token' },
     payoffCriteria: [{ event: 'death', comparator: 'repeats' }, { resource: 'mana', comparator: '>=', threshold: 0 }],
     resultClasses: ['infinite-death', 'infinite-sacrifice', 'infinite-tokens'],
+    proofDeltaResultClasses: ['infinite-mana'],
     examples: [{ name: 'creature-token replacement outlet plus death Treasure payoff', cards: ['Token Creature Replacer Outlet', 'Death Mana Payoff'] }],
     negativeFixtures: [{ name: 'token replacer without sacrifice outlet', cards: ['Token Creature Replacer', 'Death Mana Payoff'], reason: 'no local way to sacrifice the replacement creature token' }],
     knownFalsePositives: ['token doublers treated as token sources', 'noncreature token replacement treated as creature fodder'],
@@ -414,6 +445,7 @@ const COMBO_FAMILIES = [
     repeatability: { rule: 'each copied creature-copy spell creates another ETB spell copier token' },
     payoffCriteria: [{ event: 'etb', comparator: 'repeats' }, { event: 'spell-copy', comparator: 'repeats' }],
     resultClasses: ['infinite-cast', 'infinite-etb'],
+    proofDeltaResultClasses: ['infinite-tokens'],
     examples: [{ name: 'ETB spell copier + hasty creature-copy spell', cards: ['ETB Spell Copier', 'Hasty Creature Copy Spell'] }],
     negativeFixtures: [{ name: 'ETB spell copier + noncreature copy spell', cards: ['ETB Spell Copier', 'Artifact Copy Spell'], reason: 'copy spell does not recreate the spell-copying creature' }],
     knownFalsePositives: ['spell copy effects matched to permanent-only copies', 'copy spells that do not grant haste or fail to copy the spell copier', 'noncreature ETB spell copiers treated as legal creature-copy targets'],
@@ -461,6 +493,9 @@ function validateComboFamilyLibrary(families = COMBO_FAMILIES) {
     if (!['exact', 'pattern', 'heuristic'].includes(family.confidenceGate)) errors.push(`${family.id} invalid confidenceGate`);
     if (family.resultClasses != null && (!Array.isArray(family.resultClasses) || family.resultClasses.some(cls => typeof cls !== 'string' || !cls))) {
       errors.push(`${family.id} resultClasses must be non-empty strings when present`);
+    }
+    if (family.proofDeltaResultClasses != null && (!Array.isArray(family.proofDeltaResultClasses) || family.proofDeltaResultClasses.some(cls => typeof cls !== 'string' || !cls))) {
+      errors.push(`${family.id} proofDeltaResultClasses must be non-empty strings when present`);
     }
     for (const fact of family.requiredFacts || []) {
       if (!fact.role || !fact.kind) errors.push(`${family.id} required fact missing role/kind`);

@@ -35,9 +35,9 @@
   },
   "aggregate": {
     "deckCount": 3,
-    "totalEdges": 172,
-    "totalInteractions": 194,
-    "totalComboCriticalPairs": 9,
+    "totalEdges": 173,
+    "totalInteractions": 195,
+    "totalComboCriticalPairs": 10,
     "totalComboCriticalTriples": 1,
     "familyCounts": {
       "artifact-cost-reduction→top-loop-piece": 1,
@@ -63,7 +63,7 @@
       "lifeloss": 2,
       "lifeloss→lifegain-loop": 2,
       "mill→graveyard-payoff": 1,
-      "opponent-draw-punisher-win": 4,
+      "opponent-draw-punisher-win": 5,
       "ramp→sink": 42,
       "sacrifice": 3,
       "steal": 1,
@@ -92,7 +92,7 @@
       "enable:lifegain→lifeloss-loop": 2,
       "enable:lifeloss→lifegain-loop": 2,
       "enable:mill→graveyard-payoff": 1,
-      "enable:opponent-draw-punisher-win": 4,
+      "enable:opponent-draw-punisher-win": 5,
       "enable:token-production→amplifier": 3,
       "goad": 9,
       "graveyard": 12,
@@ -127,9 +127,9 @@
       "missing": [
         "Valley of Gorgoroth"
       ],
-      "edgeCount": 153,
+      "edgeCount": 154,
       "zoneEdgeCount": 87,
-      "interactionCount": 165,
+      "interactionCount": 166,
       "familyCounts": {
         "attack": 1,
         "cast": 3,
@@ -144,7 +144,7 @@
         "goad→punisher": 3,
         "graveyard": 12,
         "mill→graveyard-payoff": 1,
-        "opponent-draw-punisher-win": 4,
+        "opponent-draw-punisher-win": 5,
         "ramp→sink": 42,
         "sacrifice": 3,
         "steal": 1,
@@ -163,7 +163,7 @@
         "enable:death→tokens": 2,
         "enable:goad→punisher": 3,
         "enable:mill→graveyard-payoff": 1,
-        "enable:opponent-draw-punisher-win": 4,
+        "enable:opponent-draw-punisher-win": 5,
         "goad": 9,
         "graveyard": 12,
         "mana": 42,
@@ -173,19 +173,29 @@
         "treasure": 3
       },
       "strengthCounts": {
-        "combo-critical": 4,
+        "combo-critical": 5,
         "moderate": 10,
         "weak": 151
       },
       "kindCounts": {
-        "enablement": 10,
+        "enablement": 11,
         "reaction": 95,
         "synergy": 60
       },
       "combos": {
         "mutualEnablementLoops": [],
-        "comboCriticalPairCount": 4,
+        "comboCriticalPairCount": 5,
         "comboCriticalPairs": [
+          {
+            "cards": [
+              "Orcish Bowmasters",
+              "Peer into the Abyss"
+            ],
+            "family": "opponent-draw-punisher-win",
+            "families": [
+              "opponent-draw-punisher-win"
+            ]
+          },
           {
             "cards": [
               "Peer into the Abyss",
@@ -318,7 +328,7 @@
         {
           "id": "Orcish Bowmasters",
           "role": "payoff",
-          "degree": 12,
+          "degree": 13,
           "cmc": 2,
           "topFamilies": [
             {
@@ -335,6 +345,10 @@
             },
             {
               "family": "death→tokens",
+              "count": 1
+            },
+            {
+              "family": "opponent-draw-punisher-win",
               "count": 1
             }
           ]
@@ -373,7 +387,7 @@
         }
       ],
       "reviewWarnings": {
-        "weakInteractionShare": 0.915,
+        "weakInteractionShare": 0.91,
         "weakInteractionShareExceedsThreshold": true,
         "highDegreeNodes": [],
         "highFamilyFanout": [
@@ -407,7 +421,7 @@
         "comboCriticalPairCountExceedsThreshold": false
       },
       "metricsSnapshot": {
-        "cohesionScore": 23,
+        "cohesionScore": 27,
         "cohesionBand": "Pile of good-stuff",
         "selfSufficiencyScore": 70,
         "winTuningScore": 91,
@@ -417,8 +431,8 @@
         "pctInteractive": 90,
         "pctMeaningful": 21,
         "largestWebShare": 90,
-        "avgDegree": 4.75,
-        "satWeightedAvgDegree": 0.84,
+        "avgDegree": 4.78,
+        "satWeightedAvgDegree": 0.87,
         "islandCount": 6
       }
     },

@@ -78,8 +78,8 @@ assert.ok(report.manualAudit.suspiciousHubs.some(hub => hub.family === 'draw' &&
 assert.ok(report.manualAudit.suspiciousHubs.some(hub => hub.family === 'ramp→sink' && hub.count === 42));
 
 assert.equal(report.deckSmoke[0].status, 'ok');
-assert.equal(report.deckSmoke[0].edgeCount, 153);
-assert.equal(report.deckSmoke[0].weakInteractionShare, 0.915);
+assert.equal(report.deckSmoke[0].edgeCount, 154);
+assert.equal(report.deckSmoke[0].weakInteractionShare, 0.91);
 
 const markdown = renderMarkdown(report);
 assert.match(markdown, /## Source coverage/);

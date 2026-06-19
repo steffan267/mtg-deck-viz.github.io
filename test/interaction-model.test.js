@@ -218,6 +218,7 @@ When Gilded Goose enters, create a Food token.
   const quina = node('Quina, Qu Gourmet', 'Legendary Creature — Rat Chef', 'If one or more tokens would be created under your control, those tokens plus a 1/1 green Frog creature token are created instead. {2}, Sacrifice a Frog: Put a +1/+1 counter on Quina.');
   const slimeAgainstHumanity = node('Slime Against Humanity', 'Sorcery', 'Create a 0/0 green Ooze creature token with trample. Put X +1/+1 counters on it, where X is two plus the total number of cards you own in exile and in your graveyard that are Oozes or are named Slime Against Humanity. A deck can have any number of cards named Slime Against Humanity.');
   const genericTokenAmplifier = node('Generic Token Amplifier', 'Enchantment', 'If one or more tokens would be created under your control, twice that many of those tokens are created instead.');
+  const replacementOnlyTokenModifier = node('Replacement-Only Token Modifier', 'Enchantment', 'If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens with flying and vigilance are created instead.');
   const genericTokenSpell = node('Generic Token Spell', 'Sorcery', 'Create a 2/2 green Bear creature token.');
   const winota = node('Winota, Joiner of Forces', 'Legendary Creature — Human Warrior', 'Whenever a non-Human creature you control attacks, look at the top six cards of your library. You may put a Human creature card from among them onto the battlefield tapped and attacking. It gains indestructible until end of turn. Put the rest of the cards on the bottom of your library in a random order.');
   const bladeHistorian = node('Blade Historian', 'Creature — Human Cleric', 'Attacking creatures you control have double strike.');
@@ -231,8 +232,12 @@ When Gilded Goose enters, create a Food token.
   assertHasFamily(slimeAgainstHumanity, quina, 'token-production→amplifier');
   assertHasEvent(slimeAgainstHumanity, quina, 'tokens');
   assertHasCap(genericTokenAmplifier, 'is-token-doubler');
+  assertHasCap(replacementOnlyTokenModifier, 'is-token-replacement-modifier');
+  assertNoCap(replacementOnlyTokenModifier, 'is-token-doubler');
+  assertNoCap(replacementOnlyTokenModifier, 'is-token-to-creature-token-replacer');
   assertHasCap(genericTokenSpell, 'is-creature-token-producer');
   assertHasFamily(genericTokenSpell, genericTokenAmplifier, 'token-production→amplifier');
+  assertHasFamily(genericTokenSpell, replacementOnlyTokenModifier, 'token-production→replacement');
   assertHasCap(winota, 'is-tribal-payoff');
   assertHasFamily(winota, bladeHistorian, 'tribal-payoff→tribe');
   assertHasEvent(winota, bladeHistorian, 'tribal');
@@ -367,15 +372,20 @@ When Gilded Goose enters, create a Food token.
 
   const drawDamageEngine = node('Draw Damage Engine', 'Legendary Creature — Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.');
   const damageDrawAura = node('Damage Draw Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.');
+  const noncombatDamageDrawPayoff = node('Noncombat Damage Draw Payoff', 'Creature — Dragon Wizard', 'Whenever a source you control deals noncombat damage to an opponent, you draw that many cards.');
   const opponentDrawDamage = node('Opponent Draw Damage Engine', 'Creature — Devil', 'Whenever an opponent draws a card, this creature deals 1 damage to any target.');
   assertHasCap(drawDamageEngine, 'is-draw-to-damage-payoff');
   assertHasCap(drawDamageEngine, 'draw-to-damage-subject:you');
   assertHasCap(damageDrawAura, 'is-damage-to-draw-payoff');
+  assertHasCap(noncombatDamageDrawPayoff, 'is-damage-to-draw-payoff');
   assertHasCap(opponentDrawDamage, 'is-draw-to-damage-payoff');
   assertHasCap(opponentDrawDamage, 'draw-to-damage-subject:opp');
   assertHasInteraction(drawDamageEngine, damageDrawAura,
     it => it.family === 'draw-damage-feedback-loop' && it.strength === 'combo-critical',
     'draw-triggered damage plus damage-triggered draw should be detected without card names');
+  assertHasInteraction(drawDamageEngine, noncombatDamageDrawPayoff,
+    it => it.family === 'draw-damage-feedback-loop' && it.strength === 'combo-critical',
+    'draw-triggered damage should feed source-controlled noncombat damage draw payoffs without card names');
   assertNoEvent(opponentDrawDamage, damageDrawAura, 'enable:draw-damage-feedback-loop');
 
   const lifelinkCounterEngine = node('Lifelink Counter Engine', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.');
@@ -462,12 +472,18 @@ When Gilded Goose enters, create a Food token.
 
   const massOpponentDraw = node('Opponent Half-Library Draw', 'Sorcery', 'Target opponent draws cards equal to half the number of cards in their library, rounded up.');
   const opponentDrawPunisher = node('Opponent Draw Punisher', 'Enchantment', 'Whenever an opponent draws a card, that player loses 1 life.');
+  const compoundOpponentDrawPunisher = node('Compound Opponent Draw Punisher', 'Creature — Archer', 'When this creature enters and whenever an opponent draws a card except the first one they draw in each of their draw steps, this creature deals 1 damage to any target.');
   const smallOpponentDraw = node('Small Opponent Draw', 'Sorcery', 'Target opponent draws a card.');
   assertHasCap(massOpponentDraw, 'is-mass-opponent-draw-source');
   assertHasCap(opponentDrawPunisher, 'is-opponent-draw-punisher');
+  assertHasCap(compoundOpponentDrawPunisher, 'is-opponent-draw-punisher');
+  assertHasCap(compoundOpponentDrawPunisher, 'opponent-draw-punisher-damage:1');
   assertHasInteraction(massOpponentDraw, opponentDrawPunisher,
     it => it.family === 'opponent-draw-punisher-win' && it.strength === 'combo-critical',
     'large opponent draw source plus opponent draw punisher should be a finite threshold win signal');
+  assertHasInteraction(massOpponentDraw, compoundOpponentDrawPunisher,
+    it => it.family === 'opponent-draw-punisher-win' && it.strength === 'combo-critical',
+    'compound ETB/opponent-draw trigger text should preserve the opponent-draw punisher signal');
   assertNoEvent(smallOpponentDraw, opponentDrawPunisher, 'enable:opponent-draw-punisher-win');
 
   const halfLibraryMill = node('Half-Library Mill', 'Sorcery', 'Target player mills half their library, rounded up.');
@@ -514,9 +530,14 @@ When Gilded Goose enters, create a Food token.
   const tokenReplacementOutlet = node('Creature-Token Replacement Outlet', 'Legendary Creature — Squirrel Warrior', 'If one or more tokens would be created under your control, those tokens plus that many 1/1 green Squirrel creature tokens are created instead.\n{B}, Sacrifice X Squirrels: Target creature gets +X/-X until end of turn.');
   const deathManaPayoff = node('Death Mana Payoff', 'Creature — Human Pirate', 'Whenever another creature you control dies, create a Treasure token.');
   const replacementWithoutOutlet = node('Creature-Token Replacement Only', 'Enchantment', 'If one or more tokens would be created under your control, those tokens plus that many 1/1 green Squirrel creature tokens are created instead.');
+  const lifePaidTreasureSacOutlet = node('Life-Paid Treasure Sac Outlet', 'Creature — Zombie Advisor', 'Pay 1 life, Sacrifice another creature: Create a Treasure token.');
   assertHasCap(tokenReplacementOutlet, 'is-token-to-creature-token-replacer');
+  assertHasCap(tokenReplacementOutlet, 'is-token-replacement-modifier');
   assertHasCap(tokenReplacementOutlet, 'is-creature-sac-outlet');
   assertHasCap(deathManaPayoff, 'is-death-mana-payoff');
+  assertHasCap(lifePaidTreasureSacOutlet, 'is-life-paid-treasure-sac-outlet');
+  assertHasCap(lifePaidTreasureSacOutlet, 'life-sac-outlet-life-cost:1');
+  assertHasCap(lifePaidTreasureSacOutlet, 'life-sac-outlet-mana-produced:1');
   assertHasInteraction(tokenReplacementOutlet, deathManaPayoff,
     it => it.family === 'token-replacement-sacrifice-mana-loop' && it.strength === 'combo-critical',
     'token replacement on a creature sac outlet plus death-mana payoff should be detected as a loop');

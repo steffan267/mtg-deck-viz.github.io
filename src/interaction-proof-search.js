@@ -96,6 +96,17 @@ function sacOutletManaProfile(card) {
   };
 }
 
+function lifePaidTreasureSacOutletProfile(card) {
+  const produced = maxCapNumber(card, 'life-sac-outlet-mana-produced');
+  return {
+    total: produced,
+    any: maxCapNumber(card, 'life-sac-outlet-mana-any') || produced,
+    colorless: 0,
+    colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])),
+    lifeCost: maxCapNumber(card, 'life-sac-outlet-life-cost') || 1,
+  };
+}
+
 function deathManaProfile(card) {
   return {
     total: maxCapNumber(card, 'death-mana-produced'),
@@ -186,6 +197,37 @@ function recursiveBodyPreconditionSupport(body, cards, requiredCapsByCardId = ne
     supportCards: [support],
     facts: [fact(body, 'recursive-body-requires-another-creature'), fact(support, 'is-creature-permanent')],
     steps: [{ card: support.id, action: 'remains on the battlefield to satisfy the recursive cast permission' }],
+  };
+}
+
+function recursiveControlTypePrecondition(body, cards) {
+  const text = String(body.text || '').toLowerCase();
+  const match = text.match(/as long as you control an? ([a-z][a-z-]*)/);
+  if (!match) return { ok: true, facts: [], steps: [] };
+  const requiredType = match[1].replace(/s$/, '');
+  const cardHasSubtype = (card) => {
+    const listedTypes = card.myTypes || [];
+    if (listedTypes.some(type => String(type).toLowerCase().replace(/s$/, '') === requiredType)) return true;
+    const subtypeText = String(card.type || card.type_line || '').toLowerCase().split('—').slice(1).join(' ');
+    return new RegExp(`\\b${requiredType}s?\\b`).test(subtypeText);
+  };
+  const support = find(cards, card => card && card !== body
+    && (requiredType === 'creature'
+      ? hasCap(card, 'is-creature-permanent')
+      : cardHasSubtype(card)));
+  if (!support) {
+    return {
+      ok: false,
+      facts: [{ card: body.id, kind: 'precondition', predicate: 'controls-type', value: requiredType }],
+      steps: [],
+      reason: `recursive cast requires another controlled ${requiredType}`,
+    };
+  }
+  return {
+    ok: true,
+    facts: [{ card: support.id, kind: 'precondition', predicate: 'controls-type', value: requiredType }],
+    steps: [{ card: support.id, action: `satisfies recursive cast permission by remaining a controlled ${requiredType}` }],
+    support,
   };
 }
 
@@ -579,6 +621,85 @@ function proveRecursiveBodySacrificeMana(cards) {
   return failures[0] || null;
 }
 
+function proveLifePaidTreasureRecursiveDrain(cards) {
+  const bodies = cards.filter(c => hasCap(c, 'is-recursive-cast-body'));
+  const outlets = cards.filter(c => hasCap(c, 'is-life-paid-treasure-sac-outlet'));
+  const payoffs = cards.filter(c => hasCap(c, 'is-death-drain-payoff') && (c.produces || {}).lifegain);
+  const failures = [];
+  for (const body of bodies) {
+    for (const outlet of outlets) {
+      if (outlet === body) continue;
+      const cost = recursiveCostProfile(body);
+      const outletMana = lifePaidTreasureSacOutletProfile(outlet);
+      if (!canPayRecursiveCost(cost, outletMana)) {
+        failures.push(failure(
+          'proof:life-paid-treasure-recursive-drain-mana-negative:' + sorted([body.id, outlet.id]).join('|'),
+          [body, outlet],
+          'life-paid Treasure sacrifice outlet cannot cover recursive body cast cost',
+          { produced: outletMana, cost },
+        ));
+        continue;
+      }
+      const typePrecondition = recursiveControlTypePrecondition(body, cards);
+      if (!typePrecondition.ok) {
+        failures.push(failure(
+          'proof:life-paid-treasure-recursive-drain-type-precondition:' + sorted([body.id, outlet.id]).join('|'),
+          [body, outlet],
+          typePrecondition.reason,
+          { requiredFacts: typePrecondition.facts },
+        ));
+        continue;
+      }
+      if (outletMana.lifeCost > 1) {
+        failures.push(failure(
+          'proof:life-paid-treasure-recursive-drain-life-negative:' + sorted([body.id, outlet.id]).join('|'),
+          [body, outlet],
+          'death-drain lifegain does not prove replenishing a multi-life outlet cost',
+          { lifeCost: outletMana.lifeCost },
+        ));
+        continue;
+      }
+      for (const payoff of payoffs) {
+        if (payoff === body || payoff === outlet) continue;
+        const proofCards = uniqueCards([body, outlet, payoff, typePrecondition.support]);
+        return success('proof:life-paid-treasure-recursive-drain:' + sorted(proofCards.map(card => card.id)).join('|'), 'life-paid-treasure-recursive-drain-loop', proofCards, {
+          requiredFacts: [
+            fact(body, 'is-recursive-cast-body'),
+            fact(body, 'recursive-body-cost'),
+            fact(outlet, 'is-life-paid-treasure-sac-outlet'),
+            fact(outlet, 'life-sac-outlet-life-cost'),
+            fact(outlet, 'life-sac-outlet-mana-produced'),
+            fact(payoff, 'is-death-drain-payoff'),
+            ...typePrecondition.facts,
+          ],
+          steps: [
+            { card: outlet.id, action: 'pay life and sacrifice the recursive body to create a Treasure token', delta: { life: -outletMana.lifeCost, death: 1, sacrifice: 1, treasure: outletMana.total } },
+            { card: payoff.id, action: 'death trigger drains an opponent and restores the life payment', delta: { life: 1, opponentLife: -1 } },
+            { card: body.id, action: 'spend the Treasure mana to recast the recursive body', cost: { mana: cost.total, colors: cost.colors, colorless: cost.colorless } },
+            ...typePrecondition.steps,
+            { action: 'the same body, outlet, and payoff state repeats with the life payment replenished' },
+          ],
+          assumptions: ['the death-drain trigger targets an opponent when a target is required'],
+          repeatability: { status: 'repeatable-break-even', reason: 'Treasure mana covers the recursive cast cost and death-drain lifegain covers the outlet life payment' },
+        }, [
+          { resource: 'deathTriggers', min: 1, max: Infinity },
+          { resource: 'sacrifices', min: 1, max: Infinity },
+          { resource: 'etbTriggers', min: 1, max: Infinity },
+          { resource: 'casts', min: 1, max: Infinity },
+          { resource: 'opponentLife', min: -Infinity, max: -1 },
+        ]);
+      }
+      failures.push(failure(
+        'proof:life-paid-treasure-recursive-drain-no-lifegain-payoff:' + sorted([body.id, outlet.id]).join('|'),
+        [body, outlet],
+        'life-paid recursive Treasure loop needs a package-local death-drain payoff that restores life',
+        { lifeCost: outletMana.lifeCost },
+      ));
+    }
+  }
+  return failures[0] || null;
+}
+
 function canEtbBlinkTarget(blinker, target) {
   return MODEL.canEtbBlinkTarget(blinker, target);
 }
@@ -689,6 +810,16 @@ function proveAristocrats(cards) {
   const body = find(cards, c => c !== outlet && c !== payoff && (hasCap(c, 'is-creature-token-producer') || hasCap(c, 'is-body')));
   if (!outlet || !payoff || !body) return null;
   if (!hasCap(body, 'is-creature-token-producer')) return failure('proof:aristocrats-not-repeatable:' + sorted([body.id, outlet.id, payoff.id]).join('|'), [body, outlet, payoff], 'body is not replenished by the package', { body: body.id, outlet: outlet.id, payoff: payoff.id });
+  const deltas = [
+    { resource: 'deathTriggers', min: 1, max: Infinity },
+    { resource: 'sacrifices', min: 1, max: Infinity },
+  ];
+  if (hasCap(payoff, 'is-death-drain-payoff')) {
+    deltas.push({ resource: 'life', min: 1, max: Infinity });
+    deltas.push({ resource: 'opponentLife', min: -Infinity, max: -1 });
+  }
+  if (hasCap(payoff, 'is-death-draw-payoff')) deltas.push({ resource: 'cards', min: 1, max: Infinity });
+  if (hasCap(payoff, 'is-death-token-payoff')) deltas.push({ resource: 'tokens', min: 1, max: Infinity });
   return success('proof:aristocrats:' + sorted([body.id, outlet.id, payoff.id]).join('|'), 'aristocrats-body-outlet-payoff', [body, outlet, payoff], {
     requiredFacts: [fact(body, 'is-creature-token-producer'), fact(outlet, 'is-sac-outlet'), deathPayoffFact(payoff)],
     steps: [
@@ -697,7 +828,7 @@ function proveAristocrats(cards) {
       { card: payoff.id, action: 'turns death event into deterministic payoff' },
     ],
     repeatability: { status: 'repeatable-candidate', reason: 'body production can replenish sacrifice fodder' },
-  }, [{ resource: 'deathTriggers', min: 1, max: Infinity }]);
+  }, deltas);
 }
 
 function proveTokenModifierPayoff(cards) {
@@ -895,6 +1026,7 @@ function provePackage(rawCards, options = {}) {
     proveMillMultiplierFinisher(cards),
     proveTopLoop(cards),
     proveRecursiveBodySacrificeMana(cards),
+    proveLifePaidTreasureRecursiveDrain(cards),
     proveMutualEtbBlinkReset(cards),
     proveTokenReplacementSacrificeMana(cards),
     proveAristocrats(cards),

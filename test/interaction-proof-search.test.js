@@ -83,6 +83,13 @@ assert.equal(drawDamageLoop.status, 'proven');
 assert.ok(proofByFamily(drawDamageLoop, 'draw-damage-feedback-loop'));
 assert.ok(proofByFamily(drawDamageLoop, 'draw-damage-feedback-loop').positiveDeltas.some(delta => delta.resource === 'damage'));
 
+const noncombatDrawDamageLoop = provePackage([
+  card('Draw Damage Engine', 'Legendary Creature — Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.', 6),
+  card('Noncombat Damage Draw Payoff', 'Creature — Dragon Wizard', 'Whenever a source you control deals noncombat damage to an opponent, you draw that many cards.', 6),
+]);
+assert.equal(noncombatDrawDamageLoop.status, 'proven');
+assert.ok(proofByFamily(noncombatDrawDamageLoop, 'draw-damage-feedback-loop'));
+
 const opponentDrawDamageNearMiss = provePackage([
   card('Opponent Draw Damage Engine', 'Creature — Devil', 'Whenever an opponent draws a card, this creature deals 1 damage to any target.', 3),
   card('Damage Draw Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.', 1),
@@ -262,6 +269,13 @@ assert.equal(opponentDrawPunisherWin.status, 'proven');
 assert.ok(proofByFamily(opponentDrawPunisherWin, 'opponent-draw-punisher-win'));
 assert.equal(proofByFamily(opponentDrawPunisherWin, 'opponent-draw-punisher-win').proof.repeatability.status, 'non-loop-win');
 
+const compoundOpponentDrawPunisherWin = provePackage([
+  card('Opponent Half-Library Draw', 'Sorcery', 'Target opponent draws cards equal to half the number of cards in their library, rounded up.', 7),
+  card('Compound Opponent Draw Punisher', 'Creature', 'When this creature enters and whenever an opponent draws a card except the first one they draw in each of their draw steps, this creature deals 1 damage to any target.', 2),
+]);
+assert.equal(compoundOpponentDrawPunisherWin.status, 'proven');
+assert.ok(proofByFamily(compoundOpponentDrawPunisherWin, 'opponent-draw-punisher-win'));
+
 const opponentDrawPunisherNearMiss = provePackage([
   card('Small Opponent Draw', 'Sorcery', 'Target opponent draws a card.', 1),
   card('Opponent Draw Punisher', 'Enchantment', 'Whenever an opponent draws a card, that player loses 1 life.', 3),
@@ -337,6 +351,14 @@ const tokenReplacementNoOutlet = provePackage([
 assert.equal(tokenReplacementNoOutlet.status, 'not-repeatable');
 assert.ok(tokenReplacementNoOutlet.rejections.some(rejection => /sacrifice outlet/.test(rejection.reason)));
 
+const replacementOnlyCreatureTokens = provePackage([
+  card('Replacement-Only Creature Token Modifier', 'Enchantment', 'If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens with flying and vigilance are created instead.', 5),
+  card('Death Mana Payoff', 'Creature — Human Pirate', 'Whenever another creature you control dies, create a Treasure token.', 4),
+  card('Mana Sac Outlet', 'Artifact', 'Sacrifice a creature: Add one mana of any color.', 3),
+]);
+assert.notEqual(replacementOnlyCreatureTokens.status, 'proven');
+assert.equal(proofByFamily(replacementOnlyCreatureTokens, 'token-replacement-sacrifice-mana-loop'), undefined);
+
 const topLoop = provePackage([
   card('Self Top Draw Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.', 1),
   card('Artifact Spell Reducer', 'Artifact Creature — Vedalken Artificer', 'Artifact spells you cast cost {1} less to cast.', 2),
@@ -362,6 +384,42 @@ assert.equal(recursiveSacLoop.status, 'proven');
 const recursiveProof = proofByFamily(recursiveSacLoop, 'recursive-body-sacrifice-mana-loop');
 assert.ok(recursiveProof);
 assert.ok(recursiveProof.positiveDeltas.some(delta => delta.resource === 'casts'));
+
+const lifePaidTreasureRecursiveDrainLoop = provePackage([
+  card('Typed Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control a Zombie.', 1, '{B}'),
+  card('Life-Paid Treasure Outlet', 'Creature — Zombie Advisor', 'Pay 1 life, Sacrifice another creature: Create a Treasure token.', 2),
+  card('Death Drain Payoff', 'Creature — Vampire', 'Whenever another creature you control dies, target player loses 1 life and you gain 1 life.', 2),
+]);
+assert.equal(lifePaidTreasureRecursiveDrainLoop.status, 'proven');
+const lifePaidTreasureProof = proofByFamily(lifePaidTreasureRecursiveDrainLoop, 'life-paid-treasure-recursive-drain-loop');
+assert.ok(lifePaidTreasureProof);
+assert.ok(lifePaidTreasureProof.positiveDeltas.some(delta => delta.resource === 'casts'));
+assert.ok(lifePaidTreasureProof.positiveDeltas.some(delta => delta.resource === 'opponentLife'));
+assert.ok(!lifePaidTreasureProof.positiveDeltas.some(delta => delta.resource === 'life'));
+
+const lifePaidTreasureNoDrain = provePackage([
+  card('Typed Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control a Zombie.', 1, '{B}'),
+  card('Life-Paid Treasure Outlet', 'Creature — Zombie Advisor', 'Pay 1 life, Sacrifice another creature: Create a Treasure token.', 2),
+]);
+assert.notEqual(lifePaidTreasureNoDrain.status, 'proven');
+assert.equal(proofByFamily(lifePaidTreasureNoDrain, 'life-paid-treasure-recursive-drain-loop'), undefined);
+
+const multiLifePaidTreasure = provePackage([
+  card('Typed Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control a Zombie.', 1, '{B}'),
+  card('Multi-Life Treasure Outlet', 'Creature — Zombie Advisor', 'Pay 2 life, Sacrifice another creature: Create a Treasure token.', 2),
+  card('Death Drain Payoff', 'Creature — Vampire', 'Whenever another creature you control dies, target player loses 1 life and you gain 1 life.', 2),
+]);
+assert.notEqual(multiLifePaidTreasure.status, 'proven');
+assert.equal(proofByFamily(multiLifePaidTreasure, 'life-paid-treasure-recursive-drain-loop'), undefined);
+assert.ok(multiLifePaidTreasure.rejections.some(rejection => /multi-life outlet cost/.test(rejection.reason)));
+
+const lifePaidTreasureTypeMissing = provePackage([
+  card('Typed Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control a Zombie.', 1, '{B}'),
+  card('Life-Paid Treasure Outlet', 'Creature — Human Advisor', 'Pay 1 life, Sacrifice another creature: Create a Treasure token.', 2),
+  card('Death Drain Payoff', 'Creature — Vampire', 'Whenever another creature you control dies, target player loses 1 life and you gain 1 life.', 2),
+]);
+assert.notEqual(lifePaidTreasureTypeMissing.status, 'proven');
+assert.ok(lifePaidTreasureTypeMissing.rejections.some(rejection => /controlled zombie/.test(rejection.reason)));
 
 const conditionalRecursiveNearMiss = provePackage([
   card('Conditional Recursive Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control another creature.', 1, '{B}'),
@@ -468,6 +526,16 @@ const aristocratsNearMiss = provePackage([
 ]);
 assert.equal(aristocratsNearMiss.status, 'not-repeatable');
 assert.ok(aristocratsNearMiss.rejections.some(rejection => /not replenished/.test(rejection.reason)));
+
+const aristocratsDrainLoop = provePackage([
+  card('Token Body', 'Creature', 'When this creature enters, create a 1/1 white Soldier creature token.', 2),
+  card('Sac Outlet', 'Creature', 'Sacrifice a creature: Scry 1.', 1),
+  card('Death Drain Payoff', 'Creature', 'Whenever another creature you control dies, each opponent loses 1 life and you gain 1 life.', 2),
+]);
+assert.equal(aristocratsDrainLoop.status, 'proven');
+assert.ok(proofByFamily(aristocratsDrainLoop, 'aristocrats-body-outlet-payoff'));
+assert.ok(proofByFamily(aristocratsDrainLoop, 'aristocrats-body-outlet-payoff').positiveDeltas.some(delta => delta.resource === 'life'));
+assert.ok(proofByFamily(aristocratsDrainLoop, 'aristocrats-body-outlet-payoff').positiveDeltas.some(delta => delta.resource === 'opponentLife'));
 
 const tokenEngine = provePackage([
   card('Token Source', 'Creature', 'When this creature enters, create a 1/1 white Soldier creature token.', 2),
