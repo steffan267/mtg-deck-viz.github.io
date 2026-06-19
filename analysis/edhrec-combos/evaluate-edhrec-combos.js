@@ -32,13 +32,26 @@ const RESULT_CLASS_PATTERNS = [
   { id: 'infinite-etb', re: /infinite (enter|etb)|infinite .*enters/i },
   { id: 'infinite-death', re: /infinite death|infinite dies|infinite .*dies/i },
   { id: 'infinite-sacrifice', re: /infinite sacrifice/i },
-  { id: 'infinite-cast', re: /infinite (storm|magecraft|cast|spell)/i },
+  { id: 'infinite-cast', re: /infinite (storm|magecraft|cast|spell|commander casts?)/i },
   { id: 'infinite-untap', re: /infinite untap/i },
   { id: 'infinite-counters', re: /infinite .*counters?/i },
   { id: 'mill', re: /mill (each|all|target|your opponent)|infinite (?:self[- ]?)?mill/i },
   { id: 'exile-loop', re: /infinite exile|exile all/i },
   { id: 'bounce-loop', re: /infinite bounce|return .* to .*hand/i },
   { id: 'combat', re: /infinite combat|additional combat/i },
+  { id: 'infinite-ltb', re: /infinite .*ltb|near-infinite .*ltb/i },
+  { id: 'infinite-landfall', re: /infinite .*landfall|near-infinite .*landfall/i },
+  { id: 'infinite-blink', re: /infinite blinking|near-infinite blinking/i },
+  { id: 'infinite-scry', re: /infinite scry/i },
+  { id: 'infinite-surveil', re: /infinite surveil/i },
+  { id: 'infinite-looting', re: /infinite looting/i },
+  { id: 'infinite-rummage', re: /infinite rummaging/i },
+  { id: 'infinite-self-discard', re: /self-discard triggers/i },
+  { id: 'infinite-proliferate', re: /infinite proliferate/i },
+  { id: 'infinite-pump', re: /infinitely (large|powerful).*creatures?|infinite power and toughness/i },
+  { id: 'lock', re: /\block\b|mass land denial|skip your draw steps|prevent all damage|destroy all creatures opponents control/i },
+  { id: 'infinite-turns', re: /infinite turns/i },
+  { id: 'mass-reanimate', re: /return all creature cards from all graveyards/i },
 ];
 
 const FAMILY_CLASS_ALIASES = {
@@ -57,6 +70,46 @@ const FAMILY_PROOF_DELTA_CLASS_MAP = Object.fromEntries(COMBO_FAMILIES
     family.id,
     sortedUnique([...(family.resultClasses || []), ...(family.proofDeltaResultClasses || [])]),
   ]));
+
+// These are generalized interaction-edge result classes used by the offline
+// EDHREC evaluator. They deliberately do not claim bounded proof: strict proof
+// counts and proof-only coverage remain separate. The map says that when the
+// engine already found a specific interaction edge family inside a known combo
+// package, that edge can explain the corresponding EDHREC result axis.
+const EDGE_RESULT_CLASS_MAP = {
+  'sac-fodder→outlet': ['infinite-death', 'infinite-etb', 'infinite-ltb', 'infinite-sacrifice'],
+  sacrifice: ['infinite-death', 'infinite-ltb', 'infinite-sacrifice'],
+  'death→tokens': ['infinite-death', 'infinite-ltb', 'infinite-sacrifice', 'infinite-tokens'],
+  'death→drain': ['infinite-death', 'infinite-ltb', 'infinite-life', 'infinite-opponent-life-loss', 'infinite-sacrifice'],
+  'death→draw': ['infinite-death', 'infinite-draw', 'infinite-ltb', 'infinite-sacrifice'],
+  'etb→blink': ['infinite-blink', 'infinite-etb', 'infinite-ltb'],
+  blink: ['infinite-blink', 'infinite-etb', 'infinite-ltb'],
+  'blink→land-untap-etb': ['infinite-blink', 'infinite-etb', 'infinite-mana', 'infinite-untap'],
+  'copy→trigger': ['infinite-etb', 'infinite-ltb'],
+  reanimate: ['infinite-etb', 'mass-reanimate'],
+  tokens: ['infinite-tokens'],
+  'token-production→amplifier': ['infinite-tokens'],
+  'token-production→replacement': ['infinite-tokens'],
+  'go-wide→payoff': ['infinite-pump', 'infinite-tokens'],
+  landfall: ['infinite-etb', 'infinite-landfall', 'infinite-tokens'],
+  'land-recursion→landfall': ['infinite-etb', 'infinite-landfall'],
+  'ramp→sink': ['infinite-mana'],
+  'untap→tap-ability': ['infinite-mana', 'infinite-untap'],
+  counters: ['infinite-counters', 'infinite-pump'],
+  'counter-multiplier': ['infinite-counters', 'infinite-pump'],
+  'proliferate→counters': ['infinite-counters', 'infinite-proliferate'],
+  draw: ['infinite-draw'],
+  scry: ['infinite-scry'],
+  discard: ['infinite-self-discard'],
+  graveyard: ['mill'],
+  cast: ['infinite-cast'],
+  magecraft: ['infinite-cast'],
+  'artifact-cost-reduction→top-loop-piece': ['infinite-cast', 'infinite-draw'],
+  'cast-from-top→top-loop-piece': ['infinite-cast', 'infinite-draw'],
+  'combat-enabler': ['combat'],
+  'combat→payoff': ['combat'],
+  bounce: ['bounce-loop'],
+};
 
 function usage() {
   console.error('Usage: node analysis/edhrec-combos/evaluate-edhrec-combos.js [--cache file] [--json-out file] [--md-out file] [--max n]');
@@ -318,6 +371,14 @@ function classesForFamilies(families) {
   return sortedUnique((families || []).flatMap(family => FAMILY_CLASS_MAP[family] || []));
 }
 
+function edgeResultFamilies(families) {
+  return sortedUnique((families || []).filter(family => EDGE_RESULT_CLASS_MAP[family]));
+}
+
+function classesForEdgeFamilies(families) {
+  return sortedUnique((families || []).flatMap(family => EDGE_RESULT_CLASS_MAP[family] || []));
+}
+
 const PROOF_DELTA_CLASS_MAP = {
   mana: 'infinite-mana',
   life: 'infinite-life',
@@ -330,6 +391,7 @@ const PROOF_DELTA_CLASS_MAP = {
   deathTriggers: 'infinite-death',
   sacrifices: 'infinite-sacrifice',
   etbTriggers: 'infinite-etb',
+  ltbTriggers: 'infinite-ltb',
   casts: 'infinite-cast',
   untaps: 'infinite-untap',
 };
@@ -390,16 +452,20 @@ function evaluateCombo(combo, idx) {
   const proofFamilies = sortedUnique((proof.proofs || []).map(item => item.family));
   const packageFamilies = sortedUnique((graph.interactionProofs || []).map(pkg => pkg.family));
   const proofOnlyFamilies = sortedUnique([...proofFamilies, ...packageFamilies]);
+  const graphEdgeFamilies = edgeFamilies(graph);
+  const edgeSignalFamilies = edgeResultFamilies(graphEdgeFamilies);
+  const capabilityFamilies = detectCapabilityFamilies(nodes);
   const capabilities = Object.keys(indexes.byCapability || {}).sort();
   const familySignals = sortedUnique([
     ...proofFamilies,
     ...packageFamilies,
-    ...edgeFamilies(graph).filter(family => FAMILY_CLASS_MAP[family]),
-    ...detectCapabilityFamilies(nodes),
+    ...edgeSignalFamilies,
+    ...capabilityFamilies,
   ]);
   const proofDeltaClasses = classesForProofDeltas(proof.proofs);
+  const edgeSignalClasses = classesForEdgeFamilies(edgeSignalFamilies);
   const proofOnlyModelClasses = sortedUnique([...classesForFamilies(proofOnlyFamilies), ...proofDeltaClasses]);
-  const modelClasses = sortedUnique([...classesForFamilies(familySignals), ...proofDeltaClasses]);
+  const modelClasses = sortedUnique([...classesForFamilies(familySignals), ...edgeSignalClasses, ...proofDeltaClasses]);
   const proofOnlyCoverage = resultCoverage(expectedClasses, proofOnlyModelClasses);
   const coverage = resultCoverage(expectedClasses, modelClasses);
   const resolvedAll = graph.missing.length === 0 && nodes.length === combo.cards.length;
@@ -432,8 +498,10 @@ function evaluateCombo(combo, idx) {
     packageFamilies,
     proofOnlyFamilies,
     proofDeltaClasses,
-    edgeFamilies: edgeFamilies(graph),
-    capabilityFamilies: detectCapabilityFamilies(nodes),
+    edgeFamilies: graphEdgeFamilies,
+    edgeSignalFamilies,
+    edgeSignalClasses,
+    capabilityFamilies,
     familySignals,
     proofOnlyModelClasses,
     modelClasses,
@@ -461,11 +529,17 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
     byModelClass: {},
     topFamilySignals: {},
     unmappedResultLabels: { combosWithAny: 0, labelInstances: 0, topLabels: {} },
+    resolvedResultCoverage: { considered: 0, coveredAny: 0, missedAll: 0 },
     expectedClassCoverage: { considered: 0, coveredAny: 0, missedAll: 0, unclassifiedExpected: 0 },
     proofOnlyExpectedClassCoverage: { considered: 0, coveredAny: 0, missedAll: 0, unclassifiedExpected: 0 },
   };
   for (const item of evaluations) {
-    if (item.resolvedAll) summary.resolvedAll++;
+    if (item.resolvedAll) {
+      summary.resolvedAll++;
+      summary.resolvedResultCoverage.considered++;
+      if (item.resultCoverage.coveredAny) summary.resolvedResultCoverage.coveredAny++;
+      else summary.resolvedResultCoverage.missedAll++;
+    }
     increment(summary.byCardCount, String(item.cardCount));
     increment(summary.byBucket, item.bucket);
     increment(summary.byProofStatus, item.proofStatus || 'unknown');
@@ -492,6 +566,7 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
   summary.resolvedPct = percent(summary.resolvedAll, evaluations.length);
   summary.provedPct = percent(summary.byBucket.proved || 0, evaluations.length);
   summary.comboFamilyDetectedPct = percent(evaluations.filter(item => item.familySignals.length).length, evaluations.length);
+  summary.resolvedResultCoverage.coveredAnyPct = percent(summary.resolvedResultCoverage.coveredAny, summary.resolvedResultCoverage.considered);
   summary.expectedClassCoverage.coveredAnyPct = percent(summary.expectedClassCoverage.coveredAny, summary.expectedClassCoverage.considered);
   summary.proofOnlyExpectedClassCoverage.coveredAnyPct = percent(summary.proofOnlyExpectedClassCoverage.coveredAny, summary.proofOnlyExpectedClassCoverage.considered);
   summary.topFamilySignals = Object.fromEntries(Object.entries(summary.topFamilySignals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
@@ -563,6 +638,7 @@ function renderMarkdown(payload) {
   lines.push(`- Local card resolution: **${summary.resolvedAll}/${summary.totalDetailed}** (${summary.resolvedPct}%)`);
   lines.push(`- Proven by bounded proof/package logic: **${summary.byBucket.proved || 0}/${summary.totalDetailed}** (${summary.provedPct}%)`);
   lines.push(`- Combo-family signal detected (proof, package, edge, or capability family): **${Object.values(summary.topFamilySignals).reduce((a, b) => a + b, 0)} signal hits across ${summary.totalDetailed} combos**; combo-level detection **${summary.comboFamilyDetectedPct}%**`);
+  lines.push(`- Resolved-combo result coverage target metric: **${summary.resolvedResultCoverage.coveredAny}/${summary.resolvedResultCoverage.considered}** (${summary.resolvedResultCoverage.coveredAnyPct}%) resolved combos had a generalized signal matching at least one EDHREC result class.`);
   lines.push(`- Expected result-class coverage (all signals): **${summary.expectedClassCoverage.coveredAny}/${summary.expectedClassCoverage.considered}** (${summary.expectedClassCoverage.coveredAnyPct}%) had at least one EDHREC result class matched by a model family class.`);
   lines.push(`- Proof-only expected result-class coverage: **${summary.proofOnlyExpectedClassCoverage.coveredAny}/${summary.proofOnlyExpectedClassCoverage.considered}** (${summary.proofOnlyExpectedClassCoverage.coveredAnyPct}%) had at least one EDHREC result class matched by a bounded proof/package family.`);
   lines.push(`- Result-label taxonomy gaps: **${summary.unmappedResultLabels.combosWithAny}** combos contain **${summary.unmappedResultLabels.labelInstances}** unmapped EDHREC label instance(s).`);
@@ -642,8 +718,10 @@ function main() {
 if (require.main === module) main();
 else module.exports = {
   FAMILY_CLASS_MAP,
+  EDGE_RESULT_CLASS_MAP,
   classifyResultLabels,
   classifyResultLabelsDetailed,
+  classesForEdgeFamilies,
   classesForProofDeltas,
   detectCapabilityFamilies,
   evaluateCombo,

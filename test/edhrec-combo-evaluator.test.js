@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const {
   classifyResultLabels,
   classifyResultLabelsDetailed,
+  classesForEdgeFamilies,
   classesForProofDeltas,
   evaluateCombo,
   resultCoverage,
@@ -89,12 +90,16 @@ const idx = {
 };
 
 assert.deepEqual(classifyResultLabels(['Infinite lifegain', 'Win the game', 'Exile your library']), ['empty-library', 'infinite-life', 'win']);
-assert.deepEqual(classifyResultLabels(['Each opponent loses the game', 'Target player loses the game', 'Infinite self-mill']), ['mill', 'win']);
+assert.deepEqual(classifyResultLabels(['Each opponent loses the game', 'Target player loses the game', 'Infinite self-mill', 'Infinite commander casts']), ['infinite-cast', 'mill', 'win']);
 assert.deepEqual(classifyResultLabelsDetailed(['Infinite lifegain', 'Infinite LTB']), {
-  classes: ['infinite-life'],
-  unmappedLabels: ['Infinite LTB'],
+  classes: ['infinite-life', 'infinite-ltb'],
+  unmappedLabels: [],
 });
+assert.deepEqual(classifyResultLabels(['Infinite landfall triggers', 'Infinite blinking', 'Infinite scry 1', 'Infinite self-discard triggers']), ['infinite-blink', 'infinite-landfall', 'infinite-scry', 'infinite-self-discard']);
 assert.deepEqual(resultCoverage(['infinite-life', 'win'], ['infinite-life']).missed, ['win']);
+assert.deepEqual(classesForEdgeFamilies(['sac-fodder→outlet', 'landfall', 'unknown-family']), ['infinite-death', 'infinite-etb', 'infinite-landfall', 'infinite-ltb', 'infinite-sacrifice', 'infinite-tokens']);
+assert.deepEqual(classesForEdgeFamilies(['graveyard']), ['mill'], 'generic graveyard evidence must not imply self-discard without a discard edge');
+assert.deepEqual(classesForEdgeFamilies(['discard']), ['infinite-self-discard']);
 assert.deepEqual(classesForProofDeltas([
   { family: 'blink-etb-land-untap-loop', positiveDeltas: [{ resource: 'mana', min: 0, max: 0 }] },
 ]), []);
@@ -206,7 +211,7 @@ const hastyCopyLoop = evaluateCombo({
 }, idx);
 assert.equal(hastyCopyLoop.bucket, 'proved');
 assert.ok(hastyCopyLoop.familySignals.includes('hasty-copy→etb-untap-loop'));
-assert.deepEqual(hastyCopyLoop.modelClasses, ['infinite-etb', 'infinite-tokens', 'infinite-untap']);
+assert.deepEqual(hastyCopyLoop.modelClasses, ['infinite-etb', 'infinite-ltb', 'infinite-tokens', 'infinite-untap']);
 assert.equal(hastyCopyLoop.resultCoverage.coveredAny, false, 'hasty-copy ETB untap loops should not imply mana without mana facts');
 
 const amplifiedSelfUntapLoop = evaluateCombo({
@@ -403,8 +408,40 @@ const unmappedOnly = evaluateCombo({
   categories: ['test'],
   metadata: { deckCount: 1 },
 }, idx);
-assert.deepEqual(unmappedOnly.expectedClasses, []);
-assert.deepEqual(unmappedOnly.unmappedLabels, ['Infinite LTB']);
+assert.deepEqual(unmappedOnly.expectedClasses, ['infinite-ltb']);
+assert.deepEqual(unmappedOnly.unmappedLabels, []);
+assert.equal(unmappedOnly.resultCoverage.coveredAny, false);
+
+const edgeBridgedSacrificeInteraction = evaluateCombo({
+  id: 'edge-bridged-sacrifice-interaction',
+  detailPath: '/combos/test/edge-bridged-sacrifice-interaction',
+  url: 'https://example.test/edge-bridged-sacrifice-interaction',
+  cards: ['Aristocrats Token Body', 'Free Creature Sac Outlet'],
+  cardCount: 2,
+  results: ['Infinite sacrifice triggers', 'Infinite LTB'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(edgeBridgedSacrificeInteraction.proofStatus, 'no-proof');
+assert.equal(edgeBridgedSacrificeInteraction.bucket, 'classified-not-proven');
+assert.ok(edgeBridgedSacrificeInteraction.edgeSignalFamilies.includes('sac-fodder→outlet'));
+assert.ok(edgeBridgedSacrificeInteraction.edgeSignalClasses.includes('infinite-sacrifice'));
+assert.ok(edgeBridgedSacrificeInteraction.edgeSignalClasses.includes('infinite-ltb'));
+assert.equal(edgeBridgedSacrificeInteraction.resultCoverage.coveredAny, true);
+
+const edgeBridgeNegative = evaluateCombo({
+  id: 'edge-bridge-negative',
+  detailPath: '/combos/test/edge-bridge-negative',
+  url: 'https://example.test/edge-bridge-negative',
+  cards: ['Aristocrats Token Body', 'Free Creature Sac Outlet'],
+  cardCount: 2,
+  results: ['Infinite colorless mana'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(edgeBridgeNegative.bucket, 'classified-not-proven');
+assert.ok(edgeBridgeNegative.edgeSignalFamilies.includes('sac-fodder→outlet'));
+assert.equal(edgeBridgeNegative.resultCoverage.coveredAny, false, 'sacrifice edge signals must not imply unrelated mana results');
 
 const summary = summarizeEvaluations([
   lifeLoop,
@@ -430,9 +467,9 @@ assert.equal(summary.proofOnlyExpectedClassCoverage.considered, 15);
 assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAny, 13);
 assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAnyPct, 86.7);
 const taxonomyGapSummary = summarizeEvaluations([unmappedOnly], { source: 'fixture' });
-assert.equal(taxonomyGapSummary.unmappedResultLabels.combosWithAny, 1);
-assert.equal(taxonomyGapSummary.unmappedResultLabels.labelInstances, 1);
-assert.equal(taxonomyGapSummary.unmappedResultLabels.topLabels['Infinite LTB'], 1);
+assert.equal(taxonomyGapSummary.unmappedResultLabels.combosWithAny, 0);
+assert.equal(taxonomyGapSummary.unmappedResultLabels.labelInstances, 0);
+assert.equal(taxonomyGapSummary.expectedClassCoverage.coveredAny, 0);
 assert.ok(renderMarkdown({ summary, edgeCases: [] }).includes('EDHREC combo model baseline'));
 assert.ok(renderMarkdown({ summary, edgeCases: [] }).includes('Proof-only expected result-class coverage'));
 assert.ok(renderMarkdown({ summary: taxonomyGapSummary, edgeCases: [] }).includes('Unmapped EDHREC result labels'));

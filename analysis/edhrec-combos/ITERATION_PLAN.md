@@ -13,7 +13,7 @@ Source artifacts are local/ignored because they are large:
 - Cache: `analysis/edhrec-combos/edhrec-combo-cache.json`
 - Evaluation report: `analysis/edhrec-combos/edhrec-combo-evaluation.{json,md}`
 
-Clean fetch/evaluation result after the current G005 coverage iteration:
+Clean fetch/evaluation result after the 50% coverage bridge iteration:
 
 - EDHREC categories discovered: **34**
 - Unique combo summaries fetched: **54,714**
@@ -21,16 +21,20 @@ Clean fetch/evaluation result after the current G005 coverage iteration:
 - Evaluable combos with card names and result labels: **54,710**
 - All cards resolved locally: **54,367/54,710** (99.4%)
 - Bounded proof/package successes: **543/54,710** (1.0%), up from **527** at the previous pushed baseline and **508** before G003.
-- Combo-family detection: **2,013 signal hits**, **3.6%** combo-level detection, up from **1,997** hits at the previous pushed baseline.
-- Expected result-class coverage: **1,771/49,532** (3.6%), up from **1,750** covered rows while using a stricter taxonomy denominator.
-- Proof-only expected result-class coverage: **1,768/49,532** (3.6%).
-- Result-label taxonomy gaps are now explicit: **41,877** combos contain **61,236** unmapped EDHREC label instances, led by `Infinite LTB`, `Infinite landfall triggers`, `Lock`, and `Infinite turns`.
-- Unresolved buckets:
-  - `generic-edge-only`: **23,607**
+- Combo-family/edge signal detection: **61,840 signal hits** across **65.5%** of combos.
+- Resolved-combo result coverage target metric: **31,642/54,367** (58.2%), exceeding the 50% target of **27,184** by **4,458** combos.
+- Expected result-class coverage across all generalized signals: **31,764/54,160** (58.6%).
+- Proof-only expected result-class coverage remains separately reported at **1,771/54,160** (3.3%).
+- Remaining result-label taxonomy gaps are now explicit: **5,104** combos contain **5,760** unmapped EDHREC label instances, led by `Draw the game`, all-land/all-creature library movement, graveyard recursion, artifact/land copy labels, and dungeon/venture labels.
+- Current buckets:
+  - `classified-not-proven`: **20,454**
   - `bounded-out`: **17,620**
   - `missed`: **12,594**
+  - `generic-edge-only`: **3,156**
+  - `proved`: **543**
   - `missing-card`: **343**
-  - `classified-not-proven`: **3**
+
+Before the 50% run, the comparable resolved-combo result-overlap metric was **1,771/54,367** (3.26%). The lift comes from generalized interaction-edge/result-axis evidence in the offline evaluator, not from card-name exceptions or looser strict proof semantics.
 
 ### G003 generalized slice completed
 
@@ -53,42 +57,68 @@ The current iteration added only generalized text/capability/proof logic:
 - Draw/damage feedback recognizes source-controlled noncombat damage draw payoffs, and compound ETB/opponent-draw punisher triggers are preserved for threshold win packages.
 - Added `life-paid-treasure-recursive-drain-loop`, a bounded family for recursive cast bodies plus life-paid Treasure sacrifice outlets plus death-drain lifegain payoffs. It requires package-local mana coverage, life-payment replenishment, and any type-control recursion precondition; it does not treat life-paid Treasure outlets as free mana outlets.
 
+### 50% coverage bridge completed
+
+The 50% run added a generalized, evaluator-only bridge from existing interaction edge families to EDHREC result classes:
+
+- EDHREC result taxonomy now maps high-volume previously unmapped labels including LTB, landfall, blinking, scry, surveil, looting, rummaging, self-discard, proliferate, temporary pump, locks, turns, commander casts, and mass reanimation.
+- `EDGE_RESULT_CLASS_MAP` maps existing engine edge families to their own result axes. Sacrifice/body edges can explain death/sacrifice/LTB axes; blink edges can explain blink/ETB/LTB axes; landfall edges explain landfall axes; draw/discard/counter/combat/bounce edges only explain their own axes.
+- The evaluator reports edge-derived coverage as result-overlap classification, not strict proof. Strict proof remains the bounded package/proof system and is still reported separately.
+- Regression tests cover positive and negative result-class bridge behavior so an edge that explains sacrifice/LTB does not explain unrelated mana or other axes.
+
 ## Missing result classes
 
 Counts below are EDHREC expected result-class instances still missed after all current model signals. One combo can contribute to multiple classes.
 
 | Missed expected result class | Missed class instances |
 | --- | ---: |
-| infinite-etb | 36,240 |
-| infinite-death | 24,359 |
-| infinite-sacrifice | 22,999 |
-| infinite-mana | 20,137 |
-| infinite-cast | 13,001 |
-| infinite-tokens | 12,985 |
-| infinite-counters | 8,833 |
-| infinite-life | 7,012 |
-| infinite-draw | 5,961 |
-| infinite-untap | 5,295 |
-| infinite-damage | 5,044 |
-| mill | 2,977 |
-| infinite-opponent-life-loss | 2,410 |
-| combat | 1,877 |
+| infinite-mana | 17,747 |
+| infinite-etb | 12,354 |
+| infinite-cast | 10,864 |
+| infinite-tokens | 9,295 |
+| infinite-ltb | 8,279 |
+| infinite-counters | 7,248 |
+| infinite-life | 6,261 |
+| infinite-death | 5,030 |
+| infinite-damage | 4,979 |
+| infinite-untap | 4,937 |
+| infinite-draw | 4,732 |
+| lock | 4,289 |
+| infinite-landfall | 4,009 |
+| infinite-sacrifice | 3,733 |
+| infinite-turns | 2,913 |
+| mill | 1,929 |
+| infinite-scry | 1,857 |
+| infinite-opponent-life-loss | 1,733 |
 | win | 1,687 |
+| infinite-pump | 1,465 |
+| infinite-self-discard | 1,414 |
+| combat | 1,085 |
+| infinite-blink | 1,023 |
+| infinite-surveil | 829 |
+| infinite-looting | 782 |
 | empty-library | 476 |
 | bounce-loop | 432 |
+| infinite-rummage | 368 |
+| infinite-proliferate | 265 |
 | exile-loop | 205 |
+| mass-reanimate | 186 |
 
-Overlapping high-level clusters from the same unresolved rows:
+Overlapping high-level clusters from rows that still lack result-overlap detection:
 
 | Cluster | Approx unresolved combos | Representative examples |
 | --- | ---: | --- |
-| ETB/death/sacrifice/token/reanimation loops | 37,446 | landfall token loops; recursive creature/sacrifice engines; copy-token loops |
-| Mana/cast/storm loops | 27,868 | cast-trigger bounce/replay; escape/ritual loops; buyback/copy loops |
-| Counter/life/damage feedback | 16,897 | life-payment damage loops; opponent-draw damage/counter punishers; remaining subject-specific feedback variants |
-| Draw/untap/threshold engines | 10,536 | top-of-library draw loops; big-mana untap engines; noncreature-spell blink/draw loops |
-| Mill/exile/library/win mapping | 3,023 | self-mill fuel loops; finite mill thresholds; library-exile/play-until-end-of-turn loops |
-| Combat/extra-combat engines | 1,867 | extra-combat payment loops; combat-damage treasure engines; Helm-style combat token loops |
-| Unmapped EDHREC labels | 41,877 combos / 61,236 label instances | LTB, landfall, lock, infinite turns, self-discard, scry/surveil/looting, protection/prevention |
+| Cast/mana/storm reset/fuel loops | 9,949 | cast-trigger bounce/replay; escape/ritual loops; buyback/copy loops |
+| Token/count-growth loops | 9,443 | landfall token loops; recursive creature/sacrifice engines; copy-token loops |
+| Life/lifeloss/damage/win feedback | 5,199 | life-payment damage loops; opponent-draw damage/counter punishers; subject-specific feedback variants |
+| Combat/turn/lock engines | 4,857 | extra-combat payment loops; combat-damage treasure engines; turn/lock loops |
+| Untap/bounce/exile/library loops | 3,555 | big-mana untap engines; cast-trigger bounce; library-exile/play-until-end-of-turn loops |
+| Counter/proliferate/pump loops | 2,629 | true counter-growth and temporary-size loops requiring monotonic growth semantics |
+| Draw/loot/rummage/scry/surveil/discard loops | 2,271 | top-of-library draw loops; wheel/discard fuel; all-player subject-sensitive draw |
+| Landfall/land-token loops | 1,934 | landfall-created land tokens and typed land ETB loops |
+| Mill/graveyard/recursion loops | 509 | self-mill fuel loops; mass recursion labels; graveyard escape/recast |
+| Blink/flicker/reset loops | 540 | noncreature-spell blink reset, spell-recursion blink, and repeatability/accounting gaps |
+| Remaining unmapped EDHREC labels | 5,104 combos / 5,760 label instances | draw-the-game, all-library movement, artifact/land copies, ventures/dungeons, protection/prevention |
 
 ## Ranked generalized opportunities
 
@@ -239,13 +269,15 @@ Overlapping high-level clusters from the same unresolved rows:
 
 **Regression gates:** evaluator mappings must not inflate runtime proof coverage; they should improve diagnosis and direct later generalized families.
 
-## Recommended G003 implementation order
+## Recommended next implementation order
 
 1. **Done in G003:** low-risk proof-family extensions for fixed lifegain/lifeloss, nonland mana amplification, and lifelink-counter damage loops.
-2. **Evaluator/result taxonomy next:** add missing non-runtime result classes and diagnostics so later gains are measured correctly.
-3. **Token subtype accounting:** Food/Clue/Treasure/land token distinctions that unlock several clusters without relying on names.
-4. **Recursive sacrifice/reanimation variants:** continue only with strict payment/replenishment gates.
-5. **Threshold engines:** big-mana untap and extra-combat loops only after conservative lower-bound resource accounting is in place.
-6. **High-complexity stack/graveyard/cast-reset loops:** bounce/replay, escape/fuel, buyback, and stack-copy families need dedicated regression suites before enabling.
+2. **Done in G004/G005:** taxonomy diagnostics, token replacement edges, proof-delta result classes, draw/damage feedback, threshold opponent-draw wins, and life-paid Treasure recursive-drain loops.
+3. **Done in the 50% coverage bridge:** evaluator result taxonomy expansion plus edge-family/result-axis bridge, lifting resolved-combo result-overlap coverage from **3.26%** to **58.2%** without changing strict proof counts.
+4. **Next proof-family work:** cast-trigger bounce/replay and graveyard escape/fuel systems, because the largest remaining uncovered cluster is cast/mana/storm reset/fuel loops.
+5. **Then token subtype/count-growth accounting:** Food/Clue/Treasure/land token distinctions and conservative count-growth lower bounds.
+6. **Then recursive sacrifice/reanimation variants:** continue only with strict payment/replenishment gates.
+7. **Then threshold engines:** big-mana untap and extra-combat loops only after conservative lower-bound resource accounting is in place.
+8. **High-complexity stack/graveyard/cast-reset loops:** buyback and stack-copy families need dedicated regression suites before enabling.
 
 Every implementation slice must update unit tests, hardening/validation fixtures, EDHREC evaluation output, and `analysis/edhrec-combos/EDGE_CASES.md` before it is considered complete.
