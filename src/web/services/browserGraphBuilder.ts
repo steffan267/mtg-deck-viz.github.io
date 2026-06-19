@@ -1,7 +1,8 @@
 import type { DeckGraph, GraphEdge, GraphNode, ResolvedDeckCard, ZoneDescriptor } from '../types'
 import type { InteractionModelModule } from './adapters/interactionModel'
 import type { MetricsModule } from '../types'
-import { graphNodeFromResolvedCard, interactionEvents } from './adapters/interactionModel'
+import { annotateInteractionFaceEvidence, graphNodeFromResolvedCard, interactionEvents } from './adapters/interactionModel'
+import * as CARD_FACES from '../../card-faces.js'
 
 export interface BrowserGraphBuilderOptions {
   includeInteractionProofs?: boolean
@@ -13,20 +14,36 @@ function isCommanderish(node: GraphNode): boolean {
   return type.includes('legendary') && (type.includes('creature') || type.includes('planeswalker'))
 }
 
+function mergeResolvedDeckCards(cards: ResolvedDeckCard[]): ResolvedDeckCard[] {
+  const byPhysicalCard = new Map<string, ResolvedDeckCard>()
+  for (const entry of cards) {
+    const key = CARD_FACES.physicalCardKey(entry.card)
+    const current = byPhysicalCard.get(key)
+    if (!current) {
+      byPhysicalCard.set(key, { qty: entry.qty, card: entry.card })
+      continue
+    }
+    current.qty += entry.qty
+    if (CARD_FACES.faceDataScore(entry.card) > CARD_FACES.faceDataScore(current.card)) current.card = entry.card
+  }
+  return [...byPhysicalCard.values()]
+}
+
 export function createBrowserGraphBuilder(model: InteractionModelModule, metrics: MetricsModule, options: BrowserGraphBuilderOptions = {}) {
   return function buildGraph(cards: ResolvedDeckCard[], onProgress?: (done: number, total: number) => void): DeckGraph {
+    const mergedCards = mergeResolvedDeckCards(cards)
     const nodes: GraphNode[] = []
     const missing: string[] = []
     let commanderAssigned = false
 
-    cards.forEach((entry, index) => {
+    mergedCards.forEach((entry, index) => {
       const node = graphNodeFromResolvedCard(entry.qty, entry.card, model)
       if (!commanderAssigned && isCommanderish(node)) {
         node.role = 'commander'
         commanderAssigned = true
       }
       nodes.push(node)
-      onProgress?.(index + 1, cards.length)
+      onProgress?.(index + 1, mergedCards.length)
     })
 
     const edges: GraphEdge[] = []
@@ -35,7 +52,7 @@ export function createBrowserGraphBuilder(model: InteractionModelModule, metrics
       for (let j = i + 1; j < nodes.length; j += 1) {
         const a = nodes[i]
         const b = nodes[j]
-        const interactions = model.interactionsBetween(a, b)
+        const interactions = annotateInteractionFaceEvidence(a, b, model.interactionsBetween(a, b))
         if (!interactions.length) continue
         const key = [a.id, b.id].sort().join('||')
         if (seen.has(key)) continue

@@ -14,6 +14,40 @@ export type CardRole =
 export type InteractionStrength = 'weak' | 'moderate' | 'strong' | 'combo-critical' | string
 export type InteractionKind = 'reaction' | 'enablement' | string
 export type InteractionDirection = 'A→B' | 'B→A' | '↔' | string
+export type CardFaceAvailability = 'single' | 'either-face' | 'transforms' | 'same-object-parts' | 'separate-objects'
+
+export interface CardFaceFacts {
+  index: number
+  name: string
+  type_line: string
+  oracle_text: string
+  mana_cost: string
+  colors?: string[]
+  oracle_id?: string
+  layout?: string
+  availability?: CardFaceAvailability
+  [key: string]: unknown
+}
+
+export interface CardFaceSource {
+  index?: number | null
+  name: string
+  availability?: string
+  layout?: string
+  snippet?: string
+  [key: string]: unknown
+}
+
+export interface CardFaceClassification extends CardFaceFacts {
+  role?: string
+  produces?: Record<string, unknown>
+  consumes?: Record<string, unknown>
+  zones?: unknown[]
+  caps?: string[]
+  myTypes?: string[]
+  tribalRefs?: string[]
+  classification?: unknown
+}
 
 export interface Interaction {
   family: string
@@ -23,6 +57,9 @@ export interface Interaction {
   direction?: InteractionDirection
   label?: string
   subjects?: string[]
+  sourceFace?: CardFaceSource | null
+  targetFace?: CardFaceSource | null
+  faceEvidence?: { source?: CardFaceSource | null; target?: CardFaceSource | null; [key: string]: unknown }
   [key: string]: unknown
 }
 
@@ -58,6 +95,14 @@ export interface GraphNode {
   myTypes?: string[]
   tribalRefs?: string[]
   caps?: string[]
+  layout?: string
+  aliases?: string[]
+  faces?: CardFaceFacts[]
+  faceFacts?: CardFaceClassification[]
+  factSources?: Record<string, Record<string, unknown[]>>
+  faceCompatibilityWarnings?: unknown[]
+  cardKey?: string
+  canonicalName?: string
   zoneLabel?: string
   color?: string
   fixed?: FixedPosition
@@ -78,6 +123,7 @@ export interface InteractionProofContribution {
   role: string
   facts: string[]
   text?: string
+  faces?: CardFaceSource[]
   [key: string]: unknown
 }
 
@@ -104,6 +150,8 @@ export interface InteractionProofEvidence {
   card?: string
   predicate?: string
   text?: string
+  faces?: CardFaceSource[]
+  face?: CardFaceSource
   [key: string]: unknown
 }
 
@@ -219,7 +267,12 @@ export interface ResolvedCard {
   cmc: number
   edhrec_rank: number | null
   color_identity: string[]
-  card_faces?: Array<{ oracle_text?: string; mana_cost?: string }>
+  layout?: string
+  aliases?: string[]
+  faces?: CardFaceFacts[]
+  cardKey?: string
+  canonicalName?: string
+  card_faces?: Array<Partial<CardFaceFacts>>
   [key: string]: unknown
 }
 
@@ -237,6 +290,11 @@ export interface CandidateCard {
   text: string
   edh: number | null
   tags: string[]
+  layout?: string
+  aliases?: string[]
+  faces?: CardFaceFacts[]
+  cardKey?: string
+  canonicalName?: string
   [key: string]: unknown
 }
 

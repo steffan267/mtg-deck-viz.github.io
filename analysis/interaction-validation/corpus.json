@@ -14,14 +14,14 @@
       "type": "known-combo-deck-seed",
       "status": "local-fixtures",
       "caseSourceType": "known-combo-seed",
-      "purpose": "Known combo-deck packages and an explicit known gap for regression tracking."
+      "purpose": "Known combo-deck packages and regression-tracked proof families."
     },
     {
       "id": "negative-near-misses",
       "type": "negative-corpus",
       "status": "local-fixtures",
       "caseSourceType": "negative-near-miss",
-      "purpose": "Precision guards for one-shot effects, scoped reducers, unreplenished bodies, and token reminder overreach."
+      "purpose": "Precision guards for one-shot effects, scoped reducers, illegal targets, unmet preconditions, unreplenished bodies, and token reminder overreach."
     },
     {
       "id": "precon-sample-100",
@@ -49,103 +49,952 @@
     {
       "id": "spellbook-seed-self-untap-mana",
       "sourceType": "commander-spellbook-seed",
-      "expect": { "status": "proven", "families": ["self-untap-mana-loop"] },
+      "expect": {
+        "status": "proven",
+        "families": [
+          "self-untap-mana-loop"
+        ]
+      },
       "cards": [
-        { "id": "Self Untap Dork", "type_line": "Creature — Elf Druid", "oracle_text": "{T}: Add {G}{G}. {0}: Untap this creature.", "cmc": 2 }
+        {
+          "id": "Self Untap Dork",
+          "type_line": "Creature — Elf Druid",
+          "oracle_text": "{T}: Add {G}{G}. {0}: Untap this creature.",
+          "cmc": 2
+        }
       ]
     },
     {
       "id": "spellbook-seed-deadeye-drake",
       "sourceType": "commander-spellbook-seed",
-      "expect": { "status": "proven", "families": ["blink-etb-land-untap-loop"] },
+      "expect": {
+        "status": "proven",
+        "families": [
+          "blink-etb-land-untap-loop"
+        ]
+      },
       "cards": [
-        { "id": "Deadeye Navigator", "type_line": "Creature — Spirit", "oracle_text": "{1}{U}: Exile another target creature you control, then return it to the battlefield under your control.", "cmc": 6 },
-        { "id": "Peregrine Drake", "type_line": "Creature — Drake", "oracle_text": "Flying When this creature enters, untap up to five lands.", "cmc": 5 }
+        {
+          "id": "Deadeye Navigator",
+          "type_line": "Creature — Spirit",
+          "oracle_text": "{1}{U}: Exile another target creature you control, then return it to the battlefield under your control.",
+          "cmc": 6
+        },
+        {
+          "id": "Peregrine Drake",
+          "type_line": "Creature — Drake",
+          "oracle_text": "Flying When this creature enters, untap up to five lands.",
+          "cmc": 5
+        }
       ]
     },
     {
       "id": "spellbook-seed-lifegain-lifeloss",
       "sourceType": "commander-spellbook-seed",
-      "expect": { "status": "proven", "families": ["lifegain-lifeloss-loop"] },
+      "expect": {
+        "status": "proven",
+        "families": [
+          "lifegain-lifeloss-loop"
+        ]
+      },
       "cards": [
-        { "id": "Sanguine Bond", "type_line": "Enchantment", "oracle_text": "Whenever you gain life, target opponent loses that much life.", "cmc": 5 },
-        { "id": "Exquisite Blood", "type_line": "Enchantment", "oracle_text": "Whenever an opponent loses life, you gain that much life.", "cmc": 5 }
+        {
+          "id": "Sanguine Bond",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever you gain life, target opponent loses that much life.",
+          "cmc": 5
+        },
+        {
+          "id": "Exquisite Blood",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever an opponent loses life, you gain that much life.",
+          "cmc": 5
+        }
       ]
     },
     {
       "id": "spellbook-seed-artifact-top-loop",
       "sourceType": "commander-spellbook-seed",
-      "expect": { "status": "proven", "families": ["artifact-top-cost-reduction-loop"] },
+      "expect": {
+        "status": "proven",
+        "families": [
+          "artifact-top-cost-reduction-loop"
+        ]
+      },
       "cards": [
-        { "id": "Self Top Draw Artifact", "type_line": "Artifact", "oracle_text": "{1}: Draw a card, then put this artifact on top of its owner’s library.", "cmc": 1 },
-        { "id": "Artifact Spell Reducer", "type_line": "Artifact Creature — Vedalken Artificer", "oracle_text": "Artifact spells you cast cost {1} less to cast.", "cmc": 2 },
-        { "id": "Artifact Top Caster", "type_line": "Artifact", "oracle_text": "You may look at the top card of your library any time. You may cast artifact spells from the top of your library.", "cmc": 4 }
+        {
+          "id": "Self Top Draw Artifact",
+          "type_line": "Artifact",
+          "oracle_text": "{1}: Draw a card, then put this artifact on top of its owner’s library.",
+          "cmc": 1
+        },
+        {
+          "id": "Artifact Spell Reducer",
+          "type_line": "Artifact Creature — Vedalken Artificer",
+          "oracle_text": "Artifact spells you cast cost {1} less to cast.",
+          "cmc": 2
+        },
+        {
+          "id": "Artifact Top Caster",
+          "type_line": "Artifact",
+          "oracle_text": "You may look at the top card of your library any time. You may cast artifact spells from the top of your library.",
+          "cmc": 4
+        }
       ]
     },
     {
       "id": "known-combo-token-modifier-payoff",
       "sourceType": "known-combo-seed",
-      "expect": { "status": "proven", "families": ["token-source-modifier-payoff"] },
+      "expect": {
+        "status": "proven",
+        "families": [
+          "token-source-modifier-payoff"
+        ]
+      },
       "cards": [
-        { "id": "Token Source", "type_line": "Creature", "oracle_text": "When this creature enters, create a 1/1 white Soldier creature token.", "cmc": 2 },
-        { "id": "Token Doubler", "type_line": "Enchantment", "oracle_text": "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.", "cmc": 4 },
-        { "id": "Token Payoff", "type_line": "Creature", "oracle_text": "Whenever one or more tokens you control enter, draw a card.", "cmc": 3 }
+        {
+          "id": "Token Source",
+          "type_line": "Creature",
+          "oracle_text": "When this creature enters, create a 1/1 white Soldier creature token.",
+          "cmc": 2
+        },
+        {
+          "id": "Token Doubler",
+          "type_line": "Enchantment",
+          "oracle_text": "If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.",
+          "cmc": 4
+        },
+        {
+          "id": "Token Payoff",
+          "type_line": "Creature",
+          "oracle_text": "Whenever one or more tokens you control enter, draw a card.",
+          "cmc": 3
+        }
       ]
     },
     {
       "id": "known-combo-aristocrats-token",
       "sourceType": "known-combo-seed",
-      "expect": { "status": "proven", "families": ["aristocrats-body-outlet-payoff"] },
+      "expect": {
+        "status": "proven",
+        "families": [
+          "aristocrats-body-outlet-payoff"
+        ]
+      },
       "cards": [
-        { "id": "Token Fodder", "type_line": "Creature", "oracle_text": "When this creature enters, create a 1/1 white Soldier creature token.", "cmc": 2 },
-        { "id": "Sac Outlet", "type_line": "Creature", "oracle_text": "Sacrifice a creature: Add {C}.", "cmc": 1 },
-        { "id": "Death Payoff", "type_line": "Creature", "oracle_text": "Whenever another creature dies, each opponent loses 1 life.", "cmc": 2 }
+        {
+          "id": "Token Fodder",
+          "type_line": "Creature",
+          "oracle_text": "When this creature enters, create a 1/1 white Soldier creature token.",
+          "cmc": 2
+        },
+        {
+          "id": "Sac Outlet",
+          "type_line": "Creature",
+          "oracle_text": "Sacrifice a creature: Add {C}.",
+          "cmc": 1
+        },
+        {
+          "id": "Death Payoff",
+          "type_line": "Creature",
+          "oracle_text": "Whenever another creature dies, each opponent loses 1 life.",
+          "cmc": 2
+        }
       ]
     },
     {
-      "id": "known-gap-library-exile-win",
+      "id": "known-combo-library-exile-win",
       "sourceType": "known-combo-seed",
-      "expect": { "status": "proven", "families": ["library-exile-empty-library-win"] },
+      "expect": {
+        "status": "proven",
+        "families": [
+          "library-exile-empty-library-win"
+        ]
+      },
       "cards": [
-        { "id": "Library Exiling Tutor", "type_line": "Instant", "oracle_text": "Name a card. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal the named card. Put that card into your hand and exile all other cards revealed this way.", "cmc": 1 },
-        { "id": "Empty Library Oracle", "type_line": "Creature — Merfolk Wizard", "oracle_text": "When this creature enters, look at the top X cards of your library, where X is your devotion to blue. If X is greater than or equal to the number of cards in your library, you win the game.", "cmc": 2 }
+        {
+          "id": "Library Exiling Tutor",
+          "type_line": "Instant",
+          "oracle_text": "Name a card. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal the named card. Put that card into your hand and exile all other cards revealed this way.",
+          "cmc": 1
+        },
+        {
+          "id": "Empty Library Oracle",
+          "type_line": "Creature — Merfolk Wizard",
+          "oracle_text": "When this creature enters, look at the top X cards of your library, where X is your devotion to blue. If X is greater than or equal to the number of cards in your library, you win the game.",
+          "cmc": 2
+        }
+      ]
+    },
+    {
+      "id": "known-combo-imprint-untap-spell-loop",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "imprint-untap-spell-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Nonland Untap Spell",
+          "type_line": "Instant",
+          "oracle_text": "Untap all nonland permanents you control.",
+          "cmc": 2
+        },
+        {
+          "id": "Repeatable Instant Caster",
+          "type_line": "Artifact",
+          "oracle_text": "Imprint — When this artifact enters, you may exile an instant card with mana value 2 or less from your hand. {2}, {T}: You may copy the exiled card. If you do, you may cast the copy without paying its mana cost.",
+          "cmc": 2
+        }
+      ]
+    },
+    {
+      "id": "known-combo-self-untap-ability-copy",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "self-untap-mana→ability-copy-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Ability Copier",
+          "type_line": "Artifact",
+          "oracle_text": "Whenever you activate an ability, if it isn't a mana ability, you may pay {2}. If you do, copy that ability.",
+          "cmc": 3
+        },
+        {
+          "id": "Self Untap Mana Rock",
+          "type_line": "Artifact",
+          "oracle_text": "{T}: Add {C}{C}{C}. {3}: Untap this artifact.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "known-combo-hasty-copy-etb-untap",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "hasty-copy→etb-untap-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Hasty Copy Engine",
+          "type_line": "Legendary Creature — Goblin Shaman",
+          "oracle_text": "{T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste.",
+          "cmc": 5
+        },
+        {
+          "id": "Permanent Untapper",
+          "type_line": "Creature — Human Warrior",
+          "oracle_text": "When this creature enters, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn.",
+          "cmc": 5
+        }
+      ]
+    },
+    {
+      "id": "known-combo-spell-copy-creature-copy",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "spell-copy-etb→creature-copy-spell-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "ETB Spell Copier",
+          "type_line": "Creature — Human Wizard",
+          "oracle_text": "Flash When this creature enters, copy target instant or sorcery spell. You may choose new targets for the copy.",
+          "cmc": 3
+        },
+        {
+          "id": "Hasty Creature Copy Spell",
+          "type_line": "Sorcery",
+          "oracle_text": "Choose target creature you control. Create a token that's a copy of that creature, except it has haste. Exile it at the beginning of the next end step.",
+          "cmc": 2
+        }
+      ]
+    },
+    {
+      "id": "known-combo-artifact-top-loop-flexible-caster",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "artifact-top-cost-reduction-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Self Top Draw Artifact",
+          "type_line": "Artifact",
+          "oracle_text": "{1}: Draw a card, then put this artifact on top of its owner’s library.",
+          "cmc": 1
+        },
+        {
+          "id": "Historic Spell Reducer",
+          "type_line": "Artifact Creature — Construct",
+          "oracle_text": "Historic spells you cast cost {1} less to cast.",
+          "cmc": 2
+        },
+        {
+          "id": "Flexible Artifact Top Caster",
+          "type_line": "Artifact",
+          "oracle_text": "You may look at the top card of your library any time. You may cast artifact spells and colorless spells from the top of your library.",
+          "cmc": 4
+        }
+      ]
+    },
+    {
+      "id": "known-combo-draw-damage-feedback",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "draw-damage-feedback-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Draw Damage Engine",
+          "type_line": "Legendary Creature — Wizard",
+          "oracle_text": "Whenever you draw a card, this creature deals 1 damage to any target.",
+          "cmc": 6
+        },
+        {
+          "id": "Damage Draw Aura",
+          "type_line": "Enchantment — Aura",
+          "oracle_text": "Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.",
+          "cmc": 1
+        }
+      ]
+    },
+    {
+      "id": "known-combo-recursive-body-sacrifice-mana",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "recursive-body-sacrifice-mana-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Recursive Body",
+          "type_line": "Creature — Zombie",
+          "oracle_text": "You may cast this card from your graveyard.",
+          "cmc": 1,
+          "mana_cost": "{B}"
+        },
+        {
+          "id": "Mana Sac Outlet",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add one mana of any color.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "known-combo-layered-recursive-body-death-mana",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "recursive-body-sacrifice-mana-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Death Mana Payoff",
+          "type_line": "Creature — Human Pirate",
+          "oracle_text": "Whenever another creature you control dies, create a Treasure token.",
+          "cmc": 4
+        },
+        {
+          "id": "Colorless Mana Sac Outlet",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add {C}{C}.",
+          "cmc": 3
+        },
+        {
+          "id": "Colored Recursive Body",
+          "type_line": "Creature — Skeleton",
+          "oracle_text": "{1}{B}: Return this creature from your graveyard to the battlefield.",
+          "cmc": 2
+        }
+      ]
+    },
+    {
+      "id": "known-combo-colorless-amplified-self-untap",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "self-untap-mana-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Colorless Mana Amplifier",
+          "type_line": "Artifact",
+          "oracle_text": "Whenever you tap a permanent for {C}, add an additional {C}.",
+          "cmc": 5
+        },
+        {
+          "id": "Break-Even Self Untapper With Colorless",
+          "type_line": "Artifact",
+          "oracle_text": "{T}: Add {C}{C}{C}. {3}: Untap this artifact.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "known-combo-mill-lifeloss-feedback",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "mill-lifeloss-feedback-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Mill To Life Loss Payoff",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a card is put into an opponent's graveyard from anywhere, that player loses 1 life and you gain 1 life.",
+          "cmc": 1
+        },
+        {
+          "id": "Life Loss To Mill Payoff",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever an opponent loses life, that player mills that many cards.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "known-combo-opponent-draw-punisher-win",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "opponent-draw-punisher-win"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Opponent Half-Library Draw",
+          "type_line": "Sorcery",
+          "oracle_text": "Target opponent draws cards equal to half the number of cards in their library, rounded up.",
+          "cmc": 7
+        },
+        {
+          "id": "Opponent Draw Punisher",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever an opponent draws a card, that player loses 1 life.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "known-combo-mill-multiplier-finite-mill",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "mill-multiplier-finite-mill"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Half-Library Mill",
+          "type_line": "Sorcery",
+          "oracle_text": "Target player mills half their library, rounded up.",
+          "cmc": 5
+        },
+        {
+          "id": "Mill Multiplier",
+          "type_line": "Enchantment",
+          "oracle_text": "If an opponent would mill one or more cards, that player mills twice that many cards instead.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "known-combo-mutual-etb-blink-reset",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "mutual-etb-blink-reset-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "ETB Creature Blinker",
+          "type_line": "Creature — Angel",
+          "oracle_text": "Flying When this creature enters the battlefield, exile another target creature you control, then return that card to the battlefield under its owner’s control.",
+          "cmc": 5
+        },
+        {
+          "id": "ETB Permanent Blinker",
+          "type_line": "Creature — Cat Beast",
+          "oracle_text": "When this creature enters the battlefield, exile another target permanent you control, then return that card to the battlefield under its owner’s control.",
+          "cmc": 4
+        }
+      ]
+    },
+    {
+      "id": "known-combo-token-replacement-sacrifice-mana",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "token-replacement-sacrifice-mana-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Creature-Token Replacement Outlet",
+          "type_line": "Legendary Creature — Squirrel Warrior",
+          "oracle_text": "If one or more tokens would be created under your control, those tokens plus that many 1/1 green Squirrel creature tokens are created instead.\n{B}, Sacrifice X Squirrels: Target creature gets +X/-X until end of turn.",
+          "cmc": 3
+        },
+        {
+          "id": "Death Mana Payoff",
+          "type_line": "Creature — Human Pirate",
+          "oracle_text": "Whenever another creature you control dies, create a Treasure token.",
+          "cmc": 4
+        }
+      ]
+    },
+    {
+      "id": "negative-colorless-amplifier-colored-self-untapper",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Colorless Mana Amplifier",
+          "type_line": "Artifact",
+          "oracle_text": "Whenever you tap a permanent for {C}, add an additional {C}.",
+          "cmc": 5
+        },
+        {
+          "id": "Colored Self Untapper",
+          "type_line": "Creature — Elf",
+          "oracle_text": "{T}: Add {G}{G}{G}. {3}: Untap this creature.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "negative-one-way-mill-lifeloss",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Mill To Life Loss Payoff",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever a card is put into an opponent's graveyard from anywhere, that player loses 1 life and you gain 1 life.",
+          "cmc": 1
+        }
+      ]
+    },
+    {
+      "id": "negative-small-opponent-draw-punisher",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Small Opponent Draw",
+          "type_line": "Sorcery",
+          "oracle_text": "Target opponent draws a card.",
+          "cmc": 1
+        },
+        {
+          "id": "Opponent Draw Punisher",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever an opponent draws a card, that player loses 1 life.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "negative-small-mill-multiplier",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Small Mill",
+          "type_line": "Sorcery",
+          "oracle_text": "Target player mills three cards.",
+          "cmc": 2
+        },
+        {
+          "id": "Mill Multiplier",
+          "type_line": "Enchantment",
+          "oracle_text": "If an opponent would mill one or more cards, that player mills twice that many cards instead.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "negative-mutual-etb-blink-target-mismatch",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "ETB Creature Blinker",
+          "type_line": "Creature — Angel",
+          "oracle_text": "Flying When this creature enters the battlefield, exile another target creature you control, then return that card to the battlefield under its owner’s control.",
+          "cmc": 5
+        },
+        {
+          "id": "ETB Artifact Blinker",
+          "type_line": "Artifact",
+          "oracle_text": "When this artifact enters the battlefield, exile another target creature you control, then return that card to the battlefield under its owner’s control.",
+          "cmc": 4
+        }
+      ]
+    },
+    {
+      "id": "negative-token-replacement-missing-outlet",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Creature-Token Replacement Only",
+          "type_line": "Enchantment",
+          "oracle_text": "If one or more tokens would be created under your control, those tokens plus that many 1/1 green Squirrel creature tokens are created instead.",
+          "cmc": 3
+        },
+        {
+          "id": "Death Mana Payoff",
+          "type_line": "Creature — Human Pirate",
+          "oracle_text": "Whenever another creature you control dies, create a Treasure token.",
+          "cmc": 4
+        }
+      ]
+    },
+    {
+      "id": "negative-low-output-ability-copy",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Ability Copier",
+          "type_line": "Artifact",
+          "oracle_text": "Whenever you activate an ability, if it isn't a mana ability, you may pay {2}. If you do, copy that ability.",
+          "cmc": 3
+        },
+        {
+          "id": "Low Output Self Untapper",
+          "type_line": "Artifact",
+          "oracle_text": "{T}: Add {C}. {1}: Untap this artifact.",
+          "cmc": 2
+        }
+      ]
+    },
+    {
+      "id": "negative-expensive-imprint-untap",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Expensive Untap Spell",
+          "type_line": "Instant",
+          "oracle_text": "Untap all nonland permanents you control.",
+          "cmc": 3
+        },
+        {
+          "id": "Repeatable Instant Caster",
+          "type_line": "Artifact",
+          "oracle_text": "Imprint — When this artifact enters, you may exile an instant card with mana value 2 or less from your hand. {2}, {T}: You may copy the exiled card. If you do, you may cast the copy without paying its mana cost.",
+          "cmc": 2
+        }
+      ]
+    },
+    {
+      "id": "negative-one-way-draw-damage",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Draw Damage Engine",
+          "type_line": "Legendary Creature — Wizard",
+          "oracle_text": "Whenever you draw a card, this creature deals 1 damage to any target.",
+          "cmc": 6
+        },
+        {
+          "id": "Card Draw Spell",
+          "type_line": "Sorcery",
+          "oracle_text": "Draw two cards.",
+          "cmc": 2
+        }
+      ]
+    },
+    {
+      "id": "negative-opponent-draw-damage-feedback",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Opponent Draw Damage Engine",
+          "type_line": "Creature — Devil",
+          "oracle_text": "Whenever an opponent draws a card, this creature deals 1 damage to any target.",
+          "cmc": 3
+        },
+        {
+          "id": "Damage Draw Aura",
+          "type_line": "Enchantment — Aura",
+          "oracle_text": "Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.",
+          "cmc": 1
+        }
+      ]
+    },
+    {
+      "id": "negative-expensive-recursive-body",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Expensive Recursive Body",
+          "type_line": "Creature — Skeleton",
+          "oracle_text": "You may cast this card from your graveyard.",
+          "cmc": 3
+        },
+        {
+          "id": "Mana Sac Outlet",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add one mana of any color.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "negative-colored-recursion-colorless-sac",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Colored Recursive Body",
+          "type_line": "Creature — Skeleton",
+          "oracle_text": "{1}{B}: Return this creature from your graveyard to the battlefield.",
+          "cmc": 2
+        },
+        {
+          "id": "Colorless Mana Sac Outlet",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add {C}{C}.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "negative-colored-recursive-cast-colorless-sac",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Black Recursive Cast Body",
+          "type_line": "Creature — Zombie",
+          "oracle_text": "You may cast this card from your graveyard.",
+          "cmc": 1,
+          "mana_cost": "{B}"
+        },
+        {
+          "id": "Colorless One Mana Sac Outlet",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add {C}.",
+          "cmc": 1
+        }
       ]
     },
     {
       "id": "negative-one-shot-blink",
       "sourceType": "negative-near-miss",
-      "expect": { "status": "not-proven" },
+      "expect": {
+        "status": "not-proven"
+      },
       "cards": [
-        { "id": "Ephemerate", "type_line": "Instant", "oracle_text": "Exile target creature you control, then return it to the battlefield under its owner’s control.", "cmc": 1 },
-        { "id": "Peregrine Drake", "type_line": "Creature — Drake", "oracle_text": "Flying When this creature enters, untap up to five lands.", "cmc": 5 }
+        {
+          "id": "Ephemerate",
+          "type_line": "Instant",
+          "oracle_text": "Exile target creature you control, then return it to the battlefield under its owner’s control.",
+          "cmc": 1
+        },
+        {
+          "id": "Peregrine Drake",
+          "type_line": "Creature — Drake",
+          "oracle_text": "Flying When this creature enters, untap up to five lands.",
+          "cmc": 5
+        }
       ]
     },
     {
       "id": "negative-reducer-scope-rock",
       "sourceType": "negative-near-miss",
-      "expect": { "status": "not-proven" },
+      "expect": {
+        "status": "not-proven"
+      },
       "cards": [
-        { "id": "Heartstone", "type_line": "Artifact", "oracle_text": "Activated abilities of creatures cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.", "cmc": 3 },
-        { "id": "Sol Ring", "type_line": "Artifact", "oracle_text": "{T}: Add {C}{C}.", "cmc": 1 }
+        {
+          "id": "Heartstone",
+          "type_line": "Artifact",
+          "oracle_text": "Activated abilities of creatures cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.",
+          "cmc": 3
+        },
+        {
+          "id": "Sol Ring",
+          "type_line": "Artifact",
+          "oracle_text": "{T}: Add {C}{C}.",
+          "cmc": 1
+        }
       ]
     },
     {
       "id": "negative-unreplenished-aristocrats",
       "sourceType": "negative-near-miss",
-      "expect": { "status": "not-proven" },
+      "expect": {
+        "status": "not-proven"
+      },
       "cards": [
-        { "id": "Free Body", "type_line": "Creature", "oracle_text": "When this creature dies, draw a card.", "cmc": 1 },
-        { "id": "Sac Outlet", "type_line": "Creature", "oracle_text": "Sacrifice a creature: Add {C}.", "cmc": 1 },
-        { "id": "Death Payoff", "type_line": "Creature", "oracle_text": "Whenever another creature dies, each opponent loses 1 life.", "cmc": 2 }
+        {
+          "id": "Free Body",
+          "type_line": "Creature",
+          "oracle_text": "When this creature dies, draw a card.",
+          "cmc": 1
+        },
+        {
+          "id": "Sac Outlet",
+          "type_line": "Creature",
+          "oracle_text": "Sacrifice a creature: Add {C}.",
+          "cmc": 1
+        },
+        {
+          "id": "Death Payoff",
+          "type_line": "Creature",
+          "oracle_text": "Whenever another creature dies, each opponent loses 1 life.",
+          "cmc": 2
+        }
       ]
     },
     {
       "id": "negative-token-reminder-overreach",
       "sourceType": "negative-near-miss",
-      "expect": { "status": "not-proven" },
+      "expect": {
+        "status": "not-proven"
+      },
       "cards": [
-        { "id": "Smothering Tithe", "type_line": "Enchantment", "oracle_text": "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token.", "cmc": 4 },
-        { "id": "Academy Manufactor", "type_line": "Artifact Creature — Assembly-Worker", "oracle_text": "If you would create a Clue, Food, or Treasure token, instead create one of each.", "cmc": 3 }
+        {
+          "id": "Smothering Tithe",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token.",
+          "cmc": 4
+        },
+        {
+          "id": "Academy Manufactor",
+          "type_line": "Artifact Creature — Assembly-Worker",
+          "oracle_text": "If you would create a Clue, Food, or Treasure token, instead create one of each.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "negative-hasty-copy-nonlegendary-target",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Hasty Copy Engine",
+          "type_line": "Legendary Creature — Goblin Shaman",
+          "oracle_text": "{T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste.",
+          "cmc": 5
+        },
+        {
+          "id": "Legendary Permanent Untapper",
+          "type_line": "Legendary Creature — Human Warrior",
+          "oracle_text": "When this creature enters, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn.",
+          "cmc": 5
+        }
+      ]
+    },
+    {
+      "id": "negative-spell-copy-noncreature-copier",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Artifact ETB Spell Copier",
+          "type_line": "Artifact",
+          "oracle_text": "When this artifact enters, copy target instant or sorcery spell. You may choose new targets for the copy.",
+          "cmc": 3
+        },
+        {
+          "id": "Hasty Creature Copy Spell",
+          "type_line": "Sorcery",
+          "oracle_text": "Choose target creature you control. Create a token that's a copy of that creature, except it has haste. Exile it at the beginning of the next end step.",
+          "cmc": 2
+        }
+      ]
+    },
+    {
+      "id": "negative-recursive-body-missing-another-creature",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Conditional Recursive Body",
+          "type_line": "Creature — Zombie",
+          "oracle_text": "You may cast this card from your graveyard as long as you control another creature.",
+          "cmc": 1,
+          "mana_cost": "{B}"
+        },
+        {
+          "id": "Mana Sac Outlet",
+          "type_line": "Artifact",
+          "oracle_text": "Sacrifice a creature: Add one mana of any color.",
+          "cmc": 3
+        }
       ]
     }
   ],

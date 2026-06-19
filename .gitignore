@@ -23,3 +23,6 @@ analysis/**/*.tmp
 
 # TypeScript incremental metadata
 *.tsbuildinfo
+analysis/edhrec-combos/edhrec-combo-cache.json
+analysis/edhrec-combos/edhrec-combo-evaluation.json
+analysis/edhrec-combos/edhrec-combo-evaluation.md

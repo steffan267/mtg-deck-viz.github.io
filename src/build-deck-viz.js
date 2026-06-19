@@ -24,6 +24,8 @@ const path = require("path");
 const MODEL = require("./interaction-model.js");
 const METRICS = require("./metrics.js");
 const PROOF_PACKAGES = require("./interaction-proof-packages.js");
+const CARD_FACES = require("./card-faces.js");
+const FACE_CLASSIFICATION = require("./face-classification.js");
 
 const ROOT = path.resolve(__dirname, "..");
 const COMPACT = path.join(ROOT, "data/out/commander-search.json");
@@ -36,7 +38,15 @@ const DEFAULT_BUILD_OPTIONS = {
 // ---------------------------------------------------------------- load DB
 function loadCards() {
   const idx = {};
-  function add(c) { if (c && c.name) idx[c.name.toLowerCase()] = c; }
+  function add(c) {
+    if (!c || !c.name) return;
+    const faceAware = CARD_FACES.toFaceAwareResolvedCard(c);
+    const rootKey = CARD_FACES.normalizeCardNameKey(faceAware.name);
+    idx[rootKey] = faceAware;
+    for (const alias of faceAware.aliases || []) {
+      if (!idx[alias]) idx[alias] = faceAware;
+    }
+  }
   if (fs.existsSync(COMPACT)) {
     const raw = JSON.parse(fs.readFileSync(COMPACT, "utf8"));
     const arr = Array.isArray(raw) ? raw : (raw.cards || Object.values(raw).find(v => Array.isArray(v)));
@@ -46,7 +56,7 @@ function loadCards() {
   if (fs.existsSync(ORACLE)) {
     const raw = JSON.parse(fs.readFileSync(ORACLE, "utf8"));
     const arr = Array.isArray(raw) ? raw : raw.data || [];
-    arr.forEach(c => { if (c && c.name && !idx[c.name.toLowerCase()]) add(c); });
+    arr.forEach(c => { if (c && c.name && !idx[CARD_FACES.normalizeCardNameKey(c.name)]) add(c); });
   }
   return idx;
 }
@@ -55,15 +65,21 @@ function playable(c) { return c && !NON_GAMEPLAY.test(c.layout || ""); }
 
 function compactCandidate(c) {
   if (!playable(c) || c.is_commander_legal === false || (c.legalities && c.legalities.commander !== "legal")) return null;
+  const faceAware = CARD_FACES.toFaceAwareResolvedCard(c);
   return {
-    name: c.name,
-    ci: c.color_identity || [],
-    cmc: c.cmc != null ? c.cmc : 0,
-    type: c.type_line || "",
-    mana: c.mana_cost || "",
-    text: (c.oracle_text || (c.card_faces ? c.card_faces.map(f => f.oracle_text || "").join(" ") : "")).replace(/\r/g, ""),
-    edh: c.edhrec_rank || null,
-    tags: c.tags || [],
+    name: faceAware.name,
+    ci: faceAware.color_identity || [],
+    cmc: faceAware.cmc != null ? faceAware.cmc : 0,
+    type: faceAware.type_line || "",
+    mana: faceAware.mana_cost || "",
+    text: (faceAware.oracle_text || "").replace(/\r/g, ""),
+    edh: faceAware.edhrec_rank || null,
+    tags: faceAware.tags || [],
+    layout: faceAware.layout,
+    aliases: faceAware.aliases,
+    faces: faceAware.faces,
+    cardKey: faceAware.cardKey,
+    canonicalName: faceAware.canonicalName,
   };
 }
 
@@ -110,10 +126,11 @@ async function fetchMoxfield(id) {
     const cards = (boards[board] && boards[board].cards) || {};
     for (const entry of Object.values(cards)) {
       const c = entry.card; if (!c) continue;
+      const faceAware = CARD_FACES.toFaceAwareResolvedCard(c);
       decklist.push({
         qty: entry.quantity || 1,
-        name: c.name,
-        resolved: { name: c.name, type_line: c.type_line || "", oracle_text: c.oracle_text || (c.card_faces ? c.card_faces.map(f => f.oracle_text || "").join(" ") : ""), mana_cost: c.mana_cost || "", cmc: c.cmc, edhrec_rank: c.edhrec_rank, color_identity: c.color_identity || [] },
+        name: faceAware.name,
+        resolved: { name: faceAware.name, type_line: faceAware.type_line || "", oracle_text: faceAware.oracle_text || "", mana_cost: faceAware.mana_cost || "", cmc: faceAware.cmc, edhrec_rank: faceAware.edhrec_rank, color_identity: faceAware.color_identity || [], layout: faceAware.layout, aliases: faceAware.aliases, faces: faceAware.faces, cardKey: faceAware.cardKey, canonicalName: faceAware.canonicalName, card_faces: faceAware.card_faces },
       });
     }
   }
@@ -121,13 +138,12 @@ async function fetchMoxfield(id) {
 }
 
 function lookup(idx, name) {
-  const n = name.toLowerCase();
+  const n = CARD_FACES.normalizeCardNameKey(name);
   if (idx[n] && playable(idx[n])) return idx[n];
-  // split / DFC: match on front face or full "a // b", skip art/token layouts
+  // split / DFC: match on any provider-backed alias, skip art/token layouts
   const hit = Object.values(idx).find(c => {
     if (!playable(c)) return false;
-    const cn = c.name.toLowerCase();
-    return cn === n || cn.startsWith(n + " //") || cn.split(" // ")[0] === n;
+    return CARD_FACES.cardAliases(c).includes(n);
   });
   return hit || null;
 }
@@ -160,14 +176,39 @@ function isCommanderish(c) {
   return t.includes("legendary") && (t.includes("creature") || /planeswalker/.test(t));
 }
 
+function mergeDecklistEntries(decklist, idx) {
+  const byPhysicalCard = new Map();
+  const missing = [];
+  for (const { qty, name, resolved } of decklist) {
+    const found = resolved || lookup(idx, name);   // Moxfield supplies resolved cards
+    if (!found) {
+      missing.push(name);
+      continue;
+    }
+    const faceAware = CARD_FACES.toFaceAwareResolvedCard(found);
+    const key = CARD_FACES.physicalCardKey(faceAware);
+    const current = byPhysicalCard.get(key);
+    if (current) {
+      current.qty += qty;
+      current.names.push(name);
+      if (CARD_FACES.faceDataScore(faceAware) > CARD_FACES.faceDataScore(current.card)) current.card = faceAware;
+    } else {
+      byPhysicalCard.set(key, { qty, name: faceAware.name, names: [name], card: faceAware });
+    }
+  }
+  return { entries: [...byPhysicalCard.values()], missing };
+}
+
 function build(decklist, idx, options = {}) {
   const buildOptions = Object.assign({}, DEFAULT_BUILD_OPTIONS, options);
   const nodes = [], missing = [];
   let commanderAssigned = false;
-  for (const { qty, name, resolved } of decklist) {
-    const c = resolved || lookup(idx, name);   // Moxfield supplies resolved cards
-    if (!c) { missing.push(name); continue; }
-    const cls = MODEL.classify({ type_line: c.type_line, oracle_text: c.oracle_text });
+  const merged = mergeDecklistEntries(decklist, idx);
+  missing.push(...merged.missing);
+  for (const { qty, card } of merged.entries) {
+    const faceClassified = FACE_CLASSIFICATION.classifyFaceAwareCard(card, MODEL);
+    const c = faceClassified.faceAware;
+    const cls = faceClassified.aggregate;
     let role = cls.role;
     if (!commanderAssigned && isCommanderish(c)) { role = "commander"; commanderAssigned = true; }
     nodes.push({
@@ -177,6 +218,14 @@ function build(decklist, idx, options = {}) {
       text: (c.oracle_text || "").replace(/\r/g, ""),
       ci: c.color_identity || [],
       edh: c.edhrec_rank || null,
+      layout: c.layout,
+      aliases: c.aliases,
+      faces: c.faces,
+      faceFacts: faceClassified.faceFacts,
+      factSources: faceClassified.factSources,
+      faceCompatibilityWarnings: faceClassified.faceCompatibilityWarnings,
+      cardKey: c.cardKey,
+      canonicalName: c.canonicalName,
       produces: cls.produces, consumes: cls.consumes, zones: cls.zones,
       myTypes: cls.myTypes, tribalRefs: cls.tribalRefs, caps: cls.caps,
     });
@@ -186,7 +235,7 @@ function build(decklist, idx, options = {}) {
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i], b = nodes[j];
-      const ints = MODEL.interactionsBetween(a, b);
+      const ints = FACE_CLASSIFICATION.annotateInteractionsWithFaceEvidence(a, b, MODEL.interactionsBetween(a, b));
       if (ints.length) {
         const key = [a.id, b.id].sort().join("||");
         if (!seen[key]) {

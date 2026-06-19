@@ -1,5 +1,5 @@
 import type { CandidateCard, DeckGraph, GraphEdge, GraphNode, Interaction, RecommendationCardResult } from '../../types'
-import { graphNodeFromCandidate, interactionEvents, type InteractionModelModule } from './interactionModel'
+import { annotateInteractionFaceEvidence, graphNodeFromCandidate, interactionEvents, type InteractionModelModule } from './interactionModel'
 import type { MetricsModule } from '../../types'
 
 const TOTAL_VALUE_AXIS_SIGMA = { win: 6.94, cohesion: 16.59, self: 7.19 }
@@ -40,7 +40,7 @@ export function cloneGraphWithCandidate(graph: DeckGraph, candidateNode: GraphNo
 
   for (const node of nodes) {
     if (node.id === added.id) continue
-    const interactions = model.interactionsBetween(added, node)
+    const interactions = annotateInteractionFaceEvidence(added, node, model.interactionsBetween(added, node))
     if (interactions.length) {
       edges.push({ source: added.id, target: node.id, interactions, events: interactionEvents(interactions, model) })
     }

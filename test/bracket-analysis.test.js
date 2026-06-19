@@ -15,6 +15,8 @@ function main() {
   assert.deepEqual(summary.map(row => row.label), ["B1", "B3", "B5"]);
   assert.equal(summary[0].meanWin, 11);
   assert.equal(summary[1].medianSelf, 62);
+  assert.equal(ANALYSIS.percentile([1, 2, 3, 4], 0.75), 3);
+  assert.deepEqual(ANALYSIS.statSummary([10, 12]), { min: 10, p25: 10, median: 12, mean: 11, p75: 12, max: 12 });
 
   const exact = ANALYSIS.centroidAccuracy(rows, bracket => String(bracket));
   assert.equal(exact.n, 6);
@@ -25,8 +27,12 @@ function main() {
   assert.equal(coarse.accuracy, 1);
 
   const report = ANALYSIS.buildBracketAnalysis(rows);
+  assert.equal(report.sourceBracketBreakdown.length, 3);
+  assert.deepEqual(report.sourceBracketBreakdown[0].metrics.win, { min: 10, p25: 10, median: 12, mean: 11, p75: 12, max: 12 });
+  assert.deepEqual(report.sourceBracketBreakdown[0].modelBrackets, { Unknown: 2 });
   const md = ANALYSIS.renderMarkdown(report, "data/example.json");
   assert.match(md, /Exact source-bracket accuracy/);
+  assert.match(md, /Per-bracket baseline detail/);
   assert.match(md, /B1/);
 
   process.stdout.write("Bracket analysis tests passed\n");

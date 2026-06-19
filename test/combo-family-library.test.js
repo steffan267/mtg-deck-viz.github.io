@@ -29,6 +29,16 @@ assert.ok(getComboFamily('artifact-top-cost-reduction-loop').requiredFacts.some(
 assert.ok(getComboFamily('blink-etb-land-untap-loop').negativeFixtures.some(fixture => fixture.cards.includes('Ephemerate')));
 assert.ok(getComboFamily('cost-reducer-activated-output-payoff').knownFalsePositives.some(text => /scoped/i.test(text)));
 assert.ok(getComboFamily('token-source-modifier-payoff').requiredFacts.some(fact => fact.kind === 'event.consumes' && fact.event === 'tokens'));
+assert.deepEqual(getComboFamily('hasty-copy→etb-untap-loop').resultClasses, ['infinite-etb', 'infinite-tokens', 'infinite-untap']);
+assert.equal(getComboFamily('hasty-copy→etb-untap-loop').resultClasses.includes('infinite-mana'), false);
+assert.deepEqual(getComboFamily('draw-damage-feedback-loop').resultClasses, ['infinite-damage', 'infinite-draw']);
+assert.ok(getComboFamily('recursive-body-sacrifice-mana-loop').requiredFacts.some(fact => fact.predicate === 'is-mana-sac-outlet'));
+assert.ok(getComboFamily('self-untap-mana-loop').optionalAccelerants.some(fact => fact.predicate === 'is-colorless-mana-amplifier'));
+assert.deepEqual(getComboFamily('mill-lifeloss-feedback-loop').resultClasses, ['mill', 'infinite-opponent-life-loss', 'infinite-life']);
+assert.deepEqual(getComboFamily('opponent-draw-punisher-win').resultClasses, ['win']);
+assert.deepEqual(getComboFamily('mill-multiplier-finite-mill').resultClasses, ['mill']);
+assert.deepEqual(getComboFamily('mutual-etb-blink-reset-loop').resultClasses, ['infinite-etb']);
+assert.ok(getComboFamily('token-replacement-sacrifice-mana-loop').requiredFacts.some(fact => fact.predicate === 'is-token-to-creature-token-replacer'));
 assert.equal(getComboFamily('missing-family'), null);
 
 const invalid = validateComboFamilyLibrary([

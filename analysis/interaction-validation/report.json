@@ -6,18 +6,18 @@
     "budgetMs": 250
   },
   "summary": {
-    "caseCount": 11,
-    "positiveCount": 7,
-    "negativeCount": 4,
-    "truePositives": 6,
-    "falseNegatives": 1,
+    "caseCount": 41,
+    "positiveCount": 21,
+    "negativeCount": 20,
+    "truePositives": 21,
+    "falseNegatives": 0,
     "falsePositives": 0,
-    "recall": 0.857,
-    "twoCardRecall": 0.667,
+    "recall": 1,
+    "twoCardRecall": 1,
     "threeCardRecall": 1,
     "sampledPrecision": 1,
     "falsePositiveHubRate": 0,
-    "unexplainedRate": 0.091,
+    "unexplainedRate": 0,
     "averageProofConfidence": 0.75
   },
   "rows": [
@@ -32,6 +32,234 @@
       "actualStatus": "proven",
       "actualFamilies": [
         "aristocrats-body-outlet-payoff"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-artifact-top-loop-flexible-caster",
+      "sourceType": "known-combo-seed",
+      "cardCount": 3,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "artifact-top-cost-reduction-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "artifact-top-cost-reduction-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-colorless-amplified-self-untap",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "self-untap-mana-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "self-untap-mana-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-draw-damage-feedback",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "draw-damage-feedback-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "draw-damage-feedback-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-hasty-copy-etb-untap",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "hasty-copy→etb-untap-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "hasty-copy→etb-untap-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-imprint-untap-spell-loop",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "imprint-untap-spell-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "imprint-untap-spell-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-layered-recursive-body-death-mana",
+      "sourceType": "known-combo-seed",
+      "cardCount": 3,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "recursive-body-sacrifice-mana-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "recursive-body-sacrifice-mana-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": [
+        "body is not replenished by the package"
+      ]
+    },
+    {
+      "id": "known-combo-library-exile-win",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "library-exile-empty-library-win"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "library-exile-empty-library-win"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-mill-lifeloss-feedback",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "mill-lifeloss-feedback-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "mill-lifeloss-feedback-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-mill-multiplier-finite-mill",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "mill-multiplier-finite-mill"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "mill-multiplier-finite-mill"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-mutual-etb-blink-reset",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "mutual-etb-blink-reset-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "mutual-etb-blink-reset-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-opponent-draw-punisher-win",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "opponent-draw-punisher-win"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "opponent-draw-punisher-win"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-recursive-body-sacrifice-mana",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "recursive-body-sacrifice-mana-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "recursive-body-sacrifice-mana-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-self-untap-ability-copy",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "self-untap-mana→ability-copy-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "self-untap-mana→ability-copy-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": [
+        "self-untap cost is not below produced mana"
+      ]
+    },
+    {
+      "id": "known-combo-spell-copy-creature-copy",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "spell-copy-etb→creature-copy-spell-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "spell-copy-etb→creature-copy-spell-loop"
       ],
       "pass": true,
       "confidence": 0.75,
@@ -54,18 +282,131 @@
       "rejectionReasons": []
     },
     {
-      "id": "known-gap-library-exile-win",
+      "id": "known-combo-token-replacement-sacrifice-mana",
       "sourceType": "known-combo-seed",
       "cardCount": 2,
       "expectedStatus": "proven",
       "expectedFamilies": [
-        "library-exile-empty-library-win"
+        "token-replacement-sacrifice-mana-loop"
       ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "token-replacement-sacrifice-mana-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "negative-colored-recursion-colorless-sac",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "sacrifice outlet mana cannot cover recursive body cost"
+      ]
+    },
+    {
+      "id": "negative-colored-recursive-cast-colorless-sac",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "sacrifice outlet mana cannot cover recursive body cost"
+      ]
+    },
+    {
+      "id": "negative-colorless-amplifier-colored-self-untapper",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "self-untap cost is not below produced mana"
+      ]
+    },
+    {
+      "id": "negative-expensive-imprint-untap",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
       "actualStatus": "no-proof",
       "actualFamilies": [],
-      "pass": false,
+      "pass": true,
       "confidence": 0,
       "rejectionReasons": []
+    },
+    {
+      "id": "negative-expensive-recursive-body",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "sacrifice outlet mana cannot cover recursive body cost"
+      ]
+    },
+    {
+      "id": "negative-hasty-copy-nonlegendary-target",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "hasty creature-copy target restrictions cannot copy the ETB untapper"
+      ]
+    },
+    {
+      "id": "negative-low-output-ability-copy",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "copied untap does not create positive mana after copy cost",
+        "self-untap cost is not below produced mana"
+      ]
+    },
+    {
+      "id": "negative-mutual-etb-blink-target-mismatch",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "ETB blink target scopes cannot reset each other"
+      ]
     },
     {
       "id": "negative-one-shot-blink",
@@ -82,6 +423,61 @@
       ]
     },
     {
+      "id": "negative-one-way-draw-damage",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "no-proof",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": []
+    },
+    {
+      "id": "negative-one-way-mill-lifeloss",
+      "sourceType": "negative-near-miss",
+      "cardCount": 1,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "mill/life-loss package is one-way and cannot recreate the trigger condition"
+      ]
+    },
+    {
+      "id": "negative-opponent-draw-damage-feedback",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "damage-to-draw effect draws cards for you, but draw-to-damage trigger does not react to your draws",
+        "draw source is not large enough to prove a threshold win with the opponent-draw punisher"
+      ]
+    },
+    {
+      "id": "negative-recursive-body-missing-another-creature",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "recursive cast permission requires another creature controlled by the package"
+      ]
+    },
+    {
       "id": "negative-reducer-scope-rock",
       "sourceType": "negative-near-miss",
       "cardCount": 2,
@@ -94,6 +490,48 @@
       "rejectionReasons": []
     },
     {
+      "id": "negative-small-mill-multiplier",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "mill source is not a half-library threshold effect"
+      ]
+    },
+    {
+      "id": "negative-small-opponent-draw-punisher",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "draw source is not large enough to prove a threshold win with the opponent-draw punisher"
+      ]
+    },
+    {
+      "id": "negative-spell-copy-noncreature-copier",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "hasty creature-copy spell cannot target the ETB spell copier"
+      ]
+    },
+    {
       "id": "negative-token-reminder-overreach",
       "sourceType": "negative-near-miss",
       "cardCount": 2,
@@ -104,6 +542,20 @@
       "pass": true,
       "confidence": 0,
       "rejectionReasons": []
+    },
+    {
+      "id": "negative-token-replacement-missing-outlet",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "token replacement and death-mana payoff need a local creature sacrifice outlet"
+      ]
     },
     {
       "id": "negative-unreplenished-aristocrats",
@@ -197,17 +649,17 @@
       "id": "known-combo-seeds",
       "type": "known-combo-deck-seed",
       "status": "local-fixtures",
-      "purpose": "Known combo-deck packages and an explicit known gap for regression tracking.",
+      "purpose": "Known combo-deck packages and regression-tracked proof families.",
       "caseSourceType": "known-combo-seed",
-      "caseCount": 3
+      "caseCount": 17
     },
     {
       "id": "negative-near-misses",
       "type": "negative-corpus",
       "status": "local-fixtures",
-      "purpose": "Precision guards for one-shot effects, scoped reducers, unreplenished bodies, and token reminder overreach.",
+      "purpose": "Precision guards for one-shot effects, scoped reducers, illegal targets, unmet preconditions, unreplenished bodies, and token reminder overreach.",
       "caseSourceType": "negative-near-miss",
-      "caseCount": 4
+      "caseCount": 20
     },
     {
       "id": "precon-sample-100",
@@ -286,8 +738,8 @@
       "status": "ok",
       "source": "analysis/interaction-baseline/interaction-baseline.json",
       "baselineDeckId": "sample-xantcha",
-      "edgeCount": 148,
-      "comboCriticalPairCount": 0,
+      "edgeCount": 153,
+      "comboCriticalPairCount": 4,
       "comboCriticalTripleCount": 0,
       "highFanoutFamilies": [
         {
@@ -299,13 +751,11 @@
           "count": 42
         }
       ],
-      "weakInteractionShare": 0.937
+      "weakInteractionShare": 0.915
     }
   ],
   "manualAudit": {
-    "topMissedCombos": [
-      "known-gap-library-exile-win"
-    ],
+    "topMissedCombos": [],
     "topFalsePositives": [],
     "suspiciousHubs": [
       {

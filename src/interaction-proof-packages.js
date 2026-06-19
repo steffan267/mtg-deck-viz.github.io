@@ -8,6 +8,8 @@
 const { getComboFamily } = require('./combo-family-library');
 const { buildInteractionIndexes, candidateTriples } = require('./interaction-indexes');
 const { provePackage } = require('./interaction-proof-search');
+const FACE_CLASSIFICATION = require('./face-classification');
+const MODEL = require('./interaction-model.js');
 
 const PROOF_PACKAGE_SCHEMA_VERSION = 'interaction-proof-package.v1';
 
@@ -35,6 +37,10 @@ const PROOF_PACKAGE_SCHEMA_FIELDS = [
 const DEFAULT_OPTIONS = {
   maxProofPackages: 24,
   perCardTripleLimit: 8,
+};
+
+const FAMILY_HYPEREDGE_ALIASES = {
+  'library-exile-empty-library-win': ['library-exile→empty-library-win'],
 };
 
 function compareId(a, b) {
@@ -98,6 +104,104 @@ function seedCandidates(indexes, options) {
     capabilityIds(indexes, 'is-lifeloss-from-your-lifegain'),
   );
 
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-mill-to-lifeloss-payoff'),
+    capabilityIds(indexes, 'is-lifeloss-to-mill-payoff'),
+  );
+
+  pairCandidates(
+    candidates,
+    sortedUnique([
+      ...capabilityIds(indexes, 'draw-to-damage-subject:you'),
+      ...capabilityIds(indexes, 'draw-to-damage-subject:each'),
+    ]),
+    capabilityIds(indexes, 'is-damage-to-draw-payoff'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-mass-opponent-draw-source'),
+    capabilityIds(indexes, 'is-opponent-draw-punisher'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-half-library-mill-source'),
+    capabilityIds(indexes, 'is-mill-multiplier'),
+  );
+
+  const recursiveBodies = capabilityIds(indexes, 'is-recursive-body');
+  const manaSacOutlets = capabilityIds(indexes, 'is-mana-sac-outlet');
+  pairCandidates(candidates, recursiveBodies, manaSacOutlets);
+  for (const body of recursiveBodies) {
+    const bodyCard = indexes.cardsById[body];
+    for (const outlet of manaSacOutlets) {
+      const outletCard = indexes.cardsById[outlet];
+      for (const support of capabilityIds(indexes, 'is-death-mana-payoff')) {
+        addCandidate(candidates, [body, outlet, support]);
+      }
+      if (bodyCard && outletCard && (bodyCard.caps || []).includes('recursive-body-requires-another-creature')) {
+        const outletCanAlsoSupport = MODEL.faceCompatibleCaps(outletCard, ['is-creature-permanent', 'is-mana-sac-outlet', 'sac-outlet-mana-produced']);
+        if (!outletCanAlsoSupport) {
+          const creatureSupport = capabilityIds(indexes, 'is-creature-permanent')
+            .find(id => id !== body && id !== outlet);
+          if (creatureSupport) addCandidate(candidates, [body, outlet, creatureSupport]);
+        }
+      }
+    }
+  }
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-etb-blink'),
+    capabilityIds(indexes, 'is-etb-blink'),
+  );
+
+  for (const replacer of capabilityIds(indexes, 'is-token-to-creature-token-replacer')) {
+    for (const outlet of capabilityIds(indexes, 'is-creature-sac-outlet')) {
+      for (const payoff of capabilityIds(indexes, 'is-death-mana-payoff')) {
+        addCandidate(candidates, [replacer, outlet, payoff]);
+      }
+    }
+  }
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-library-exile-source'),
+    capabilityIds(indexes, 'is-empty-library-win-payoff'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-cheap-instant-nonland-permanent-untap-spell'),
+    capabilityIds(indexes, 'is-repeatable-cheap-instant-caster'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-activated-ability-copier'),
+    capabilityIds(indexes, 'is-self-untapper'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-colorless-mana-amplifier'),
+    capabilityIds(indexes, 'is-self-untapper'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-repeatable-hasty-creature-copy'),
+    capabilityIds(indexes, 'etb-untaps-permanent'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-etb-spell-copier'),
+    capabilityIds(indexes, 'is-hasty-creature-copy-spell'),
+  );
+
   for (const card of indexes.cards) {
     for (const triple of candidateTriples(card.id, indexes, { limit: options.perCardTripleLimit })) {
       addCandidate(candidates, triple.cards);
@@ -109,7 +213,8 @@ function seedCandidates(indexes, options) {
 
 function relatedHyperedges(result, proof) {
   const key = packageKey(proof.cards);
-  return (result.hyperedges || []).filter(edge => edge.family === proof.family && packageKey(edge.cards) === key);
+  const families = new Set([proof.family, ...(FAMILY_HYPEREDGE_ALIASES[proof.family] || [])]);
+  return (result.hyperedges || []).filter(edge => families.has(edge.family) && packageKey(edge.cards) === key);
 }
 
 function jsonSafeNumber(value) {
@@ -153,26 +258,55 @@ function resultSummary(familyDef, proof, hyperedges) {
   return familyDef && familyDef.uiExplanation ? familyDef.uiExplanation : `${titleCase(proof.family)} package proven`;
 }
 
-function contributionFacts(card, hyperedges) {
-  return hyperedges
-    .flatMap(edge => edge.requires || [])
+function requiredFactsForProof(proofBody, hyperedges) {
+  return [
+    ...hyperedges.flatMap(edge => edge.requires || []),
+    ...((proofBody && proofBody.requiredFacts) || []),
+  ];
+}
+
+function proofEvidence(indexes, fact) {
+  const source = indexes.cardsById[fact.card] || {};
+  const faces = FACE_CLASSIFICATION.compactFaceSources(FACE_CLASSIFICATION.faceSourcesForFact(source, fact));
+  return {
+    card: fact.card,
+    predicate: fact.predicate || fact.event || fact.kind,
+    kind: fact.kind,
+    event: fact.event,
+    text: (source.text || '').replace(/\s+/g, ' ').trim().slice(0, 240),
+    faces,
+    face: faces[0],
+  };
+}
+
+function contributionFacts(card, requiredFacts) {
+  return requiredFacts
     .filter(fact => fact.card === card)
     .map(fact => fact.predicate || fact.event || fact.kind)
     .filter(Boolean);
 }
 
-function contributionRole(card, familyDef, hyperedges) {
-  const facts = hyperedges.flatMap(edge => edge.requires || []).filter(fact => fact.card === card);
+function contributionFaceSources(card, requiredFacts, indexes) {
+  const indexed = indexes.cardsById[card] || {};
+  const sources = requiredFacts
+    .filter(fact => fact.card === card)
+    .flatMap(fact => FACE_CLASSIFICATION.faceSourcesForFact(indexed, fact));
+  return FACE_CLASSIFICATION.compactFaceSources(sources);
+}
+
+function contributionRole(card, familyDef, requiredFacts) {
+  const facts = requiredFacts.filter(fact => fact.card === card);
   const fact = facts.find(item => item.role) || facts[0];
   if (fact && fact.role) return fact.role;
   const required = (familyDef && familyDef.requiredFacts) || [];
-  return required.find(req => contributionFacts(card, hyperedges).some(value => value === req.predicate || (req.predicates || []).includes(value)))?.role || 'piece';
+  return required.find(req => contributionFacts(card, requiredFacts).some(value => value === req.predicate || (req.predicates || []).includes(value)))?.role || 'piece';
 }
 
 function packageFromProof(result, proof, indexes) {
   const familyDef = getComboFamily(proof.family);
   const hyperedges = relatedHyperedges(result, proof);
   const proofBody = proof.proof || {};
+  const requiredFacts = requiredFactsForProof(proofBody, hyperedges);
   const hyperProofs = hyperedges.map(edge => edge.proof || {});
   const assumptions = sortedUnique([...(proofBody.assumptions || []), ...hyperProofs.flatMap(p => p.assumptions || [])]);
   const limitingClauses = sortedUnique([...(proofBody.limitingClauses || []), ...hyperProofs.flatMap(p => p.limitingClauses || [])]);
@@ -181,6 +315,7 @@ function packageFromProof(result, proof, indexes) {
     ...hyperProofs.flatMap(p => p.resourceDeltas || []),
   ].map(normalizeDelta).filter(Boolean);
   const evidence = hyperProofs.flatMap(p => p.evidence || []);
+  const packageEvidence = evidence.length ? evidence : requiredFacts.map(fact => proofEvidence(indexes, fact));
   const steps = (proofBody.steps || hyperProofs.flatMap(p => p.steps || []) || []).map((step, index) => ({
     index: index + 1,
     card: step.card,
@@ -207,11 +342,12 @@ function packageFromProof(result, proof, indexes) {
     sequence: steps,
     contributions: proof.cards.slice().sort(compareId).map(card => ({
       card,
-      role: contributionRole(card, familyDef, hyperedges),
-      facts: sortedUnique(contributionFacts(card, hyperedges)),
+      role: contributionRole(card, familyDef, requiredFacts),
+      facts: sortedUnique(contributionFacts(card, requiredFacts)),
       text: indexes.cardsById[card]?.text || '',
+      faces: contributionFaceSources(card, requiredFacts, indexes),
     })),
-    evidence,
+    evidence: packageEvidence,
     hyperedgeIds: hyperedges.map(edge => edge.id).sort(compareId),
   };
 }

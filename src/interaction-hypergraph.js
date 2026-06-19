@@ -11,6 +11,7 @@ const {
   candidatePairs,
   candidateTriples,
 } = require('./interaction-indexes');
+const FACE_CLASSIFICATION = require('./face-classification.js');
 
 const COMBO_STRENGTH = 'combo-critical';
 
@@ -34,21 +35,48 @@ function firstWithCap(indexes, cards, cap) {
   return cards.find(id => hasCap(indexes, id, cap));
 }
 
-function fact(card, predicate, value = null) {
-  return { card, kind: 'capability', predicate, value };
+function fact(card, predicate, value = null, extra = {}) {
+  return Object.assign({ card, kind: 'capability', predicate, value }, extra);
 }
 
-function eventFact(card, kind, event) {
-  return { card, kind, event };
+function eventFact(card, kind, event, extra = {}) {
+  return Object.assign({ card, kind, event }, extra);
 }
 
-function evidence(indexes, card, predicate) {
+function evidenceFact(input) {
+  if (typeof input === 'string') return { kind: 'capability', predicate: input };
+  return input || {};
+}
+
+function evidence(indexes, card, factLike) {
   const source = indexes.cardsById[card] || {};
+  const fact = evidenceFact(factLike);
+  const predicate = fact.predicate || fact.event || fact.kind || String(factLike || '');
+  const faces = FACE_CLASSIFICATION.compactFaceSources(FACE_CLASSIFICATION.faceSourcesForFact(source, fact));
   return {
     card,
     predicate,
+    kind: fact.kind,
+    event: fact.event,
     text: (source.text || '').replace(/\s+/g, ' ').trim().slice(0, 240),
+    faces,
+    face: faces[0],
   };
+}
+
+function firstCap(indexes, card, caps) {
+  const indexed = indexes.cardsById[card] || {};
+  return (caps || []).find(cap => (indexed.caps || []).includes(cap));
+}
+
+function tokenPayoffFact(indexes, card) {
+  const indexed = indexes.cardsById[card] || {};
+  if ((indexed.consumes || {}).tokens) return eventFact(card, 'event.consumes', 'tokens', { role: 'payoff' });
+  return fact(card, firstCap(indexes, card, ['is-combat-payoff', 'is-width-payoff']) || 'token-payoff', null, { role: 'payoff' });
+}
+
+function deathPayoffFact(indexes, card) {
+  return fact(card, firstCap(indexes, card, ['is-death-drain-payoff', 'is-death-draw-payoff', 'is-death-token-payoff']) || 'death-payoff', null, { role: 'payoff' });
 }
 
 function baseProof(cards, family, steps, extra = {}) {
@@ -115,14 +143,17 @@ function tokenModifierPayoff(candidate, indexes) {
   const source = cards.find(id => id !== modifier && hasCap(indexes, id, 'is-token-producer'));
   const payoff = cards.find(id => id !== source && id !== modifier);
   if (!source || !modifier || !payoff) return null;
+  const sourceReq = fact(source, 'is-token-producer', null, { role: 'source' });
+  const modifierReq = fact(modifier, 'is-token-doubler', null, { role: 'modifier' });
+  const payoffReq = tokenPayoffFact(indexes, payoff);
   return hyperedge(
     'hyper:token-source-modifier-payoff:' + cards.join('|'),
     'token-source-modifier-payoff',
     cards,
     [
-      fact(source, 'is-token-producer'),
-      fact(modifier, 'is-token-doubler'),
-      eventFact(payoff, 'event.consumes', 'tokens'),
+      sourceReq,
+      modifierReq,
+      payoffReq,
     ],
     [{ kind: 'amplified.event', event: 'tokens', result: 'token payoff sees an amplified token event' }],
     baseProof(cards, 'token-source-modifier-payoff', [
@@ -132,7 +163,7 @@ function tokenModifierPayoff(candidate, indexes) {
     ], {
       assumptions: ['token modifier applies to the source event under controller restrictions'],
       resourceDeltas: [{ resource: 'tokens', delta: 'amplified', confidence: 'pattern' }],
-      evidence: [evidence(indexes, source, 'is-token-producer'), evidence(indexes, modifier, 'is-token-doubler'), evidence(indexes, payoff, 'tokens-payoff')],
+      evidence: [evidence(indexes, source, sourceReq), evidence(indexes, modifier, modifierReq), evidence(indexes, payoff, payoffReq)],
     }),
     'strong',
     'pattern',
@@ -145,14 +176,17 @@ function aristocrats(candidate, indexes) {
   const payoff = cards.find(id => ['is-death-drain-payoff', 'is-death-draw-payoff', 'is-death-token-payoff'].some(cap => hasCap(indexes, id, cap)));
   const body = cards.find(id => id !== outlet && id !== payoff);
   if (!body || !outlet || !payoff) return null;
+  const bodyReq = fact(body, hasCap(indexes, body, 'is-creature-token-producer') ? 'is-creature-token-producer' : 'is-body', null, { role: 'body' });
+  const outletReq = fact(outlet, 'is-sac-outlet', null, { role: 'outlet' });
+  const payoffReq = deathPayoffFact(indexes, payoff);
   return hyperedge(
     'hyper:aristocrats-body-outlet-payoff:' + cards.join('|'),
     'aristocrats-body-outlet-payoff',
     cards,
     [
-      fact(body, hasCap(indexes, body, 'is-creature-token-producer') ? 'is-creature-token-producer' : 'is-body'),
-      fact(outlet, 'is-sac-outlet'),
-      { card: payoff, kind: 'capability', predicate: 'death-payoff' },
+      bodyReq,
+      outletReq,
+      payoffReq,
     ],
     [{ kind: 'triggered.payoff', event: 'death', result: 'sacrifice/death payoff engine' }],
     baseProof(cards, 'aristocrats-body-outlet-payoff', [
@@ -162,7 +196,7 @@ function aristocrats(candidate, indexes) {
     ], {
       assumptions: ['body is available to sacrifice or replace itself with creature tokens'],
       limitingClauses: ['repeatability depends on body replenishment'],
-      evidence: [evidence(indexes, body, 'body'), evidence(indexes, outlet, 'is-sac-outlet'), evidence(indexes, payoff, 'death-payoff')],
+      evidence: [evidence(indexes, body, bodyReq), evidence(indexes, outlet, outletReq), evidence(indexes, payoff, payoffReq)],
     }),
     'strong',
     'pattern',
@@ -175,14 +209,17 @@ function costReducerActivatedPayoff(candidate, indexes) {
   const ability = cards.find(id => id !== reducer && ['has-nonmana-activated-ability', 'has-creature-activated-ability'].some(cap => hasCap(indexes, id, cap)));
   const payoff = cards.find(id => id !== reducer && id !== ability);
   if (!reducer || !ability || !payoff) return null;
+  const reducerReq = fact(reducer, firstCap(indexes, reducer, ['is-cost-reducer', 'is-creature-ability-cost-reducer', 'is-food-ability-cost-reducer']) || 'ability-cost-reducer', null, { role: 'reducer' });
+  const abilityReq = fact(ability, firstCap(indexes, ability, ['has-nonmana-activated-ability', 'has-creature-activated-ability']) || 'activated-output', null, { role: 'ability' });
+  const payoffReq = eventFact(payoff, 'event.consumes', 'output-from-activated-ability', { role: 'payoff' });
   return hyperedge(
     'hyper:cost-reducer-activated-output-payoff:' + cards.join('|'),
     'cost-reducer-activated-output-payoff',
     cards,
     [
-      { card: reducer, kind: 'capability', predicate: 'ability-cost-reducer' },
-      { card: ability, kind: 'capability', predicate: 'activated-output' },
-      { card: payoff, kind: 'event.consumes', event: 'output-from-activated-ability' },
+      reducerReq,
+      abilityReq,
+      payoffReq,
     ],
     [{ kind: 'discounted.ability.payoff', result: 'reduced activation can feed a payoff' }],
     baseProof(cards, 'cost-reducer-activated-output-payoff', [
@@ -192,7 +229,7 @@ function costReducerActivatedPayoff(candidate, indexes) {
     ], {
       assumptions: ['cost reducer scope applies to the activated ability'],
       limitingClauses: ['output/payoff event compatibility is refined by the bounded interpreter'],
-      evidence: [evidence(indexes, reducer, 'ability-cost-reducer'), evidence(indexes, ability, 'activated-output'), evidence(indexes, payoff, 'payoff')],
+      evidence: [evidence(indexes, reducer, reducerReq), evidence(indexes, ability, abilityReq), evidence(indexes, payoff, payoffReq)],
     }),
     'moderate',
     'heuristic',
@@ -216,7 +253,7 @@ function pairHyperedge(candidate) {
       { card: cards[0], action: 'provides the source fact' },
       { card: cards[1], action: 'provides the matching target fact' },
     ]),
-    reason.kind === 'enablement' ? 'strong' : 'weak',
+    reason.strength || (reason.kind === 'enablement' ? 'strong' : 'weak'),
     'pattern',
   );
 }

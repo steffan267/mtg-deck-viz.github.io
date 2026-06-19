@@ -620,6 +620,7 @@
       // punctuation ("Defender When this creature enters..."). Split common
       // keyword-only prefixes so ETB/triggers are still seen as abilities.
       .replace(/\b(Defender|Flying|Reach|Deathtouch|First strike|Double strike|Haste|Lifelink|Menace|Trample|Vigilance|Ward(?: \{[^}]+\})?|Hexproof|Indestructible|Flash)\s+(?=(When|Whenever|At the beginning|At end|At your|At each)\b)/gi, "$1\n")
+      .replace(/\b(Enchant [^.\n]+?)\s+(?=(When|Whenever|At the beginning|At end|At your|At each)\b)/gi, "$1\n")
       .replace(/\b(Fabricate \d+)\s+(?=(When|Whenever|At the beginning|At end|At your|At each)\b)/gi, "$1\n")
       .replace(/([.)])\s+(?=Crew \d+)/gi, "$1\n")
       .replace(/([.)])\s+(?=(Sacrifice|Discard|Pay|Remove|Tap|Exert|Reveal)\b[^:]{0,120}:)/gi, "$1\n")
@@ -881,6 +882,36 @@
     return total;
   }
 
+  const MANA_COLORS = ["w", "u", "b", "r", "g"];
+
+  function manaCostProfile(cost, genericFallback = 0) {
+    const profile = { total: 0, generic: 0, colorless: 0, colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])) };
+    let sawSymbol = false;
+    for (const m of String(cost || "").matchAll(/\{([^}]+)\}/g)) {
+      sawSymbol = true;
+      const sym = m[1].toLowerCase();
+      if (/^\d+$/.test(sym)) {
+        const value = parseInt(sym, 10);
+        profile.generic += value;
+        profile.total += value;
+      } else if (MANA_COLORS.includes(sym)) {
+        profile.colors[sym]++;
+        profile.total++;
+      } else if (sym === "c") {
+        profile.colorless++;
+        profile.total++;
+      } else if (sym !== "x") {
+        profile.generic++;
+        profile.total++;
+      }
+    }
+    if (!sawSymbol && genericFallback > 0) {
+      profile.generic = genericFallback;
+      profile.total = genericFallback;
+    }
+    return profile;
+  }
+
   function maxManaProduced(text) {
     let best = 0;
     const s = String(text || "").toLowerCase();
@@ -892,6 +923,48 @@
       best = Math.max(best, n);
     }
     return best;
+  }
+
+  function tokenCountFor(text, tokenWord) {
+    const re = new RegExp("\\bcreate (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\\d+)?[^.]{0,80}\\b" + tokenWord + " tokens?\\b");
+    const s = String(text || "").toLowerCase();
+    const match = s.match(re);
+    if (!match) return 0;
+    const count = match[0].match(/\b(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\b/);
+    return numberWordValue(count && count[1]);
+  }
+
+  function producedManaProfile(text) {
+    const s = String(text || "").toLowerCase();
+    const profile = { total: maxManaProduced(s), any: 0, colorless: 0, colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])) };
+    if (/\badd\b.{0,40}\bmana of any (one )?color\b/.test(s)) profile.any = Math.max(profile.any, profile.total || 1);
+    for (const m of s.matchAll(/\badd ((?:\{[wubrgc]\})+)/g)) {
+      const symbols = [...m[1].matchAll(/\{([wubrgc])\}/g)].map(match => match[1].toLowerCase());
+      for (const sym of symbols) {
+        if (MANA_COLORS.includes(sym)) profile.colors[sym]++;
+        else if (sym === "c") profile.colorless++;
+      }
+      profile.total = Math.max(profile.total, symbols.length);
+    }
+    if (/\badd (one|two|three|four|five|six|seven|eight|nine|ten|\d+) colorless mana\b/.test(s)) {
+      const match = s.match(/\badd (one|two|three|four|five|six|seven|eight|nine|ten|\d+) colorless mana\b/);
+      profile.colorless = Math.max(profile.colorless, numberWordValue(match && match[1]));
+    }
+    return profile;
+  }
+
+  function addManaCostCaps(caps, prefix, profile) {
+    caps.add(prefix + "-cost:" + profile.total);
+    caps.add(prefix + "-generic-cost:" + profile.generic);
+    caps.add(prefix + "-colorless-cost:" + profile.colorless);
+    for (const color of MANA_COLORS) if (profile.colors[color]) caps.add(prefix + "-color-" + color + ":" + profile.colors[color]);
+  }
+
+  function addProducedManaCaps(caps, prefix, profile) {
+    caps.add(prefix + "-mana-produced:" + Math.max(1, profile.total));
+    if (profile.any) caps.add(prefix + "-mana-any:" + profile.any);
+    if (profile.colorless) caps.add(prefix + "-mana-c:" + profile.colorless);
+    for (const color of MANA_COLORS) if (profile.colors[color]) caps.add(prefix + "-mana-" + color + ":" + profile.colors[color]);
   }
 
   const NON_ACCESS_EXILE_COUNTERS = new Set([
@@ -949,6 +1022,7 @@
         if (s.kind === "activated" && /\{t\}|\{q\}/.test(c) && /\badd \{|\badd (one|two|three|x|an amount)/.test(e)) {
           caps.add("taps-for-mana");
           caps.add("mana-produced:" + Math.max(1, maxManaProduced(e)));
+          if (producedManaProfile(e).colorless > 0) caps.add("produces-colorless-mana");
           const mt = classified._type || "";
           if (/creature/.test(mt)) caps.add("mana-from-creature");
           else if (/artifact/.test(mt)) caps.add("mana-from-artifact");
@@ -1000,6 +1074,13 @@
       if (s.kind === "etb" && /\bthis\b|^when [a-z]+ enters|enters the battlefield/.test(s.trigger)) caps.add("has-etb");
       // blink/flicker: exile then return to the battlefield
       if (/exile .* return (it|them|that card|those cards|the exiled)/.test(e) && /battlefield/.test(e)) caps.add("is-blink");
+      if (s.kind === "etb"
+          && /exile (another target |target |up to one target )?(non-angel )?(creature|permanent)( you control)?/.test(effectAndRaw)
+          && /return (that card|it|the exiled card|the exiled cards|them) to the battlefield/.test(effectAndRaw)) {
+        caps.add("is-etb-blink");
+        if (/permanent/.test(effectAndRaw)) caps.add("etb-blinks-permanent");
+        if (/creature/.test(effectAndRaw)) caps.add("etb-blinks-creature");
+      }
       // Repeatable blink engines can turn ETB land-untappers into loops. This is
       // capability-based, not a card-name exception: it covers granted
       // activated blink abilities as well as native activated flicker text.
@@ -1012,10 +1093,16 @@
         }
       }
       // sac outlet: an activated ability whose COST sacrifices a creature/permanent
-      if (s.kind === "activated" && /sacrifice (a|an|another|two|three|x|that) (creature|permanent|artifact|token)/.test(c)) {
+      if (s.kind === "activated" && /sacrifice (a|an|another|two|three|x|that) (creature|permanent|artifact|token)|sacrifice x [a-z]+s?/.test(c)) {
         caps.add("is-sac-outlet");
-        if (/sacrifice (a|an|another|two|three|x|that) creature/.test(c)) caps.add("is-creature-sac-outlet");
+        addManaCostCaps(caps, "sac-outlet-activation", manaCostProfile(c));
+        if (/sacrifice (a|an|another|two|three|x|that) creature|sacrifice x [a-z]+s?/.test(c)) caps.add("is-creature-sac-outlet");
+        if (/sacrifice x [a-z]+s?/.test(c)) caps.add("is-creature-token-sac-outlet");
         if (/sacrifice (a|an|another|two|three|x|that) (artifact|token)/.test(c)) caps.add("is-artifact-sac-outlet");
+        if (/\badd \{|\badd (one|two|three|x|an amount)/.test(e)) {
+          caps.add("is-mana-sac-outlet");
+          addProducedManaCaps(caps, "sac-outlet", producedManaProfile(e));
+        }
       }
       // cost reducer (Round-3 gate): only a reducer of ACTIVATED ABILITIES is
       // relevant to the cost-reduction→ability family. Scope-specific reducers
@@ -1028,8 +1115,15 @@
         caps.add("is-cost-reducer");
       else if (/(spells?|creature spells?) .* cost \{?\d* ?[^ ]* ?less|costs? \{\d+\} less to cast/.test(e))
         caps.add("is-spell-cost-reducer");
-      if (/\bartifact spells? you cast cost \{?\d* ?[^ ]* ?less|artifact spells? cost \{?\d* ?[^ ]* ?less/.test(e))
+      if (/\bartifact spells? you cast cost \{?\d* ?[^ ]* ?less|artifact spells? cost \{?\d* ?[^ ]* ?less/.test(e)
+          || /\bhistoric spells? you cast cost \{?\d* ?[^ ]* ?less/.test(e)
+          || /choose .*artifact.{0,80}spells? you cast of the chosen type cost \{?\d* ?[^ ]* ?less/.test(effectAndRaw))
         caps.add("is-artifact-spell-cost-reducer");
+      if (/whenever you tap (a|an) (permanent|artifact) for \{c\}|whenever you tap (a|an) (permanent|artifact) for colorless mana/.test(effectAndRaw)
+          || /(?:tap|tapped).{0,80}(?:permanent|artifact).{0,80}(?:\{c\}|colorless mana).{0,80}(?:add an additional \{c\}|add one additional colorless mana|produces? an additional \{c\})/.test(effectAndRaw)) {
+        caps.add("is-colorless-mana-amplifier");
+        caps.add("colorless-mana-amplifier:1");
+      }
       // copy effects. Split generic copy text from permanent-copy scope so
       // spell-copy/self-copy does not trigger arbitrary ETB cards.
       if (/copy (target|that)/.test(e) || /create a token that.?s a copy/.test(e) || /token that.?s a copy/.test(e) || /copy it/.test(e)) {
@@ -1037,15 +1131,22 @@
         if (/copy target (creature|permanent)|copy of (up to one )?(other )?target|copy of target creature|copy of (a|another) creature|copy of a permanent/.test(e))
           caps.add("is-permanent-copy");
       }
-      if (s.kind === "activated" && /create .*token that.?s a copy of target .*creature/.test(e) && /haste/.test(e))
+      if (s.kind === "activated" && /create .*token that.?s a copy of target .*creature/.test(e) && /haste/.test(e)) {
         caps.add("is-repeatable-hasty-creature-copy");
+        caps.add("hasty-copy-target-creature");
+        if (/target nonlegendary creature/.test(e)) caps.add("hasty-copy-target-requires-nonlegendary");
+      }
       if (/\bwhen\b.*enters\b.*copy target instant or sorcery spell/.test(s.raw))
         caps.add("is-etb-spell-copier");
-      if (/target creatures? you control.*create .*tokens?.*copy of (that|those|it|them|the targeted|target) creatures?/.test(e) && /haste/.test(e))
+      if (/target creatures? you control.*create .*tokens?.*copy of (that|those|it|them|the targeted|target) creatures?/.test(e) && /haste/.test(e)) {
         caps.add("is-hasty-creature-copy-spell");
+        caps.add("hasty-copy-spell-target-creature");
+        if (/target nonlegendary creatures?/.test(e)) caps.add("hasty-copy-spell-target-requires-nonlegendary");
+      }
       if (/when .* enters\b/.test(s.raw) && /if .*number of cards in your library.*you win the game/.test(e))
         caps.add("is-empty-library-win-payoff");
       if (/name a card[\s\S]{0,180}reveal cards? from the top of your library until/.test(allText)
+          || /exile the top card of your library[\s\S]{0,180}repeat this process until/.test(allText)
           || /exile (your library|the rest of your library|all other cards revealed this way|all cards revealed this way)/.test(effectAndRaw)
           || /exile cards? from the top of your library until/.test(effectAndRaw))
         caps.add("is-library-exile-source");
@@ -1053,14 +1154,57 @@
         caps.add("is-lifegain-from-opponent-lifeloss");
       if (/whenever you gain life/.test(s.trigger) && /(target opponent|each opponent).*loses that much life/.test(e))
         caps.add("is-lifeloss-from-your-lifegain");
+      if (s.kind === "triggered"
+          && /\bwhenever (you|a player|an opponent) draws?\b/.test(s.trigger)
+          && /\bdeals? (that much|\d+|x)? ?damage\b|\bdeals? damage equal\b/.test(e)) {
+        caps.add("is-draw-to-damage-payoff");
+        if (/\bwhenever you draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:you");
+        else if (/\bwhenever a player draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:each");
+        else if (/\bwhenever an opponent draws?\b/.test(s.trigger)) caps.add("draw-to-damage-subject:opp");
+      }
+      if (s.kind === "triggered"
+          && /\bdeals? (combat )?damage to (a player|an opponent|one of your opponents|that player|any target)\b/.test(s.trigger)
+          && /draw (a card|two cards|three cards|that many cards?)/.test(e))
+        caps.add("is-damage-to-draw-payoff");
+      if (s.kind === "triggered"
+          && /\bwhenever (an opponent|a player) draws?\b/.test(s.trigger)
+          && /(loses? \d+ life|deals? \d+ damage|loses? that much life|deals? that much damage)/.test(e)) {
+        caps.add("is-opponent-draw-punisher");
+        if (/loses? \d+ life|deals? \d+ damage/.test(e)) {
+          const amount = e.match(/(?:loses?|deals?) (\d+)/);
+          if (amount) caps.add("opponent-draw-punisher-damage:" + amount[1]);
+        }
+      }
+      if (/target player draws? cards? equal to half (the number of cards in )?(their|that player'?s?) library/.test(effectAndRaw)
+          || /target opponent draws? cards? equal to half (the number of cards in )?(their|that opponent'?s?) library/.test(effectAndRaw)) {
+        caps.add("is-mass-opponent-draw-source");
+        caps.add("mass-opponent-draw-count:20");
+      }
       if (/whenever you activate an ability/.test(s.trigger) && /copy that ability/.test(e)) {
         caps.add("is-activated-ability-copier");
         const pay = e.match(/pay \{([^}]+)\}/);
         caps.add("ability-copy-cost:" + (pay ? manaCostValue("{" + pay[1] + "}") : 0));
       }
       if (/\b(look at|play with) the top card of your library\b/.test(effectAndRaw)
-          && /\bcast artifact spells? (from|off) the top of your library\b|\bplay artifact cards? from the top of your library\b/.test(effectAndRaw))
+          && (/\bcast\b.{0,100}\bartifact spells?\b.{0,120}\b(from|off) the top of your library\b/.test(effectAndRaw)
+              || /\bplay artifact cards? from the top of your library\b/.test(effectAndRaw)))
         caps.add("is-artifact-cast-from-top-enabler");
+      if (/\bcreature\b/.test(typeText)
+          && /\byou may cast this card from your graveyard\b|\bcast this card from your graveyard\b/.test(effectAndRaw)) {
+        caps.add("is-recursive-body");
+        caps.add("is-recursive-cast-body");
+        if (/\b(as long as|if) you control another creature\b/.test(effectAndRaw))
+          caps.add("recursive-body-requires-another-creature");
+        addManaCostCaps(caps, "recursive-body", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
+      }
+      if (/\bcreature\b/.test(typeText)
+          && s.kind === "activated"
+          && /\breturn (this card|this creature|[^.,:]{1,60}) from your graveyard to (the )?battlefield\b/.test(effectAndRaw)
+          && !/\breturn target\b/.test(effectAndRaw)) {
+        caps.add("is-recursive-body");
+        caps.add("is-recursive-return-body");
+        addManaCostCaps(caps, "recursive-body", manaCostProfile(c));
+      }
       if (s.kind === "activated"
           && (hasCheapInstantImprint || /exiled card|the exiled card|copy the exiled card/.test(effectAndRaw))
           && /\bcast\b/.test(effectAndRaw)
@@ -1081,6 +1225,12 @@
           caps.add("is-death-draw-payoff");
         if (/create .*token|create .*treasure/.test(e))
           caps.add("is-death-token-payoff");
+        if (/create .*treasure/.test(e)) {
+          const treasureCount = Math.max(1, tokenCountFor(e, "treasure"));
+          caps.add("is-death-mana-payoff");
+          caps.add("death-mana-produced:" + treasureCount);
+          caps.add("death-mana-any:" + treasureCount);
+        }
       }
       // Sacrifice payoffs are related to death engines but not identical: an
       // artifact/treasure sacrifice trigger must not be fed by every creature
@@ -1117,6 +1267,8 @@
       }
       if (/if one or more tokens? would be created under your control|if .* would create .* tokens?.* instead|tokens? plus .* token .* created instead|twice that many tokens|double .* tokens/.test(e))
         caps.add("is-token-doubler");
+      if (/tokens? plus that many .*creature tokens? .* created instead|tokens? plus .*creature tokens? .* created instead|create that many .*creature tokens? in addition/.test(e))
+        caps.add("is-token-to-creature-token-replacer");
 
       // --- Round-4: the COMBAT axis (biggest missing payoff class, ~30 decks) ---
       // combat-trigger PAYOFF: "whenever ~ attacks / deals combat damage to a
@@ -1205,6 +1357,19 @@
       // MILL as engine: opponent-mill source + graveyard-size payoff
       if (/(target (player|opponent)|each opponent|that player) (mills?|puts? the top)/.test(e) || /\bmills? (a|an|\d+|that many)/.test(e))
         caps.add("is-mill-source");
+      if (/if (an|a) opponent would mill|if .* would mill one or more cards?.*mill twice that many|mills? twice that many cards? instead/.test(effectAndRaw))
+        caps.add("is-mill-multiplier");
+      if (/(target (player|opponent)|each opponent|that player) mills? half (their|that player'?s?|that opponent'?s?) library/.test(effectAndRaw)
+          || /mills? half (their|that player'?s?|that opponent'?s?) library/.test(effectAndRaw))
+        caps.add("is-half-library-mill-source");
+      if (s.kind === "triggered"
+          && /(cards?|one or more cards?).{0,80}(opponents?|opponent'?s|their).{0,80}graveyards?/.test(s.trigger)
+          && /(loses? \d+ life|loses? that much life|you gain \d+ life|you gain that much life)/.test(e))
+        caps.add("is-mill-to-lifeloss-payoff");
+      if (s.kind === "triggered"
+          && /\bwhenever (an opponent|one or more opponents|a player|that player) loses life\b/.test(s.trigger)
+          && /(mills? that many cards?|that player mills?|they mill|mills? \d+ cards?)/.test(e))
+        caps.add("is-lifeloss-to-mill-payoff");
       if (/(power|equal to|number of cards).{0,40}(cards? in|graveyard)|for each card in (a|target|their) (player'?s? )?graveyard/.test(e))
         caps.add("is-graveyard-size-payoff");
       // TRIBAL-COUNT / X-per-type payoff (Distant Melody, Lathril). Round-3 gate:
@@ -1243,6 +1408,11 @@
       caps.add("is-lord");
       if (classified.tribalRefs.some(r => r !== "creature")) caps.add("is-typed-lord");
     }
+    if (!isLand && /\bcreature\b/.test(typeText)) caps.add("is-creature-permanent");
+    if (!isLand && isPermanent) {
+      if (/\blegendary\b/.test(typeText)) caps.add("is-legendary-permanent");
+      else caps.add("is-nonlegendary-permanent");
+    }
     // sac fodder / blink target: real creatures and produced creature tokens
     // are bodies; noncreature tokens such as Treasure are not attackers/deaths.
     if (!isLand && (caps.has("is-creature-token-producer") || /creature/.test((classified._type || "")))) caps.add("is-body");
@@ -1271,6 +1441,7 @@
       tribalRefs: tribalRefs(o),                    // creature types this card scales on
       _type: (card.type_line || "").toLowerCase(),
       _cmc: typeof card.cmc === "number" ? card.cmc : null,
+      _manaCost: (card.mana_cost || "").toLowerCase(),
     };
     // pipeline layers: segment → capability tags (used by interactionsBetween)
     result.segments = segmentOracle(card.oracle_text);
@@ -1366,20 +1537,139 @@
     { family: "library-exile→empty-library-win", from: "is-library-exile-source", to: "is-empty-library-win-payoff", kind: "enablement", strength: "combo-critical" },
     { family: "lifeloss→lifegain-loop", from: "is-lifegain-from-opponent-lifeloss", to: "is-lifeloss-from-your-lifegain", kind: "enablement", strength: "combo-critical" },
     { family: "lifegain→lifeloss-loop", from: "is-lifeloss-from-your-lifegain", to: "is-lifegain-from-opponent-lifeloss", kind: "enablement", strength: "combo-critical" },
+    { family: "mill-lifeloss-feedback-loop", from: "is-mill-to-lifeloss-payoff", to: "is-lifeloss-to-mill-payoff", kind: "enablement", strength: "combo-critical" },
+    { family: "mill-lifeloss-feedback-loop", from: "is-lifeloss-to-mill-payoff", to: "is-mill-to-lifeloss-payoff", kind: "enablement", strength: "combo-critical" },
+    { family: "opponent-draw-punisher-win", from: "is-mass-opponent-draw-source", to: "is-opponent-draw-punisher", kind: "enablement", strength: "combo-critical" },
+    { family: "mill-multiplier-finite-mill", from: "is-half-library-mill-source", to: "is-mill-multiplier", kind: "enablement", strength: "combo-critical" },
+    { family: "mutual-etb-blink-reset-loop", from: "is-etb-blink", to: "is-etb-blink", kind: "enablement", strength: "combo-critical" },
+    { family: "self-untap-mana-loop", from: "is-colorless-mana-amplifier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
+    { family: "token-replacement-sacrifice-mana-loop", from: "is-token-to-creature-token-replacer", to: "is-death-mana-payoff", kind: "enablement", strength: "combo-critical" },
     { family: "imprint-untap-spell-loop", from: "is-cheap-instant-nonland-permanent-untap-spell", to: "is-repeatable-cheap-instant-caster", kind: "enablement", strength: "combo-critical" },
     { family: "self-untap-mana→ability-copy-loop", from: "is-activated-ability-copier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
     { family: "hasty-copy→etb-untap-loop", from: "is-repeatable-hasty-creature-copy", to: "etb-untaps-permanent", kind: "enablement", strength: "combo-critical" },
     { family: "spell-copy-etb→creature-copy-spell-loop", from: "is-etb-spell-copier", to: "is-hasty-creature-copy-spell", kind: "enablement", strength: "combo-critical" },
     { family: "artifact-cost-reduction→top-loop-piece", from: "is-artifact-spell-cost-reducer", to: "is-self-top-draw-artifact", kind: "enablement", strength: "strong" },
     { family: "cast-from-top→top-loop-piece", from: "is-artifact-cast-from-top-enabler", to: "is-self-top-draw-artifact", kind: "enablement", strength: "strong" },
+    { family: "draw-damage-feedback-loop", from: "draw-to-damage-subject:you", to: "is-damage-to-draw-payoff", kind: "enablement", strength: "combo-critical" },
+    { family: "draw-damage-feedback-loop", from: "draw-to-damage-subject:each", to: "is-damage-to-draw-payoff", kind: "enablement", strength: "combo-critical" },
+    { family: "draw-damage-feedback-loop", from: "is-damage-to-draw-payoff", to: "draw-to-damage-subject:you", kind: "enablement", strength: "combo-critical" },
+    { family: "draw-damage-feedback-loop", from: "is-damage-to-draw-payoff", to: "draw-to-damage-subject:each", kind: "enablement", strength: "combo-critical" },
+    { family: "recursive-body-sacrifice-mana-loop", from: "is-recursive-body", to: "is-mana-sac-outlet", kind: "enablement", strength: "combo-critical" },
   ];
   const hasCap = (node, cap) => (node.caps || []).includes(cap);
   const capSuffixes = (node, prefix) => (node.caps || [])
     .filter(cap => cap.startsWith(prefix))
     .map(cap => cap.slice(prefix.length));
+  const capNumbers = (node, prefix) => capSuffixes(node, prefix + ":")
+    .map(x => parseInt(x, 10))
+    .filter(Number.isFinite);
   const maxCapNumber = (node, prefix) => Math.max(0, ...capSuffixes(node, prefix)
     .map(x => parseInt(x, 10))
     .filter(Number.isFinite));
+  const minCapNumber = (node, prefix) => {
+    const values = capSuffixes(node, prefix).map(x => parseInt(x, 10)).filter(Number.isFinite);
+    return values.length ? Math.min(...values) : 0;
+  };
+  const maxCap = (node, prefix) => Math.max(0, ...capNumbers(node, prefix));
+  const recursiveCostProfile = (node) => ({
+    total: minCapNumber(node, "recursive-body-cost:"),
+    colorless: maxCap(node, "recursive-body-colorless-cost"),
+    colors: Object.fromEntries(MANA_COLORS.map(color => [color, maxCap(node, "recursive-body-color-" + color)])),
+  });
+  const sacOutletManaProfile = (node) => ({
+    total: maxCapNumber(node, "sac-outlet-mana-produced:"),
+    any: maxCap(node, "sac-outlet-mana-any"),
+    colorless: maxCap(node, "sac-outlet-mana-c"),
+    colors: Object.fromEntries(MANA_COLORS.map(color => [color, maxCap(node, "sac-outlet-mana-" + color)])),
+  });
+  const manaCostProfileFromCaps = (node, prefix) => ({
+    total: minCapNumber(node, prefix + "-cost:"),
+    colorless: maxCap(node, prefix + "-colorless-cost"),
+    colors: Object.fromEntries(MANA_COLORS.map(color => [color, maxCap(node, prefix + "-color-" + color)])),
+  });
+  const deathManaProfile = (node) => ({
+    total: maxCapNumber(node, "death-mana-produced:"),
+    any: maxCap(node, "death-mana-any"),
+    colorless: maxCap(node, "death-mana-c"),
+    colors: Object.fromEntries(MANA_COLORS.map(color => [color, maxCap(node, "death-mana-" + color)])),
+  });
+  const etbBlinkTargetCaps = (blinker) => {
+    if (hasCap(blinker, "etb-blinks-permanent")) return ["is-etb-blink"];
+    if (hasCap(blinker, "etb-blinks-creature")) return ["is-etb-blink", "is-creature-permanent"];
+    return [];
+  };
+  const canEtbBlinkTarget = (blinker, target) => {
+    const requiredCaps = etbBlinkTargetCaps(blinker);
+    if (!requiredCaps.length) return false;
+    if (!faceCompatibleCaps(target, requiredCaps)) return false;
+    if (!target?.faceFacts?.length && requiredCaps.includes("is-creature-permanent") && !isCreaturePermanent(target)) return false;
+    return true;
+  };
+  const EXCLUSIVE_FACE_AVAILABILITIES = new Set(["either-face", "transforms", "separate-objects", "merged-multiface"]);
+  const factSourcesForCap = (node, cap) => {
+    const caps = node && node.factSources && node.factSources.caps;
+    if (!caps) return [];
+    if (caps[cap]) return caps[cap];
+    const prefix = cap + ":";
+    return Object.entries(caps).filter(([key]) => key.startsWith(prefix)).flatMap(([, sources]) => sources);
+  };
+  const faceConstraintKey = source => {
+    if (!source || source.faceIndex == null) return null;
+    if (!EXCLUSIVE_FACE_AVAILABILITIES.has(source.availability)) return null;
+    return `${source.availability}:${source.faceIndex}`;
+  };
+  const isExclusivePhysicalCard = node => (node && node.faceFacts || []).some(face => EXCLUSIVE_FACE_AVAILABILITIES.has(face.availability));
+  const capAvailable = (node, cap) => hasCap(node, cap)
+    || (node?.caps || []).some(key => key.startsWith(cap + ":"))
+    || factSourcesForCap(node, cap).length > 0;
+  const faceCompatibleCaps = (node, caps) => {
+    if (!(caps || []).every(cap => capAvailable(node, cap))) return false;
+    if (!isExclusivePhysicalCard(node)) return true;
+    const constrained = [];
+    for (const cap of caps || []) {
+      const sources = factSourcesForCap(node, cap);
+      if (sources.length && sources.every(source => source.availability === "merged-multiface" && source.faceIndex == null)) return false;
+      const keys = [...new Set(sources.map(faceConstraintKey).filter(Boolean))].sort();
+      if (keys.length) constrained.push(keys);
+    }
+    if (constrained.length <= 1) return true;
+    let possible = new Set(constrained[0]);
+    for (const keys of constrained.slice(1)) possible = new Set(keys.filter(key => possible.has(key)));
+    return possible.size > 0;
+  };
+  const isCreaturePermanent = (node) => capAvailable(node, "is-creature-permanent") || /\bcreature\b/i.test(node.type || "");
+  const isLegendaryPermanent = (node) => hasCap(node, "is-legendary-permanent") || /\blegendary\b/i.test(node.type || "");
+  const canHastyCopyTarget = (copier, target, extraTargetCaps = []) => {
+    if (!hasCap(copier, "hasty-copy-target-creature")) return false;
+    const targetCaps = ["is-creature-permanent", ...extraTargetCaps];
+    if (hasCap(copier, "hasty-copy-target-requires-nonlegendary")) targetCaps.push("is-nonlegendary-permanent");
+    if (!faceCompatibleCaps(target, targetCaps)) return false;
+    if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
+    if (!target?.faceFacts?.length && hasCap(copier, "hasty-copy-target-requires-nonlegendary") && isLegendaryPermanent(target)) return false;
+    return true;
+  };
+  const canHastyCopySpellTarget = (copySpell, target, extraTargetCaps = []) => {
+    if (!hasCap(copySpell, "hasty-copy-spell-target-creature")) return false;
+    const targetCaps = ["is-creature-permanent", ...extraTargetCaps];
+    if (hasCap(copySpell, "hasty-copy-spell-target-requires-nonlegendary")) targetCaps.push("is-nonlegendary-permanent");
+    if (!faceCompatibleCaps(target, targetCaps)) return false;
+    if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
+    if (!target?.faceFacts?.length && hasCap(copySpell, "hasty-copy-spell-target-requires-nonlegendary") && isLegendaryPermanent(target)) return false;
+    return true;
+  };
+  const recursiveBodyPreconditionSatisfiedByPair = (body, outlet) =>
+    !hasCap(body, "recursive-body-requires-another-creature")
+      || faceCompatibleCaps(outlet, ["is-mana-sac-outlet", "is-creature-permanent"]);
+  function canPayRecursiveCost(cost, mana) {
+    if ((mana.colorless || 0) < (cost.colorless || 0)) return false;
+    let anyRemaining = mana.any;
+    for (const color of MANA_COLORS) {
+      const shortage = Math.max(0, (cost.colors[color] || 0) - (mana.colors[color] || 0));
+      anyRemaining -= shortage;
+      if (anyRemaining < 0) return false;
+    }
+    return mana.total >= cost.total;
+  }
 
   // Build the full set of classified Interactions between two cards (both ways).
   function interactionsBetween(a, b) {
@@ -1464,6 +1754,52 @@
             const manaProduced = maxCapNumber(dst, "mana-produced:");
             evidence = { from: f.from, to: f.to, copyCost, untapCost, manaProduced };
             if (!hasCap(dst, "taps-for-mana") || (2 * manaProduced) <= (untapCost + copyCost)) continue;
+          }
+          if (f.family === "self-untap-mana-loop" && f.from === "is-colorless-mana-amplifier") {
+            const untapCost = maxCapNumber(dst, "self-untap-cost:");
+            const manaProduced = maxCapNumber(dst, "mana-produced:");
+            const amplification = maxCapNumber(src, "colorless-mana-amplifier:");
+            evidence = { from: f.from, to: f.to, amplification, untapCost, manaProduced };
+            if (!hasCap(dst, "taps-for-mana") || !hasCap(dst, "produces-colorless-mana") || manaProduced + amplification <= untapCost) continue;
+          }
+          if (f.family === "mutual-etb-blink-reset-loop") {
+            evidence = { from: f.from, to: f.to, firstCanTargetSecond: canEtbBlinkTarget(src, dst), secondCanTargetFirst: canEtbBlinkTarget(dst, src) };
+            if (!evidence.firstCanTargetSecond || !evidence.secondCanTargetFirst) continue;
+          }
+          if (f.family === "hasty-copy→etb-untap-loop") {
+            evidence = {
+              from: f.from,
+              to: f.to,
+              copyTargetLegal: canHastyCopyTarget(src, dst, ["etb-untaps-permanent"]),
+              targetIsCreature: isCreaturePermanent(dst),
+              targetIsLegendary: isLegendaryPermanent(dst),
+              requiresNonlegendary: hasCap(src, "hasty-copy-target-requires-nonlegendary"),
+            };
+            if (!evidence.copyTargetLegal) continue;
+          }
+          if (f.family === "spell-copy-etb→creature-copy-spell-loop") {
+            evidence = {
+              from: f.from,
+              to: f.to,
+              copyTargetLegal: canHastyCopySpellTarget(dst, src, ["is-etb-spell-copier"]),
+              targetIsCreature: isCreaturePermanent(src),
+              targetIsLegendary: isLegendaryPermanent(src),
+              requiresNonlegendary: hasCap(dst, "hasty-copy-spell-target-requires-nonlegendary"),
+            };
+            if (!evidence.copyTargetLegal) continue;
+          }
+          if (f.family === "token-replacement-sacrifice-mana-loop") {
+            const activationCost = manaCostProfileFromCaps(src, "sac-outlet-activation");
+            const deathMana = deathManaProfile(dst);
+            evidence = { from: f.from, to: f.to, activationCost: activationCost.total, deathManaProduced: deathMana.total, producedAny: deathMana.any, producedColorless: deathMana.colorless, producedColors: deathMana.colors };
+            if (!hasCap(src, "is-creature-sac-outlet") || !canPayRecursiveCost(activationCost, deathMana)) continue;
+          }
+          if (f.family === "recursive-body-sacrifice-mana-loop") {
+            const cost = recursiveCostProfile(src);
+            const mana = sacOutletManaProfile(dst);
+            const preconditionSatisfied = recursiveBodyPreconditionSatisfiedByPair(src, dst);
+            evidence = { from: f.from, to: f.to, bodyCost: cost.total, sacManaProduced: mana.total, requiredColorless: cost.colorless, requiredColors: cost.colors, producedAny: mana.any, producedColorless: mana.colorless, producedColors: mana.colors, recursionPreconditionSatisfied: preconditionSatisfied };
+            if (!preconditionSatisfied || !canPayRecursiveCost(cost, mana)) continue;
           }
           out.push({ kind: f.kind, family, event: "enable:" + family, direction: dir,
             strength, loops: false, evidence });
@@ -1581,13 +1917,23 @@
   EVENT_LABEL["enable:library-exile→empty-library-win"] = "library exile → empty-library win";
   EVENT_LABEL["enable:lifeloss→lifegain-loop"] = "life loss → life gain loop";
   EVENT_LABEL["enable:lifegain→lifeloss-loop"] = "life gain → life loss loop";
+  EVENT_LABEL["enable:mill-lifeloss-feedback-loop"] = "mill ↔ life loss loop";
+  EVENT_LABEL["enable:opponent-draw-punisher-win"] = "opponent mass draw → punisher win";
+  EVENT_LABEL["enable:mill-multiplier-finite-mill"] = "mill multiplier → finite mill";
+  EVENT_LABEL["enable:mutual-etb-blink-reset-loop"] = "mutual ETB blink reset loop";
+  EVENT_LABEL["enable:self-untap-mana-loop"] = "self-untap mana loop";
+  EVENT_LABEL["enable:token-replacement-sacrifice-mana-loop"] = "token replacement → sacrifice/death-mana loop";
   EVENT_LABEL["enable:imprint-untap-spell-loop"] = "repeatable imprinted untap spell loop";
   EVENT_LABEL["enable:self-untap-mana→ability-copy-loop"] = "self-untap mana ability copy loop";
   EVENT_LABEL["enable:hasty-copy→etb-untap-loop"] = "hasty copy → ETB untap loop";
   EVENT_LABEL["enable:spell-copy-etb→creature-copy-spell-loop"] = "ETB spell copy → creature-copy spell loop";
   EVENT_LABEL["enable:artifact-cost-reduction→top-loop-piece"] = "artifact cost reduction → top-loop piece";
   EVENT_LABEL["enable:cast-from-top→top-loop-piece"] = "cast from top → top-loop piece";
+  EVENT_LABEL["enable:draw-damage-feedback-loop"] = "draw → damage feedback loop";
+  EVENT_LABEL["enable:recursive-body-sacrifice-mana-loop"] = "recursive body → mana sacrifice loop";
   EVENT_LABEL["artifact-top-cost-reduction-loop"] = "artifact top + cost reduction loop";
+  EVENT_LABEL["draw-damage-feedback-loop"] = "draw/damage feedback loop";
+  EVENT_LABEL["recursive-body-sacrifice-mana-loop"] = "recursive body sacrifice mana loop";
   EVENT_LABEL["copy→trigger"] = "copy → trigger";
   EVENT_LABEL["blink→land-untap-etb"] = "repeatable blink → land-untap ETB loop";
   EVENT_LABEL["lord→tribe"] = "tribal (creature-type synergy)";
@@ -1601,7 +1947,8 @@
   const API = { EVENTS, ZONE_RULES, ZONES, EVENT_LABEL, STRENGTH_WEIGHT,
     ONTOLOGY, ENABLEMENT,
     classify, roleOf, isLandType, sharedEvents, interactionsBetween, eventsFromInteractions,
-    subjectsOverlap, interactionProfile, semanticIR, typedPredicateForCap };
+    subjectsOverlap, interactionProfile, semanticIR, typedPredicateForCap,
+    faceCompatibleCaps, etbBlinkTargetCaps, canEtbBlinkTarget, recursiveBodyPreconditionSatisfiedByPair };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.INTERACTION_MODEL = API;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -8,6 +8,7 @@
  *
  *   node analysis/bracket/validate-wintuning.js            # full 100 (network)
  *   node analysis/bracket/validate-wintuning.js 20          # first 20 only
+ *   node analysis/bracket/validate-wintuning.js --deck-cache analysis/bracket/moxfield-reference-decks.json
  *
  * Writes analysis/bracket/wintuning-corpus.json with per-deck results.
  */
@@ -34,15 +35,16 @@ async function fetchWithRetry(id, tries = 5) {
 }
 
 function parseArgs(argv) {
-  const opts = { corpus: DEFAULT_CORPUS, out: DEFAULT_OUT, limit: Infinity };
+  const opts = { corpus: DEFAULT_CORPUS, out: DEFAULT_OUT, limit: Infinity, deckCache: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--corpus') opts.corpus = argv[++i];
     else if (a === '--out') opts.out = argv[++i];
+    else if (a === '--deck-cache') opts.deckCache = argv[++i];
     else if (a === '--limit') opts.limit = parseInt(argv[++i], 10) || Infinity;
     else if (/^\d+$/.test(a)) opts.limit = parseInt(a, 10);
     else if (a === '--help') {
-      console.error('Usage: node analysis/bracket/validate-wintuning.js [limit] [--corpus file] [--out file] [--limit n]');
+      console.error('Usage: node analysis/bracket/validate-wintuning.js [limit] [--corpus file] [--out file] [--deck-cache file] [--limit n]');
       process.exit(2);
     }
   }
@@ -64,10 +66,27 @@ function loadPrior(out) {
   };
 }
 
-function buildOutput(corpusFile, requestedDecks, results, failures) {
+function loadDeckCache(file) {
+  if (!file || !fs.existsSync(file)) return { meta: null, decksById: new Map() };
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const decks = Array.isArray(raw) ? raw : (Array.isArray(raw.decks) ? raw.decks : []);
+  return {
+    meta: Array.isArray(raw) ? null : raw.meta || null,
+    decksById: new Map(decks.filter(deck => deck && deck.id && Array.isArray(deck.decklist)).map(deck => [deck.id, deck])),
+  };
+}
+
+function getCachedDeck(deckCache, id) {
+  const hit = deckCache && deckCache.decksById && deckCache.decksById.get(id);
+  if (!hit) return null;
+  return { decklist: hit.decklist, title: hit.title || hit.name || id, cached: true };
+}
+
+function buildOutput(corpusFile, requestedDecks, results, failures, deckCacheFile = null) {
   return {
     meta: {
       corpus: corpusFile,
+      deckCache: deckCacheFile,
       requestedDecks,
       analyzedDecks: results.length,
       failedDecks: failures.length,
@@ -88,6 +107,10 @@ async function main() {
   const limit = opts.limit;
   const corpus = loadCorpus(opts.corpus).slice(0, limit);
   const idx = loadCards();
+  const deckCache = loadDeckCache(opts.deckCache);
+  if (opts.deckCache) {
+    process.stdout.write(`Loaded deck cache ${opts.deckCache}: ${deckCache.decksById.size} decks\n`);
+  }
   // resume: keep decks already scored in a previous (rate-limited) run
   const prior = loadPrior(opts.out);
   const done = new Map(prior.results.map(r => [r.id, r]));
@@ -98,10 +121,11 @@ async function main() {
     if (done.has(id)) { results.push(done.get(id)); continue; }
     process.stdout.write(`[${i + 1}/${corpus.length}] ${name.slice(0, 40)} … `);
     try {
-      const { decklist } = await fetchWithRetry(id);
+      const cached = getCachedDeck(deckCache, id);
+      const { decklist } = cached || await fetchWithRetry(id);
       const g = build(decklist, idx);
       const m = g.metrics;
-      await sleep(1500);   // be polite to the proxy between decks
+      if (!cached) await sleep(1500);   // be polite to the proxy between decks
       results.push({
         name: name.slice(0, 50), id,
         win: m.winTuningScore, band: m.winTuningBand,
@@ -110,8 +134,8 @@ async function main() {
         sig: Object.fromEntries(Object.entries(m.winTuningSignals).map(([k, v]) => [k, v.score])),
         summary: m.winSummary,
       });
-      process.stdout.write(`win ${m.winTuningScore} (${m.winTuningBand}) · GC ${m.gameChangerCount} · B${m.bracketHint}\n`);
-      writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures));   // checkpoint so a 429 mid-run is resumable
+      process.stdout.write(`win ${m.winTuningScore} (${m.winTuningBand}) · GC ${m.gameChangerCount} · B${m.bracketHint}${cached ? ' · cache' : ''}\n`);
+      writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures, opts.deckCache));   // checkpoint so a 429 mid-run is resumable
     } catch (e) {
       process.stdout.write(`✗ ${e.message}\n`);
       failures.push({
@@ -121,11 +145,11 @@ async function main() {
         sourceBracket: typeof corpus[i].bracket === "number" ? corpus[i].bracket : null,
         likes: corpus[i].likes ?? null,
       });
-      writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures));
+      writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures, opts.deckCache));
     }
   }
 
-  writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures));
+  writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures, opts.deckCache));
 
   // ---- distribution report ----
   const wins = results.map(r => r.win).sort((a, b) => a - b);
@@ -165,6 +189,8 @@ if (require.main === module) {
     parseArgs,
     loadCorpus,
     loadPrior,
+    loadDeckCache,
+    getCachedDeck,
     buildOutput,
   };
 }

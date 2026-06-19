@@ -6,8 +6,8 @@ const {
   candidateTriples,
 } = require('../src/interaction-indexes');
 
-function card(id, type, text, cmc = 0) {
-  return { id, name: id, type_line: type, oracle_text: text, cmc };
+function card(id, type, text, cmc = 0, mana_cost = '') {
+  return { id, name: id, type_line: type, oracle_text: text, cmc, mana_cost };
 }
 
 const cards = [
@@ -23,6 +23,7 @@ const cards = [
   card('Heartstone', 'Artifact', "Activated abilities of creatures cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.", 3),
   card('Xantcha', 'Legendary Creature', "{3}: Xantcha's controller loses 2 life and you draw a card. Any player may activate this ability.", 3),
   card('Draw Punisher', 'Creature', 'Whenever you draw a card, each opponent loses 1 life.', 3),
+  card('Black Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard.', 1, '{B}'),
 ];
 
 const indexes = buildInteractionIndexes(cards);
@@ -36,6 +37,8 @@ assert.deepEqual(indexes.modifiers.costReducers['creature-activated-ability'], [
 assert.ok(indexes.byCapability['is-self-top-draw-artifact'].includes('Self Top Draw Artifact'));
 assert.ok(indexes.byProducedEvent.tokens.includes('Raise the Alarm'));
 assert.ok(indexes.byConsumedEvent.tokens.includes('Token Doubler'));
+assert.ok(indexes.byCapability['recursive-body-color-b:1'].includes('Black Recursive Cast Body'));
+assert.equal(indexes.byCapability['recursive-body-generic-cost:1']?.includes('Black Recursive Cast Body') || false, false);
 
 const tokenPairs = candidatePairs('Raise the Alarm', indexes);
 assert.ok(tokenPairs.some(pair => pair.cards.includes('Raise the Alarm') && pair.cards.includes('Token Payoff') && pair.reasons.some(r => r.event === 'tokens')));

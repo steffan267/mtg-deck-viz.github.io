@@ -29,7 +29,7 @@ const BUDGETS = {
   maxProofPackagesPerDeck: 24,
   maxProofPayloadBytes: 50_000,
   maxEvidenceSnippetChars: 240,
-  allowedMissedCombos: ['known-gap-library-exile-win'],
+  allowedMissedCombos: [],
 };
 
 const PAYLOAD_FIXTURE = [

@@ -201,7 +201,7 @@ const GOLDEN_FIXTURES = [
   {
     id: 'opponent-draw-feeds-smothering-tithe',
     title: 'Wheel draw feeds Smothering Tithe as a weak reaction',
-    cards: ['Smothering Tithe', 'Wheel of Fortune'],
+    cards: ['Smothering Tithe', 'Naktamun Lorespinner // Wheel of Fortune'],
     expect: {
       edge: true,
       families: ['draw'],

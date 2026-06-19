@@ -7,7 +7,7 @@ const result = runHardeningChecks();
 assert.equal(result.ok, true, result.errors.join('\n'));
 assert.equal(BUDGETS.maxProofPackagesPerDeck, 24);
 assert.equal(BUDGETS.maxProofPayloadBytes, 50_000);
-assert.equal(BUDGETS.allowedMissedCombos.includes('known-gap-library-exile-win'), true);
+assert.deepEqual(BUDGETS.allowedMissedCombos, []);
 assert.equal(PROOF_PACKAGE_SCHEMA_VERSION, 'interaction-proof-package.v1');
 
 process.stdout.write('Interaction hardening tests passed\n');

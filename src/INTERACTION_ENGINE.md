@@ -75,13 +75,25 @@ Use this checklist for every new family or meaningful behavior change:
 
 Runtime-safe code:
 
+- `card-faces.js` and `face-classification.js` normalize physical-card faces,
+  preserve per-face provenance, and reject mutually exclusive same-card facts
+  when a proof needs them at the same time.
 - `interaction-model.js`, `interaction-indexes.js`, `interaction-hypergraph.js`,
-  `interaction-proof-search.js`, and `interaction-proof-packages.js`.
+  `interaction-proof-search.js`, and `interaction-proof-packages.js` consume
+  those face-aware facts through bounded capability/event indexes and proof
+  gates.
 - CLI/static graph builders opt into `interactionProofs` for product payloads.
   Browser imports keep proof generation off the initial graph-build path and must
   not import the Node/CommonJS proof engine directly. The browser may only
   materialize packages from an already-present payload or an explicitly injected
   browser-safe builder.
+- Copy-target, ETB-blink target, and recursive precondition legality gates must
+  use face-compatible capability facts when a card has mutually exclusive faces.
+  The runtime policy lives in `interaction-model.js` as `faceCompatibleCaps()`,
+  `canEtbBlinkTarget()`, and `recursiveBodyPreconditionSatisfiedByPair()`;
+  proof/evaluator layers should call those helpers rather than reimplementing
+  aggregate type checks. Aggregate type/text is display and backward-compatibility
+  data, not sufficient proof evidence by itself.
 - The proof package schema is versioned by
   `PROOF_PACKAGE_SCHEMA_VERSION`/`PROOF_PACKAGE_SCHEMA_FIELDS` in
   `interaction-proof-packages.js`. Treat that file as the schema source of truth;
@@ -118,8 +130,9 @@ Hardening budgets enforced by `scripts/check-interaction-hardening.js`:
   directly import `interaction-proof-packages.js`.
 - Proof payloads must carry the current schema version and all required schema
   fields.
-- The only currently allowed missed validation combo is
-  `known-gap-library-exile-win`.
+- There are no currently allowed missed validation combos; new known misses must
+  be documented as edge cases and either fixed or explicitly added to the
+  hardening allow-list with a removal plan.
 
 Baseline/validation QA:
 
@@ -151,8 +164,13 @@ candidate closures in sub-millisecond time after index construction.
 - Ordinary bodies are not infinite aristocrat fodder. A sacrifice package is not
   repeatable unless the body is replenished by the package.
 - One-shot blink plus ETB untap is a near miss, not a loop.
-- Library-exile plus empty-library win is tracked as a known validation gap until
-  the proof search can reason about library size thresholds.
+- Library-exile plus empty-library win is a finite win package, not a loop; keep
+  it proof-backed with explicit threshold assumptions.
+- Target-restricted copy loops must prove the copied permanent is legal
+  (creature, nonlegendary, or other encoded scope) before becoming
+  combo-critical.
+- Recursive-body loops must prove local recursion preconditions such as
+  "another creature" rather than assuming external board state.
 - UI proof packages are explanatory. They should surface confidence,
   assumptions, limits, and sequence rather than claim full comprehensive MTG
   rules simulation.

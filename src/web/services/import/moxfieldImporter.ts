@@ -1,13 +1,23 @@
 import { err, ok } from '../../types/result'
 import type { ResolvedCard, ResolvedDeckCard } from '../../types/deck'
 import type { DeckImportContext, DeckImporter, DeckImportSource } from './types'
+import * as CARD_FACES from '../../../card-faces.js'
 
 interface MoxfieldCardFace {
+  name?: string
+  type_line?: string
   oracle_text?: string
+  mana_cost?: string
+  colors?: string[]
+  oracle_id?: string
+  layout?: string
 }
 
 interface MoxfieldCard {
+  id?: string
+  oracle_id?: string
   name: string
+  layout?: string
   type_line?: string
   oracle_text?: string
   mana_cost?: string
@@ -103,13 +113,20 @@ function resolvedCardsFromMoxfield(data: MoxfieldDeckResponse): ResolvedDeckCard
 }
 
 function toResolvedCard(card: MoxfieldCard): ResolvedCard {
+  const faceAware = CARD_FACES.toFaceAwareResolvedCard(card)
   return {
-    name: card.name,
-    type_line: card.type_line || '',
-    oracle_text: card.oracle_text || card.card_faces?.map(face => face.oracle_text || '').join(' ') || '',
-    mana_cost: card.mana_cost || '',
-    cmc: card.cmc ?? 0,
-    edhrec_rank: card.edhrec_rank ?? null,
-    color_identity: card.color_identity || [],
+    name: faceAware.name,
+    type_line: faceAware.type_line || '',
+    oracle_text: faceAware.oracle_text || '',
+    mana_cost: faceAware.mana_cost || '',
+    cmc: faceAware.cmc ?? 0,
+    edhrec_rank: faceAware.edhrec_rank ?? null,
+    color_identity: faceAware.color_identity || [],
+    layout: faceAware.layout,
+    aliases: faceAware.aliases,
+    faces: faceAware.faces,
+    cardKey: faceAware.cardKey,
+    canonicalName: faceAware.canonicalName,
+    card_faces: faceAware.card_faces,
   }
 }

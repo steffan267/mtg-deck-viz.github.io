@@ -35,9 +35,9 @@
   },
   "aggregate": {
     "deckCount": 3,
-    "totalEdges": 167,
-    "totalInteractions": 188,
-    "totalComboCriticalPairs": 5,
+    "totalEdges": 172,
+    "totalInteractions": 194,
+    "totalComboCriticalPairs": 9,
     "totalComboCriticalTriples": 1,
     "familyCounts": {
       "artifact-cost-reduction→top-loop-piece": 1,
@@ -45,7 +45,7 @@
       "blink→land-untap-etb": 2,
       "cast": 3,
       "cast-from-top→top-loop-piece": 1,
-      "combat→payoff": 6,
+      "combat→payoff": 8,
       "cost-reduction→ability": 8,
       "death→drain": 4,
       "death→tokens": 2,
@@ -63,6 +63,7 @@
       "lifeloss": 2,
       "lifeloss→lifegain-loop": 2,
       "mill→graveyard-payoff": 1,
+      "opponent-draw-punisher-win": 4,
       "ramp→sink": 42,
       "sacrifice": 3,
       "steal": 1,
@@ -80,7 +81,7 @@
       "enable:artifact-cost-reduction→top-loop-piece": 1,
       "enable:blink→land-untap-etb": 2,
       "enable:cast-from-top→top-loop-piece": 1,
-      "enable:combat→payoff": 6,
+      "enable:combat→payoff": 8,
       "enable:cost-reduction→ability": 8,
       "enable:death→drain": 4,
       "enable:death→tokens": 2,
@@ -91,6 +92,7 @@
       "enable:lifegain→lifeloss-loop": 2,
       "enable:lifeloss→lifegain-loop": 2,
       "enable:mill→graveyard-payoff": 1,
+      "enable:opponent-draw-punisher-win": 4,
       "enable:token-production→amplifier": 3,
       "goad": 9,
       "graveyard": 12,
@@ -125,13 +127,13 @@
       "missing": [
         "Valley of Gorgoroth"
       ],
-      "edgeCount": 148,
+      "edgeCount": 153,
       "zoneEdgeCount": 87,
-      "interactionCount": 159,
+      "interactionCount": 165,
       "familyCounts": {
         "attack": 1,
         "cast": 3,
-        "combat→payoff": 6,
+        "combat→payoff": 8,
         "cost-reduction→ability": 6,
         "death→drain": 4,
         "death→tokens": 2,
@@ -142,6 +144,7 @@
         "goad→punisher": 3,
         "graveyard": 12,
         "mill→graveyard-payoff": 1,
+        "opponent-draw-punisher-win": 4,
         "ramp→sink": 42,
         "sacrifice": 3,
         "steal": 1,
@@ -154,12 +157,13 @@
         "destroy": 5,
         "discard": 14,
         "draw": 42,
-        "enable:combat→payoff": 6,
+        "enable:combat→payoff": 8,
         "enable:cost-reduction→ability": 6,
         "enable:death→drain": 4,
         "enable:death→tokens": 2,
         "enable:goad→punisher": 3,
         "enable:mill→graveyard-payoff": 1,
+        "enable:opponent-draw-punisher-win": 4,
         "goad": 9,
         "graveyard": 12,
         "mana": 42,
@@ -169,18 +173,60 @@
         "treasure": 3
       },
       "strengthCounts": {
+        "combo-critical": 4,
         "moderate": 10,
-        "weak": 149
+        "weak": 151
       },
       "kindCounts": {
-        "enablement": 6,
+        "enablement": 10,
         "reaction": 95,
-        "synergy": 58
+        "synergy": 60
       },
       "combos": {
         "mutualEnablementLoops": [],
-        "comboCriticalPairCount": 0,
-        "comboCriticalPairs": [],
+        "comboCriticalPairCount": 4,
+        "comboCriticalPairs": [
+          {
+            "cards": [
+              "Peer into the Abyss",
+              "Razorkin Needlehead"
+            ],
+            "family": "opponent-draw-punisher-win",
+            "families": [
+              "opponent-draw-punisher-win"
+            ]
+          },
+          {
+            "cards": [
+              "Peer into the Abyss",
+              "Scrawling Crawler"
+            ],
+            "family": "opponent-draw-punisher-win",
+            "families": [
+              "opponent-draw-punisher-win"
+            ]
+          },
+          {
+            "cards": [
+              "Peer into the Abyss",
+              "Sheoldred, the Apocalypse"
+            ],
+            "family": "opponent-draw-punisher-win",
+            "families": [
+              "opponent-draw-punisher-win"
+            ]
+          },
+          {
+            "cards": [
+              "Peer into the Abyss",
+              "Underworld Dreams"
+            ],
+            "family": "opponent-draw-punisher-win",
+            "families": [
+              "opponent-draw-punisher-win"
+            ]
+          }
+        ],
         "comboCriticalTripleCount": 0,
         "comboCriticalTriples": []
       },
@@ -194,6 +240,38 @@
             {
               "family": "draw",
               "count": 15
+            },
+            {
+              "family": "opponent-draw-punisher-win",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "id": "Waste Not",
+          "role": "draw",
+          "degree": 15,
+          "cmc": 2,
+          "topFamilies": [
+            {
+              "family": "discard",
+              "count": 6
+            },
+            {
+              "family": "combat→payoff",
+              "count": 4
+            },
+            {
+              "family": "ramp→sink",
+              "count": 3
+            },
+            {
+              "family": "death→drain",
+              "count": 2
+            },
+            {
+              "family": "death→tokens",
+              "count": 1
             }
           ]
         },
@@ -238,22 +316,18 @@
           ]
         },
         {
-          "id": "Waste Not",
-          "role": "draw",
-          "degree": 14,
+          "id": "Orcish Bowmasters",
+          "role": "payoff",
+          "degree": 12,
           "cmc": 2,
           "topFamilies": [
             {
-              "family": "discard",
-              "count": 6
+              "family": "draw",
+              "count": 7
             },
             {
               "family": "combat→payoff",
-              "count": 3
-            },
-            {
-              "family": "ramp→sink",
-              "count": 3
+              "count": 4
             },
             {
               "family": "death→drain",
@@ -282,44 +356,24 @@
           ]
         },
         {
-          "id": "Orcish Bowmasters",
-          "role": "payoff",
-          "degree": 11,
-          "cmc": 2,
-          "topFamilies": [
-            {
-              "family": "draw",
-              "count": 7
-            },
-            {
-              "family": "combat→payoff",
-              "count": 3
-            },
-            {
-              "family": "death→drain",
-              "count": 2
-            },
-            {
-              "family": "death→tokens",
-              "count": 1
-            }
-          ]
-        },
-        {
           "id": "Scrawling Crawler",
           "role": "payoff",
-          "degree": 10,
+          "degree": 11,
           "cmc": 3,
           "topFamilies": [
             {
               "family": "draw",
               "count": 10
+            },
+            {
+              "family": "opponent-draw-punisher-win",
+              "count": 1
             }
           ]
         }
       ],
       "reviewWarnings": {
-        "weakInteractionShare": 0.937,
+        "weakInteractionShare": 0.915,
         "weakInteractionShareExceedsThreshold": true,
         "highDegreeNodes": [],
         "highFamilyFanout": [
@@ -353,18 +407,18 @@
         "comboCriticalPairCountExceedsThreshold": false
       },
       "metricsSnapshot": {
-        "cohesionScore": 12,
+        "cohesionScore": 23,
         "cohesionBand": "Pile of good-stuff",
-        "selfSufficiencyScore": 71,
+        "selfSufficiencyScore": 70,
         "winTuningScore": 91,
         "winTuningBand": "Highly tuned",
         "bracketHint": 5,
         "bracketLabel": "Bracket 5 · cEDH",
         "pctInteractive": 90,
-        "pctMeaningful": 14,
+        "pctMeaningful": 21,
         "largestWebShare": 90,
-        "avgDegree": 4.59,
-        "satWeightedAvgDegree": 0.69,
+        "avgDegree": 4.75,
+        "satWeightedAvgDegree": 0.84,
         "islandCount": 6
       }
     },
@@ -631,7 +685,7 @@
       "metricsSnapshot": {
         "cohesionScore": 49,
         "cohesionBand": "Loosely connected",
-        "selfSufficiencyScore": 30,
+        "selfSufficiencyScore": 28,
         "winTuningScore": 34,
         "winTuningBand": "Untuned",
         "bracketHint": 3,
@@ -1086,8 +1140,8 @@
       "id": "opponent-draw-feeds-smothering-tithe",
       "title": "Wheel draw feeds Smothering Tithe as a weak reaction",
       "cards": [
-        "Smothering Tithe",
-        "Wheel of Fortune"
+        "Naktamun Lorespinner // Wheel of Fortune",
+        "Smothering Tithe"
       ],
       "status": "pass",
       "rationale": "Opponent-draw triggers are useful context but should remain low-strength unless another layer closes a loop.",

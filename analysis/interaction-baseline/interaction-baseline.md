@@ -29,9 +29,9 @@ Pass criteria:
 ## Aggregate snapshot
 
 - Decks: 3
-- Total edges: 167
-- Total interactions: 188
-- Combo-critical pairs: 5
+- Total edges: 172
+- Total interactions: 194
+- Combo-critical pairs: 9
 - Combo-critical triples: 1
 - Golden fixtures: 10
 - Golden fixture failures: none
@@ -47,17 +47,17 @@ Pass criteria:
 - Kind/source: representative-local-deck; data/sample-decklist.txt
 - Cards/nonlands: 92/63
 - Missing: Valley of Gorgoroth
-- Edges/interactions: 148/159
-- Combo-critical pairs/triples: 0/0
-- Cohesion/win tuning: 12 (Pile of good-stuff) / 91 (Highly tuned)
+- Edges/interactions: 153/165
+- Combo-critical pairs/triples: 4/0
+- Cohesion/win tuning: 23 (Pile of good-stuff) / 91 (Highly tuned)
 - Bracket hint: Bracket 5 · cEDH
-- Review warnings: weak share 0.937; high-degree nodes 0; high fan-out families 2
+- Review warnings: weak share 0.915; high-degree nodes 0; high fan-out families 2
 - Top hubs:
-  - Sheoldred, the Apocalypse: degree 15; draw 15
+  - Sheoldred, the Apocalypse: degree 15; draw 15, opponent-draw-punisher-win 1
+  - Waste Not: degree 15; discard 6, combat→payoff 4, ramp→sink 3, death→drain 2, death→tokens 1
   - Descent into Avernus: degree 14; ramp→sink 14, treasure 1
   - Exsanguinate: degree 14; ramp→sink 14
   - Fire Covenant: degree 14; ramp→sink 14
-  - Waste Not: degree 14; discard 6, combat→payoff 3, ramp→sink 3, death→drain 2, death→tokens 1
 
 ### Combo and false-positive suite
 
@@ -137,7 +137,7 @@ Pass criteria:
 
 - ID: `opponent-draw-feeds-smothering-tithe`
 - Status: pass
-- Cards: Smothering Tithe + Wheel of Fortune
+- Cards: Naktamun Lorespinner // Wheel of Fortune + Smothering Tithe
 - Families observed: draw
 - Combo pairs/triples observed: 0/0
 - Rationale: Opponent-draw triggers are useful context but should remain low-strength unless another layer closes a loop.

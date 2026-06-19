@@ -7,6 +7,7 @@
  * unbounded O(n³) enumeration.
  */
 const MODEL = require('./interaction-model.js');
+const FACE_CLASSIFICATION = require('./face-classification.js');
 
 const DEFAULT_LIMIT = 100;
 
@@ -36,8 +37,17 @@ function cardId(card) {
 
 function classifyCard(card) {
   if (card.ir && card.caps) return card;
+  if (Array.isArray(card && card.card_faces) && card.card_faces.length > 0) {
+    const faceClassified = FACE_CLASSIFICATION.classifyFaceAwareCard(card, MODEL);
+    return Object.assign({}, card, faceClassified.faceAware, faceClassified.aggregate, {
+      faceFacts: faceClassified.faceFacts,
+      factSources: faceClassified.factSources,
+      faceCompatibilityWarnings: faceClassified.faceCompatibilityWarnings,
+    });
+  }
   const typeLine = card.type_line || card.type || '';
   const oracleText = card.oracle_text || card.text || '';
+  const manaCost = card.mana_cost || card.mana || '';
   if (card.produces || card.consumes || card.caps) {
     return Object.assign({}, card, {
       produces: card.produces || {},
@@ -50,7 +60,7 @@ function classifyCard(card) {
       segments: card.segments || [],
     });
   }
-  return Object.assign({}, card, MODEL.classify({ type_line: typeLine, oracle_text: oracleText, cmc: card.cmc }));
+  return Object.assign({}, card, MODEL.classify({ type_line: typeLine, oracle_text: oracleText, cmc: card.cmc, mana_cost: manaCost }));
 }
 
 function normalizeCard(card) {
@@ -67,6 +77,9 @@ function normalizeCard(card) {
     consumes: classified.consumes || {},
     caps,
     zones: classified.zones || [],
+    factSources: classified.factSources || {},
+    faceFacts: classified.faceFacts || [],
+    faceCompatibilityWarnings: classified.faceCompatibilityWarnings || [],
   };
 }
 
@@ -209,10 +222,10 @@ function candidatePairs(cardOrId, indexes, options = {}) {
   }
   for (const rule of MODEL.ENABLEMENT) {
     if (hasCap(card, rule.from)) {
-      for (const other of capabilityIds(indexes, rule.to)) addPairCandidate(map, id, other, { kind: rule.kind, family: rule.family, from: rule.from, to: rule.to }, limit);
+      for (const other of capabilityIds(indexes, rule.to)) addPairCandidate(map, id, other, { kind: rule.kind, family: rule.family, from: rule.from, to: rule.to, strength: rule.strength }, limit);
     }
     if (hasCap(card, rule.to)) {
-      for (const other of capabilityIds(indexes, rule.from)) addPairCandidate(map, other, id, { kind: rule.kind, family: rule.family, from: rule.from, to: rule.to }, limit);
+      for (const other of capabilityIds(indexes, rule.from)) addPairCandidate(map, other, id, { kind: rule.kind, family: rule.family, from: rule.from, to: rule.to, strength: rule.strength }, limit);
     }
   }
   return [...map.values()]
