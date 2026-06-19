@@ -27,6 +27,63 @@ unbounded rules simulator.
    behavior, report validation metrics, and check performance/maintenance
    budgets.
 
+## Evidence levels: graph, result overlap, strict proof
+
+The EDHREC combo corpus is useful because it forces the engine to keep three
+evidence levels separate:
+
+1. **Graph interaction** — a real mechanical relationship between cards in a
+   deck graph. This can be a weak synergy, a combo-critical pair, or one piece
+   of a larger package. It is allowed in runtime UI when text-derived facts
+   justify the edge.
+2. **Evaluator result overlap** — the offline EDHREC evaluator maps known combo
+   result labels and model families onto coarse result classes. This is a recall
+   metric for corpus analysis, not a proof. The evaluator may say a known combo
+   has a model signal for `infinite-etb` or `combat` while still reporting
+   `proofStatus: no-proof`.
+3. **Strict proof** — `interaction-proof-search.js` can explain repeatability,
+   target legality, costs/resources, and positive deltas inside a bounded
+   package. Only this level should be described as “proved”.
+
+Do not collapse these levels. A high EDHREC result-overlap score is not license
+to mark rows as proved, and a graph edge must not infer unrelated result axes.
+When adding a family, decide explicitly which levels it supports:
+
+- runtime graph family only;
+- evaluator-only result bridge;
+- bounded proof package;
+- or a combination, with tests for each level.
+
+## Combined combo-corpus and interaction-graph policy
+
+EDHREC combo analysis and ordinary deck interaction detection now share the same
+semantic facts, but they have different jobs:
+
+- **The graph engine starts from local card text.** It should surface real
+  mechanical relationships in arbitrary decks even when no known combo row is
+  present. Its output is evidence for “these cards interact,” not evidence that
+  the full package is repeatable or winning.
+- **The combo evaluator starts from known EDHREC rows.** It may use graph-family
+  evidence to measure recall against expected result axes, but those mappings are
+  axis-specific. A sacrifice edge can explain sacrifice/death/LTB classes; it
+  must not imply mana, cards, turns, or wins without a family/proof that produces
+  those classes.
+- **Strict proof is the promotion path.** A recurring pattern graduates from
+  graph/evaluator signal to proof only after the proof layer can account for
+  source assembly, target legality, repeatability, costs, throttles, resources,
+  and result deltas/classes. Promotion must add positive and negative tests in
+  the classifier, proof search, proof package, and EDHREC evaluator layers when
+  applicable.
+- **Blockers are product input, not hidden assumptions.** `no-current-signal`,
+  `generic-edge-no-result-class`, `semantic-system-needed-classified`, and
+  `proof-size-bound` rows should guide future semantic subsystem work. Do not
+  reduce those buckets by assuming board state, extra cards, card names, or
+  unmodeled resource loops.
+
+This policy is the combined learning from the combo coverage work and the normal
+interaction graph: share facts and indexes, but keep recall metrics, graph UI
+signals, product proof packages, and strict proof claims separately validated.
+
 ## Ontology and facts
 
 The ontology is intentionally typed and small:
@@ -46,6 +103,43 @@ The ontology is intentionally typed and small:
 Keep facts evidence-backed. If a new predicate cannot cite card text or a stable
 derived reason, keep it out of runtime and put it into an audit report instead.
 
+## EDHREC-derived proof-family learnings
+
+The current combo corpus work established these reusable constraints:
+
+- **Target legality is part of the proof, not a UI detail.** Creature-copy loops
+  must prove creature/nonlegendary scope, ETB blink must prove target scope, and
+  face-aware cards must source all required facts from compatible faces.
+- **Scopes matter for reciprocal triggers.** Draw/damage feedback only proves
+  when the damage-to-draw text can apply to the draw-triggered damage source
+  (`source-you-control`, enchanted/equipped creature, or paired-creature
+  grants). A separate card that says only “this creature deals damage” is not a
+  legal scope for another card's damage source.
+- **Cost reducers are resources.** Self-untap mana loops may use generalized
+  activated-ability cost reductions only when the reducer applies to the
+  self-untapping permanent and the effective cost is below output, including
+  minimum-cost clauses.
+- **Proof-package seeds are product behavior.** If `provePackage()` learns a new
+  family, `interaction-proof-packages.js` must seed the same bounded candidate
+  shape so static/UI `interactionProofs` do not lag the proof engine.
+- **Fresh-token loops need freshness facts.** Combat-copy Equipment is only a
+  proof when it creates a hasty nonlegendary token and the copied attacker gets a
+  repeatable extra-combat trigger from each fresh token.
+- **Optional self-copy spells can be proof-safe when the payoff is specific.**
+  A targeted spell that lets the target copy it is not a win by itself; it
+  becomes a proved drain loop only with a payoff that triggers on copying
+  instant/sorcery spells and has a drain/lifegain result.
+- **Creature-lock proofs need source assembly and throttling guards.** A
+  death-untapping deathtouch pinger is proof-safe only when the free tap-only
+  ping, death-trigger untap, and deathtouch apply to the same assembled creature
+  source. `{T}` is not a mana cost for this purpose, but any real mana/payment
+  cost or once-per-turn death-untap throttle makes the package audit-only unless
+  a future proof also proves the missing resource/timing loop.
+- **Hidden board state remains audit-only.** Variable creature counts, external
+  tribal support, graveyard fuel, land drops, stack recursion, and combat damage
+  distribution must not be assumed from EDHREC rows unless the listed cards or a
+  future state model prove them.
+
 ## Adding or changing a combo family
 
 Use this checklist for every new family or meaningful behavior change:
@@ -61,10 +155,18 @@ Use this checklist for every new family or meaningful behavior change:
       optional accelerants, disqualifiers, repeatability, payoff criteria,
       positive examples, negative fixtures, known false positives, and a stable
       UI explanation.
+- [ ] Add candidate seeds in `interaction-proof-packages.js` for every proof
+      family that should be visible in product `interactionProofs`; prove/search
+      support alone is not enough.
+- [ ] If the family is used by the EDHREC evaluator, update
+      `analysis/edhrec-combos/evaluate-edhrec-combos.js` while preserving the
+      separation between proof-only classes and broader result-overlap signals.
 - [ ] Add validation cases in `analysis/interaction-validation/corpus.json` and
       regenerate the report with `npm run validate:interactions`.
 - [ ] Add/adjust unit tests near the changed layer plus a product-level test if
       the UI payload changes.
+- [ ] Add corpus/evaluator tests for positive and negative EDHREC-style fixtures
+      when a family affects combo coverage.
 - [ ] If proof package shape changes, update the schema source of truth in
       `interaction-proof-packages.js`, the browser payload adapter, web graph
       types, proof drawer, and hardening checks together.
@@ -112,6 +214,18 @@ Audit-only code:
 
 Audit scripts may read large local corpora and produce reports; runtime code must
 prefer compact derived facts and bounded candidate generation.
+
+Current EDHREC audit reports live under `analysis/edhrec-combos/`:
+
+- `100_PERCENT_COVERAGE_AUDIT.md` records why result-overlap detection cannot be
+  honestly forced to 100% without misleading taxonomy.
+- `STRICT_PROOF_COVERAGE_AUDIT.md` records the current strict-proof ceiling and
+  the semantic systems needed before proof coverage can materially approach
+  100%.
+- `FANOUT_REVIEW.md` records the G005 parallel review findings and the resolved
+  product-path/safety gaps.
+- `G008_STRICT_PROOF_BLOCKERS.md` records the latest strict-proof blocker
+  partition after the death-untap deathtouch pinger-lock addition.
 
 ## Budgets and QA gates
 

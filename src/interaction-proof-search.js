@@ -79,6 +79,14 @@ function recursiveCostProfile(card) {
   };
 }
 
+function recursiveExileCostProfile(card) {
+  return {
+    total: minCapNumber(card, 'recursive-exile-body-cost'),
+    colorless: maxCapNumber(card, 'recursive-exile-body-colorless-cost'),
+    colors: Object.fromEntries(MANA_COLORS.map(color => [color, maxCapNumber(card, 'recursive-exile-body-color-' + color)])),
+  };
+}
+
 function manaCostProfileFromCaps(card, prefix) {
   return {
     total: minCapNumber(card, prefix + '-cost'),
@@ -104,6 +112,13 @@ function lifePaidTreasureSacOutletProfile(card) {
     colorless: 0,
     colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])),
     lifeCost: maxCapNumber(card, 'life-sac-outlet-life-cost') || 1,
+  };
+}
+
+function lifePaidDamageProfile(card) {
+  return {
+    lifeCost: maxCapNumber(card, 'life-paid-damage-life-cost'),
+    damage: maxCapNumber(card, 'life-paid-damage-amount'),
   };
 }
 
@@ -166,12 +181,104 @@ function canHastyCopyTarget(copier, target, extraTargetCaps = []) {
 
 function canHastyCopySpellTarget(copySpell, target, extraTargetCaps = []) {
   if (!hasCap(copySpell, 'hasty-copy-spell-target-creature')) return false;
-  const targetCaps = ['is-creature-permanent', ...extraTargetCaps];
-  if (hasCap(copySpell, 'hasty-copy-spell-target-requires-nonlegendary')) targetCaps.push('is-nonlegendary-permanent');
+  const targetCaps = ['is-creature-permanent', 'is-nonlegendary-permanent', ...extraTargetCaps];
   if (!MODEL.faceCompatibleCaps(target, targetCaps)) return false;
   if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
-  if (!target?.faceFacts?.length && hasCap(copySpell, 'hasty-copy-spell-target-requires-nonlegendary') && isLegendaryPermanent(target)) return false;
+  if (!target?.faceFacts?.length && isLegendaryPermanent(target)) return false;
   return true;
+}
+
+function canDeathCopySpellTarget(copySpell, target, extraTargetCaps = []) {
+  if (!hasCap(copySpell, 'death-copy-spell-target-creature')) return false;
+  const targetCaps = ['is-creature-permanent', 'is-nonlegendary-permanent', ...extraTargetCaps];
+  if (!MODEL.faceCompatibleCaps(target, targetCaps)) return false;
+  if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
+  if (!target?.faceFacts?.length && isLegendaryPermanent(target)) return false;
+  return true;
+}
+
+function capSuffixes(card, prefix) {
+  return (card.caps || [])
+    .filter(cap => cap.startsWith(prefix))
+    .map(cap => cap.slice(prefix.length));
+}
+
+function counterTokenColors(card) {
+  return capSuffixes(card, 'counter-token-color:');
+}
+
+function etbCounterGranterColors(card) {
+  return capSuffixes(card, 'etb-counter-granter-token-color:');
+}
+
+function counterTokenCanTriggerGranter(tokenEngine, granter) {
+  const tokenColors = counterTokenColors(tokenEngine);
+  const accepted = etbCounterGranterColors(granter);
+  if (!tokenColors.length || !accepted.length) return false;
+  if (accepted.includes('any')) return !tokenColors.includes('unknown');
+  return accepted.some(color => tokenColors.includes(color));
+}
+
+function lifegainCounterCanTargetEngine(counterPayoff, tokenEngine) {
+  const targets = capSuffixes(counterPayoff, 'lifegain-counter-target:');
+  if (!targets.length) return false;
+  const canTargetCreature = targets.includes('creature') || targets.includes('creature-or-enchantment');
+  if (!canTargetCreature) return false;
+  return MODEL.faceCompatibleCaps(tokenEngine, ['is-creature-permanent', 'is-counter-to-creature-token-engine']);
+}
+
+function intrinsicPingerRole(card) {
+  return hasCap(card, 'has-free-creature-ping') ? { card, predicate: 'has-free-creature-ping' } : null;
+}
+
+function intrinsicDeathUntapRole(card) {
+  return hasCap(card, 'has-death-untap-self') ? { card, predicate: 'has-death-untap-self' } : null;
+}
+
+function intrinsicDeathtouchRole(card) {
+  return hasCap(card, 'has-deathtouch') ? { card, predicate: 'has-deathtouch' } : null;
+}
+
+function grantedRole(cards, predicate) {
+  const source = find(cards, card => hasCap(card, predicate));
+  return source ? { card: source, predicate } : null;
+}
+
+function assembleDeathUntapPinger(cards) {
+  const list = cards || [];
+  const grantedPing = grantedRole(list, 'grants-free-ping-to-equipped-creature');
+  const grantedUntap = grantedRole(list, 'grants-death-untap-to-equipped-creature');
+  const grantedDeathtouch = grantedRole(list, 'grants-deathtouch-to-equipped-creature');
+
+  for (const carrier of list) {
+    if (!MODEL.faceCompatibleCaps(carrier, ['is-creature-permanent'])) continue;
+    const ping = intrinsicPingerRole(carrier) || grantedPing;
+    const untap = intrinsicDeathUntapRole(carrier) || grantedUntap;
+    const deathtouch = intrinsicDeathtouchRole(carrier) || grantedDeathtouch;
+    if (ping && untap && deathtouch) {
+      return {
+        carrier,
+        externalCarrier: false,
+        ping,
+        untap,
+        deathtouch,
+        proofCards: uniqueCards([carrier, ping.card, untap.card, deathtouch.card]),
+      };
+    }
+  }
+
+  if (grantedPing && grantedUntap && grantedDeathtouch) {
+    return {
+      carrier: null,
+      externalCarrier: true,
+      ping: grantedPing,
+      untap: grantedUntap,
+      deathtouch: grantedDeathtouch,
+      proofCards: uniqueCards([grantedPing.card, grantedUntap.card, grantedDeathtouch.card]),
+    };
+  }
+
+  return null;
 }
 
 function recursiveBodyPreconditionSupport(body, cards, requiredCapsByCardId = new Map()) {
@@ -233,6 +340,16 @@ function recursiveControlTypePrecondition(body, cards) {
 
 function drawToDamageAcceptsYourDraw(card) {
   return hasCap(card, 'draw-to-damage-subject:you') || hasCap(card, 'draw-to-damage-subject:each');
+}
+
+function damageToDrawAppliesToSource(damageToDraw, source) {
+  if (hasCap(damageToDraw, 'damage-to-draw-scope:source-you-control')) return true;
+  if (hasCap(damageToDraw, 'damage-to-draw-scope:enchanted-creature')
+      || hasCap(damageToDraw, 'damage-to-draw-scope:equipped-creature')
+      || hasCap(damageToDraw, 'damage-to-draw-scope:paired-creature-grant')) {
+    return MODEL.faceCompatibleCaps(source, ['is-creature-permanent', 'is-draw-to-damage-payoff']);
+  }
+  return false;
 }
 
 function interval(min = 0, max = 0) {
@@ -315,19 +432,34 @@ function proveDirectSelfLoop(cards) {
   const cost = Number(capValue(card, 'self-untap-cost') || 0);
   const amplifier = find(cards, c => c !== card && hasCap(c, 'is-colorless-mana-amplifier'));
   const amplification = amplifier && hasCap(card, 'produces-colorless-mana') ? Number(capValue(amplifier, 'colorless-mana-amplifier') || 1) : 0;
+  const reducer = find(cards, c => c !== card
+    && Number(capValue(c, 'activated-ability-cost-reduction') || 0) > 0
+    && (
+      hasCap(c, 'is-cost-reducer')
+      || (hasCap(c, 'is-artifact-activated-ability-cost-reducer') && /\bartifact\b/i.test(card.type || card.type_line || ''))
+    ));
+  const reduction = reducer ? Number(capValue(reducer, 'activated-ability-cost-reduction') || 0) : 0;
+  const minimumCost = reducer ? Number(capValue(reducer, 'activated-ability-cost-reduction-minimum') || 0) : 0;
+  const effectiveCost = Math.max(minimumCost, cost - reduction);
   const totalProduced = produces + amplification;
-  if (totalProduced <= cost) return failure('proof:self-untap-mana:' + sorted([card.id, amplifier && amplifier.id]).join('|'), uniqueCards([card, amplifier]), 'self-untap cost is not below produced mana', { produces, amplification, cost });
-  const proofCards = uniqueCards([card, amplifier]);
+  if (totalProduced <= effectiveCost) return failure('proof:self-untap-mana:' + sorted([card.id, amplifier && amplifier.id, reducer && reducer.id]).join('|'), uniqueCards([card, amplifier, reducer]), 'self-untap cost is not below produced mana', { produces, amplification, cost, reduction, effectiveCost });
+  const proofCards = uniqueCards([card, amplifier, reducer]);
   return success('proof:self-untap-mana:' + proofCards.map(c => c.id).sort().join('|'), 'self-untap-mana-loop', proofCards, {
-    requiredFacts: [fact(card, 'taps-for-mana'), fact(card, 'is-self-untapper'), ...(amplifier ? [fact(amplifier, 'is-colorless-mana-amplifier')] : [])],
+    requiredFacts: [
+      fact(card, 'taps-for-mana'),
+      fact(card, 'is-self-untapper'),
+      ...(amplifier ? [fact(amplifier, 'is-colorless-mana-amplifier')] : []),
+      ...(reducer ? [fact(reducer, hasCap(reducer, 'is-artifact-activated-ability-cost-reducer') ? 'is-artifact-activated-ability-cost-reducer' : 'is-cost-reducer')] : []),
+    ],
     steps: [
       { card: card.id, action: 'tap for mana', delta: { mana: totalProduced } },
       ...(amplifier ? [{ card: amplifier.id, action: 'static amplifier adds colorless mana to the tap output', delta: { mana: amplification } }] : []),
-      { card: card.id, action: 'pay self-untap cost', delta: { mana: -cost } },
+      ...(reducer ? [{ card: reducer.id, action: 'reduces the self-untap activated ability cost', delta: { manaCostReduction: reduction } }] : []),
+      { card: card.id, action: 'pay self-untap cost', delta: { mana: -effectiveCost } },
       { card: card.id, action: 'return to untapped abstract state' },
     ],
     repeatability: { status: 'repeatable', reason: 'abstract state repeats with positive mana delta' },
-  }, [{ resource: 'mana', min: totalProduced - cost, max: totalProduced - cost }]);
+  }, [{ resource: 'mana', min: totalProduced - effectiveCost, max: totalProduced - effectiveCost }]);
 }
 
 function proveBlinkUntap(cards) {
@@ -414,8 +546,20 @@ function proveDrawDamageFeedback(cards) {
     }
     return null;
   }
+  if (!damageToDrawAppliesToSource(damageToDraw, drawToDamage)) {
+    return failure(
+      'proof:draw-damage-scope-mismatch:' + sorted([drawToDamage.id, damageToDraw.id]).join('|'),
+      [drawToDamage, damageToDraw],
+      'damage-to-draw trigger does not apply to the draw-triggered damage source',
+      { damageToDrawScopes: (damageToDraw.caps || []).filter(cap => cap.startsWith('damage-to-draw-scope:')) },
+    );
+  }
   return success('proof:draw-damage-feedback:' + sorted([drawToDamage.id, damageToDraw.id]).join('|'), 'draw-damage-feedback-loop', [drawToDamage, damageToDraw], {
-    requiredFacts: [fact(drawToDamage, (drawToDamage.caps || []).find(cap => cap.startsWith('draw-to-damage-subject:')) || 'is-draw-to-damage-payoff'), fact(damageToDraw, 'is-damage-to-draw-payoff')],
+    requiredFacts: [
+      fact(drawToDamage, (drawToDamage.caps || []).find(cap => cap.startsWith('draw-to-damage-subject:')) || 'is-draw-to-damage-payoff'),
+      fact(damageToDraw, 'is-damage-to-draw-payoff'),
+      ...(MODEL.faceCompatibleCaps(drawToDamage, ['is-creature-permanent']) ? [fact(drawToDamage, 'is-creature-permanent')] : []),
+    ],
     steps: [
       { card: drawToDamage.id, action: 'a draw trigger deals damage' },
       { card: damageToDraw.id, action: 'that damage creates a draw trigger' },
@@ -426,6 +570,31 @@ function proveDrawDamageFeedback(cards) {
   }, [
     { resource: 'cards', min: 1, max: Infinity },
     { resource: 'damage', min: 1, max: Infinity },
+  ]);
+}
+
+function proveSelfCopySpellMagecraftDrain(cards) {
+  const selfCopySpell = find(cards, c => hasCap(c, 'is-self-copying-targeted-spell'));
+  const drainPayoff = find(cards, c => c !== selfCopySpell && hasCap(c, 'is-magecraft-drain-payoff'));
+  if (!selfCopySpell || !drainPayoff) return null;
+  const drainAmount = Math.max(1, Number(capValue(drainPayoff, 'magecraft-drain-amount') || 1));
+  return success('proof:self-copy-spell-magecraft-drain:' + sorted([selfCopySpell.id, drainPayoff.id]).join('|'), 'self-copy-spell→magecraft-drain-loop', [selfCopySpell, drainPayoff], {
+    requiredFacts: [
+      fact(selfCopySpell, 'is-self-copying-targeted-spell'),
+      fact(drainPayoff, 'is-magecraft-drain-payoff'),
+    ],
+    steps: [
+      { card: selfCopySpell.id, action: 'target yourself or another willing player with the spell that lets that player copy it and choose a new target' },
+      { card: selfCopySpell.id, action: 'copy the spell and choose the same player as the new target' },
+      { card: drainPayoff.id, action: 'each copied instant/sorcery spell triggers the magecraft-style drain payoff' },
+      { action: 'the copied spell resolves and offers the same copy choice again, recreating the trigger condition' },
+    ],
+    assumptions: ['the spell can legally target a player who chooses to keep copying it'],
+    repeatability: { status: 'repeatable-candidate', reason: 'each spell copy recreates the same optional copy instruction' },
+  }, [
+    { resource: 'life', min: drainAmount, max: Infinity },
+    { resource: 'opponentLife', min: -Infinity, max: -drainAmount },
+    { resource: 'magecraftTriggers', min: 1, max: Infinity },
   ]);
 }
 
@@ -461,6 +630,45 @@ function proveLifelinkCounterDamageLoop(cards) {
   }, [
     { resource: 'damage', min: 1, max: Infinity },
     { resource: 'life', min: 1, max: Infinity },
+  ]);
+}
+
+function proveLifePaidDamageRecoveryLoop(cards) {
+  const source = find(cards, c => hasCap(c, 'is-life-paid-damage-source') && hasCap(c, 'life-paid-damage-can-hit-opponent'));
+  const recovery = find(cards, c => c !== source && hasCap(c, 'is-lifegain-from-opponent-lifeloss'));
+  if (!source || !recovery) {
+    if (source || find(cards, c => hasCap(c, 'is-lifegain-from-opponent-lifeloss'))) {
+      return failure(
+        'proof:life-paid-damage-one-way:' + sorted(cards.map(c => c.id)).join('|'),
+        cards,
+        'life-paid damage needs an opponent-life-loss lifegain converter to restore the life payment',
+        { hasSource: Boolean(source), hasRecovery: Boolean(find(cards, c => hasCap(c, 'is-lifegain-from-opponent-lifeloss'))) },
+      );
+    }
+    return null;
+  }
+  const profile = lifePaidDamageProfile(source);
+  if (profile.damage < profile.lifeCost || profile.lifeCost <= 0) {
+    return failure(
+      'proof:life-paid-damage-insufficient-recovery:' + sorted([source.id, recovery.id]).join('|'),
+      [source, recovery],
+      'damage dealt to an opponent is not enough to restore the life payment',
+      profile,
+    );
+  }
+  return success('proof:life-paid-damage-recovery:' + sorted([source.id, recovery.id]).join('|'), 'life-paid-damage-lifeloss-recovery-loop', [source, recovery], {
+    requiredFacts: [fact(source, 'is-life-paid-damage-source'), fact(source, 'life-paid-damage-can-hit-opponent'), fact(recovery, 'is-lifegain-from-opponent-lifeloss')],
+    steps: [
+      { card: source.id, action: 'pay life to activate a repeatable damage ability', cost: { life: profile.lifeCost } },
+      { card: source.id, action: 'deal damage to an opponent or player', delta: { damage: profile.damage, opponentLife: -profile.damage } },
+      { card: recovery.id, action: 'opponent life loss causes you to gain that much life', delta: { life: profile.damage } },
+      { action: 'the lifegain restores the life payment, so the damage activation can repeat' },
+    ],
+    assumptions: ['the player can legally pay the initial life cost', 'the damage is aimed at an opponent or opposing player'],
+    repeatability: { status: profile.damage > profile.lifeCost ? 'repeatable-positive-life' : 'repeatable-break-even-life', reason: 'opponent-loss lifegain restores the life paid for the damage activation' },
+  }, [
+    { resource: 'damage', min: profile.damage, max: Infinity },
+    { resource: 'opponentLife', min: -Infinity, max: -profile.damage },
   ]);
 }
 
@@ -526,6 +734,34 @@ function proveMillMultiplierFinisher(cards) {
       { action: 'the affected library is emptied under the rounded-up half-library threshold' },
     ],
     assumptions: ['the half-library mill mode is chosen or paid for', 'the affected opponent is the player whose mill is doubled'],
+    repeatability: { status: 'non-loop-threshold', reason: 'finite mill threshold, not an infinite loop' },
+  }, [{ resource: 'mill', min: 1, max: Infinity }]);
+}
+
+function proveDelayedMillEqualizerFinisher(cards) {
+  const source = find(cards, c => hasCap(c, 'is-half-library-mill-source'));
+  const payoff = find(cards, c => c !== source && hasCap(c, 'is-delayed-same-turn-mill-payoff'));
+  if (!source || !payoff) {
+    const anyPayoff = find(cards, c => hasCap(c, 'is-delayed-same-turn-mill-payoff'));
+    const anyMill = find(cards, c => c !== anyPayoff && hasCap(c, 'is-mill-source'));
+    if (anyPayoff && anyMill) {
+      return failure(
+        'proof:delayed-mill-small-mill:' + sorted([anyPayoff.id, anyMill.id]).join('|'),
+        [anyPayoff, anyMill],
+        'mill source is not a half-library threshold effect',
+        { millSource: anyMill.id },
+      );
+    }
+    return null;
+  }
+  return success('proof:delayed-mill-equalizer-finite:' + sorted([source.id, payoff.id]).join('|'), 'delayed-mill-equalizer-finite-mill', [source, payoff], {
+    requiredFacts: [fact(source, 'is-half-library-mill-source'), fact(payoff, 'is-delayed-same-turn-mill-payoff')],
+    steps: [
+      { card: source.id, action: 'mills half of the affected library' },
+      { card: payoff.id, action: 'at the end step, mills the same player for the number of cards put into their graveyard this turn' },
+      { action: 'the half-library mill plus equal delayed mill empties the affected library under the threshold model' },
+    ],
+    assumptions: ['the half-library mill mode is chosen or paid for', 'the delayed mill payoff enchants or otherwise tracks the same affected player'],
     repeatability: { status: 'non-loop-threshold', reason: 'finite mill threshold, not an infinite loop' },
   }, [{ resource: 'mill', min: 1, max: Infinity }]);
 }
@@ -698,6 +934,58 @@ function proveLifePaidTreasureRecursiveDrain(cards) {
     }
   }
   return failures[0] || null;
+}
+
+function proveExileRecastCreatureMana(cards) {
+  const outlet = find(cards, c => hasCap(c, 'is-creature-exile-cast-mana-outlet'));
+  const body = find(cards, c => c !== outlet && hasCap(c, 'is-recursive-exile-cast-body') && MODEL.faceCompatibleCaps(c, ['is-creature-permanent', 'is-recursive-exile-cast-body']));
+  if (!outlet || !body) {
+    if (outlet || find(cards, c => hasCap(c, 'is-recursive-exile-cast-body'))) {
+      return failure(
+        'proof:exile-recast-creature-missing-role:' + sorted(cards.map(c => c.id)).join('|'),
+        cards,
+        'creature-exile mana outlet needs a creature that can be cast from exile',
+        { hasOutlet: Boolean(outlet), hasRecursiveExileBody: Boolean(find(cards, c => hasCap(c, 'is-recursive-exile-cast-body'))) },
+      );
+    }
+    return null;
+  }
+  const cost = recursiveExileCostProfile(body);
+  const surplus = Math.max(1, maxCapNumber(outlet, 'creature-exile-cast-mana-surplus'));
+  const mana = {
+    total: cost.total + surplus,
+    any: cost.total + surplus,
+    colorless: 0,
+    colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])),
+  };
+  if (!canPayRecursiveCost(cost, mana)) {
+    return failure(
+      'proof:exile-recast-creature-cost:' + sorted([outlet.id, body.id]).join('|'),
+      [outlet, body],
+      'creature-only exile mana cannot pay the recursive exile creature cost',
+      { cost, mana },
+    );
+  }
+  const netMana = mana.total - cost.total;
+  return success('proof:exile-recast-creature-mana:' + sorted([outlet.id, body.id]).join('|'), 'exile-recast-creature-mana-loop', [outlet, body], {
+    requiredFacts: [
+      fact(outlet, 'is-creature-exile-cast-mana-outlet'),
+      fact(body, 'is-recursive-exile-cast-body'),
+      fact(body, 'is-creature-permanent'),
+    ],
+    steps: [
+      { card: outlet.id, action: 'exile the recursive creature to produce creature-spell mana', delta: { mana: mana.total } },
+      { card: body.id, action: 'spend creature-only mana to cast the same creature from exile', cost: { mana: cost.total } },
+      { card: body.id, action: 'the creature returns to the battlefield and can be exiled again' },
+    ],
+    assumptions: ['the restricted mana is spent only on the recursive creature spell it is allowed to cast'],
+    repeatability: { status: netMana > 0 ? 'repeatable-positive-mana' : 'repeatable-break-even', reason: 'exiling the creature produces enough restricted mana to recast it from exile and restore the body' },
+  }, [
+    { resource: 'casts', min: 1, max: Infinity },
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'ltbTriggers', min: 1, max: Infinity },
+    ...(netMana > 0 ? [{ resource: 'mana', min: netMana, max: netMana }] : []),
+  ]);
 }
 
 function canEtbBlinkTarget(blinker, target) {
@@ -945,6 +1233,54 @@ function proveHastyCopyEtbUntapLoop(cards) {
   ]);
 }
 
+function proveCombatCopyTokenExtraCombatLoop(cards) {
+  const copier = find(cards, c => hasCap(c, 'is-combat-copy-token-equipment'));
+  const attacker = find(cards, c => c !== copier && hasCap(c, 'is-attack-extra-combat-source'));
+  if (!copier || !attacker) return null;
+  if (!MODEL.faceCompatibleCaps(attacker, ['is-creature-permanent', 'is-attack-extra-combat-source'])) {
+    return failure(
+      'proof:combat-copy-extra-combat-target-illegal:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'combat-copy equipment cannot copy a noncreature extra-combat source',
+      { targetIsCreature: /\bcreature\b/i.test(attacker.type || attacker.type_line || '') },
+    );
+  }
+  if (!hasCap(copier, 'combat-copy-token-haste')
+      || !hasCap(copier, 'combat-copy-token-nonlegendary')
+      || !hasCap(attacker, 'extra-combat-repeatable-with-fresh-token')) {
+    return failure(
+      'proof:combat-copy-extra-combat-not-repeatable:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'combat-copy token lacks haste/nonlegendary freshness needed to repeat the extra-combat trigger',
+      {
+        hastyToken: hasCap(copier, 'combat-copy-token-haste'),
+        nonlegendaryToken: hasCap(copier, 'combat-copy-token-nonlegendary'),
+        freshTokenRepeats: hasCap(attacker, 'extra-combat-repeatable-with-fresh-token'),
+      },
+    );
+  }
+  return success('proof:combat-copy-extra-combat:' + sorted([copier.id, attacker.id]).join('|'), 'combat-copy-token→extra-combat-loop', [copier, attacker], {
+    requiredFacts: [
+      fact(copier, 'is-combat-copy-token-equipment'),
+      fact(copier, 'combat-copy-token-haste'),
+      fact(copier, 'combat-copy-token-nonlegendary'),
+      fact(attacker, 'is-attack-extra-combat-source'),
+      fact(attacker, 'is-creature-permanent'),
+    ],
+    steps: [
+      { card: copier.id, action: 'at the beginning of combat, create a hasty nonlegendary token copy of the extra-combat attacker' },
+      { card: attacker.id, action: 'the fresh token attacks and creates an additional combat phase' },
+      { action: 'the next combat phase begins and the equipment creates another fresh attacking token copy' },
+    ],
+    assumptions: ['the Equipment is attached to the extra-combat creature before the loop starts'],
+    repeatability: { status: 'repeatable-candidate', reason: 'each additional combat creates a fresh hasty token with an unused extra-combat attack trigger' },
+  }, [
+    { resource: 'tokens', min: 1, max: Infinity },
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'combatPhases', min: 1, max: Infinity },
+  ]);
+}
+
 function proveSpellCopyCreatureCopyLoop(cards) {
   const spellCopier = find(cards, c => hasCap(c, 'is-etb-spell-copier'));
   const creatureCopySpell = find(cards, c => c !== spellCopier && hasCap(c, 'is-hasty-creature-copy-spell'));
@@ -965,7 +1301,7 @@ function proveSpellCopyCreatureCopyLoop(cards) {
     requiredFacts: [
       fact(spellCopier, 'is-etb-spell-copier'),
       fact(spellCopier, 'is-creature-permanent'),
-      ...(hasCap(creatureCopySpell, 'hasty-copy-spell-target-requires-nonlegendary') ? [fact(spellCopier, 'is-nonlegendary-permanent')] : []),
+      fact(spellCopier, 'is-nonlegendary-permanent'),
       fact(creatureCopySpell, 'is-hasty-creature-copy-spell'),
       fact(creatureCopySpell, 'hasty-copy-spell-target-creature'),
     ],
@@ -981,6 +1317,198 @@ function proveSpellCopyCreatureCopyLoop(cards) {
     { resource: 'etbTriggers', min: 1, max: Infinity },
     { resource: 'magecraftTriggers', min: 1, max: Infinity },
   ]);
+}
+
+function proveDeathCopySpellEtbCopyLoop(cards) {
+  const spellCopier = find(cards, c => hasCap(c, 'is-etb-spell-copier'));
+  const copySpell = find(cards, c => c !== spellCopier && hasCap(c, 'is-death-copy-creature-spell'));
+  if (!spellCopier || !copySpell) return null;
+  if (!canDeathCopySpellTarget(copySpell, spellCopier, ['is-etb-spell-copier'])) {
+    return failure(
+      'proof:death-copy-spell-target-illegal:' + sorted([spellCopier.id, copySpell.id]).join('|'),
+      [spellCopier, copySpell],
+      'death-copy spell cannot safely target the ETB spell copier as a nonlegendary creature',
+      {
+        targetIsCreature: isCreaturePermanent(spellCopier),
+        targetIsLegendary: isLegendaryPermanent(spellCopier),
+      },
+    );
+  }
+  return success('proof:death-copy-spell-etb-copy:' + sorted([spellCopier.id, copySpell.id]).join('|'), 'death-copy-spell-etb-copy-loop', [spellCopier, copySpell], {
+    requiredFacts: [
+      fact(spellCopier, 'is-etb-spell-copier'),
+      fact(spellCopier, 'is-creature-permanent'),
+      fact(spellCopier, 'is-nonlegendary-permanent'),
+      fact(copySpell, 'is-death-copy-creature-spell'),
+      fact(copySpell, 'death-copy-spell-target-creature'),
+    ],
+    steps: [
+      { card: copySpell.id, action: 'destroy the nonlegendary ETB spell copier with a spell that creates two token copies if it dies' },
+      { card: spellCopier.id, action: 'two token copies enter and each has the ETB spell-copy trigger', delta: { tokens: 2, etbTriggers: 2, deathTriggers: 1, ltbTriggers: 1 } },
+      { card: spellCopier.id, action: 'one ETB trigger copies the original death-copy spell and targets another spell-copier token' },
+      { action: 'the copied spell recreates the death, token, ETB, and spell-copy state with surplus token material' },
+    ],
+    assumptions: ['the original creature-copying spell is still on the stack when the ETB spell-copy trigger resolves'],
+    repeatability: { status: 'repeatable-candidate', reason: 'each copied death-copy spell creates replacement spell-copier tokens and a new ETB copy trigger' },
+  }, [
+    { resource: 'tokens', min: 1, max: Infinity },
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'ltbTriggers', min: 1, max: Infinity },
+    { resource: 'deathTriggers', min: 1, max: Infinity },
+    { resource: 'magecraftTriggers', min: 1, max: Infinity },
+  ]);
+}
+
+function proveCounterTokenEtbCounterLoop(cards) {
+  const tokenEngines = (cards || []).filter(c => hasCap(c, 'is-counter-to-creature-token-engine'));
+  const counterGranters = (cards || []).filter(c => hasCap(c, 'is-creature-etb-counter-granter'));
+  if (!tokenEngines.length || !counterGranters.length) return null;
+  let firstRejected = null;
+  for (const tokenEngine of tokenEngines) {
+    for (const counterGranter of counterGranters) {
+      if (counterGranter === tokenEngine) continue;
+      const targetLegal = MODEL.faceCompatibleCaps(tokenEngine, ['is-creature-permanent', 'is-counter-to-creature-token-engine']);
+      const tokenCanTrigger = counterTokenCanTriggerGranter(tokenEngine, counterGranter);
+      if (!targetLegal || !tokenCanTrigger) {
+        firstRejected ||= { tokenEngine, counterGranter, targetLegal };
+        continue;
+      }
+      return success('proof:counter-token-etb-counter:' + sorted([tokenEngine.id, counterGranter.id]).join('|'), 'counter-token→etb-counter-loop', [tokenEngine, counterGranter], {
+        requiredFacts: [
+          fact(tokenEngine, 'is-counter-to-creature-token-engine'),
+          fact(tokenEngine, 'is-creature-permanent'),
+          fact(counterGranter, 'is-creature-etb-counter-granter'),
+          fact(counterGranter, 'etb-counter-targets-creature'),
+        ],
+        steps: [
+          { card: tokenEngine.id, action: 'a +1/+1 counter on the token engine creates a creature token', delta: { counters: 1, tokens: 1 } },
+          { card: counterGranter.id, action: 'that creature token enters and triggers the ETB counter granter' },
+          { card: counterGranter.id, action: 'put the +1/+1 counter on the token engine' },
+          { action: 'the new counter recreates the token trigger condition' },
+        ],
+        assumptions: ['an initial +1/+1 counter or legal creature-ETB seed starts the cycle', 'the ETB counter trigger chooses the counter-token engine as its target'],
+        repeatability: { status: 'repeatable-candidate', reason: 'each token ETB restores the +1/+1 counter event that creates the next token' },
+      }, [
+        { resource: 'tokens', min: 1, max: Infinity },
+        { resource: 'counters', min: 1, max: Infinity },
+        { resource: 'etbTriggers', min: 1, max: Infinity },
+      ]);
+    }
+  }
+  if (!firstRejected) return null;
+  const { tokenEngine, counterGranter, targetLegal } = firstRejected;
+  return failure(
+    'proof:counter-token-etb-counter-target-or-color:' + sorted([tokenEngine.id, counterGranter.id]).join('|'),
+    [tokenEngine, counterGranter],
+    'counter-triggered token must be a creature that can trigger the ETB counter granter, and the granter must be able to target the token engine',
+    {
+      targetLegal,
+      tokenColors: counterTokenColors(tokenEngine),
+      acceptedTokenColors: etbCounterGranterColors(counterGranter),
+    },
+  );
+}
+
+function proveMinusCounterDeathTokenLoop(cards) {
+  const spreader = find(cards, c => hasCap(c, 'is-minus-counter-death-spreader'));
+  const tokenEngine = find(cards, c => c !== spreader && hasCap(c, 'is-minus-counter-to-1-1-token-engine'));
+  if (!spreader || !tokenEngine) return null;
+  return success('proof:minus-counter-death-token:' + sorted([spreader.id, tokenEngine.id]).join('|'), 'minus-counter-death→token-loop', [spreader, tokenEngine], {
+    requiredFacts: [
+      fact(spreader, 'is-minus-counter-death-spreader'),
+      fact(tokenEngine, 'is-minus-counter-to-1-1-token-engine'),
+    ],
+    steps: [
+      { card: spreader.id, action: 'a creature with a -1/-1 counter dies and puts a -1/-1 counter on a 1/1 creature token' },
+      { card: tokenEngine.id, action: 'putting the -1/-1 counter on a creature creates a new 1/1 creature token', delta: { tokens: 1, etbTriggers: 1 } },
+      { action: 'the countered 1/1 creature dies, triggering the death spreader again', delta: { deathTriggers: 1, ltbTriggers: 1 } },
+      { action: 'the death trigger targets the newly created 1/1 token and repeats the abstract state' },
+    ],
+    assumptions: ['a legal 1/1 creature token or equivalent seeded creature is available for the first -1/-1 counter', 'the death-spreader trigger targets the newly created 1/1 creature token each loop'],
+    repeatability: { status: 'repeatable-candidate', reason: 'each -1/-1 counter kills a 1/1 token and creates the next 1/1 token target' },
+  }, [
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'ltbTriggers', min: 1, max: Infinity },
+    { resource: 'deathTriggers', min: 1, max: Infinity },
+  ]);
+}
+
+function proveLifegainCounterTokenEtbLoop(cards) {
+  const tokenEngines = (cards || []).filter(c => hasCap(c, 'is-counter-to-creature-token-engine'));
+  const counterPayoffs = (cards || []).filter(c => hasCap(c, 'is-lifegain-to-counter-payoff'));
+  const etbLifegainers = (cards || []).filter(c => hasCap(c, 'is-creature-etb-lifegain-payoff'));
+  if (!tokenEngines.length || !counterPayoffs.length || !etbLifegainers.length) return null;
+  let firstRejected = null;
+  for (const tokenEngine of tokenEngines) {
+    for (const counterPayoff of counterPayoffs) {
+      const targetLegal = lifegainCounterCanTargetEngine(counterPayoff, tokenEngine);
+      if (!targetLegal) {
+        firstRejected ||= { tokenEngine, counterPayoff, etbLifegainer: etbLifegainers[0], targetLegal };
+        continue;
+      }
+      for (const etbLifegainer of etbLifegainers) {
+        const proofCards = uniqueCards([tokenEngine, counterPayoff, etbLifegainer]);
+        return success('proof:lifegain-counter-token-etb:' + sorted(proofCards.map(card => card.id)).join('|'), 'lifegain-counter-token-etb-loop', proofCards, {
+          requiredFacts: [
+            fact(tokenEngine, 'is-counter-to-creature-token-engine'),
+            fact(tokenEngine, 'is-creature-permanent'),
+            fact(counterPayoff, 'is-lifegain-to-counter-payoff'),
+            fact(counterPayoff, firstCap(counterPayoff, ['lifegain-counter-target:creature', 'lifegain-counter-target:creature-or-enchantment']) || 'lifegain-counter-target:creature'),
+            fact(etbLifegainer, 'is-creature-etb-lifegain-payoff'),
+          ],
+          steps: [
+            { card: tokenEngine.id, action: 'a +1/+1 counter on the token engine creates a creature token', delta: { counters: 1, tokens: 1 } },
+            { card: etbLifegainer.id, action: 'that creature token enters and triggers life gain', delta: { life: 1, etbTriggers: 1 } },
+            { card: counterPayoff.id, action: 'the life-gain trigger puts a +1/+1 counter on the token engine' },
+            { action: 'the new counter recreates the creature-token ETB life-gain state' },
+          ],
+          assumptions: ['an initial +1/+1 counter or legal life-gain/counter seed starts the cycle', 'the lifegain counter trigger chooses the counter-token engine as its target'],
+          repeatability: { status: 'repeatable-candidate', reason: 'each creature token ETB gains life, and each life-gain counter recreates the token trigger condition' },
+        }, [
+          { resource: 'tokens', min: 1, max: Infinity },
+          { resource: 'counters', min: 1, max: Infinity },
+          { resource: 'etbTriggers', min: 1, max: Infinity },
+          { resource: 'life', min: 1, max: Infinity },
+        ]);
+      }
+    }
+  }
+  if (!firstRejected) return null;
+  const { tokenEngine, counterPayoff, etbLifegainer, targetLegal } = firstRejected;
+  return failure(
+    'proof:lifegain-counter-token-etb-target:' + sorted([tokenEngine.id, counterPayoff.id, etbLifegainer.id]).join('|'),
+    uniqueCards([tokenEngine, counterPayoff, etbLifegainer]),
+    'lifegain counter payoff must be able to target the counter-triggered creature-token engine',
+    {
+      targetLegal,
+      acceptedTargets: capSuffixes(counterPayoff, 'lifegain-counter-target:'),
+    },
+  );
+}
+
+function proveDeathUntapDeathtouchPingerLock(cards) {
+  const assembly = assembleDeathUntapPinger(cards);
+  if (!assembly) return null;
+  const { carrier, externalCarrier, ping, untap, deathtouch, proofCards } = assembly;
+  const sourceLabel = carrier ? carrier.id : 'equipped creature';
+  return success('proof:death-untap-deathtouch-pinger-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'death-untap-deathtouch-pinger-lock', proofCards, {
+    requiredFacts: [
+      fact(ping.card, ping.predicate),
+      fact(untap.card, untap.predicate),
+      fact(deathtouch.card, deathtouch.predicate),
+    ],
+    steps: [
+      { card: ping.card.id, action: `tap ${sourceLabel} to deal 1 damage to a creature` },
+      { card: deathtouch.card.id, action: 'deathtouch on that same source makes the damage lethal' },
+      { card: untap.card.id, action: 'the killed creature dies and untaps that same pinger source' },
+      { action: 'the pinger returns to the same abstract state and can repeat against the next creature' },
+    ],
+    assumptions: [
+      externalCarrier ? 'a legal creature can carry the equipped abilities together' : 'one legal creature source carries the ping, death-untap, and deathtouch roles together',
+      'there is a sequence of opposing creatures or lock-relevant creature targets to kill',
+    ],
+    repeatability: { status: 'repeatable-lock', reason: 'each deathtouch ping kills a creature and the death trigger untaps the pinger' },
+  });
 }
 
 function cardsById(cards) {
@@ -1021,12 +1549,16 @@ function provePackage(rawCards, options = {}) {
     proveLifeLoop(cards),
     proveMillLifeLossLoop(cards),
     proveDrawDamageFeedback(cards),
+    proveSelfCopySpellMagecraftDrain(cards),
     proveLifelinkCounterDamageLoop(cards),
+    proveLifePaidDamageRecoveryLoop(cards),
     proveOpponentDrawPunisherWin(cards),
     proveMillMultiplierFinisher(cards),
+    proveDelayedMillEqualizerFinisher(cards),
     proveTopLoop(cards),
     proveRecursiveBodySacrificeMana(cards),
     proveLifePaidTreasureRecursiveDrain(cards),
+    proveExileRecastCreatureMana(cards),
     proveMutualEtbBlinkReset(cards),
     proveTokenReplacementSacrificeMana(cards),
     proveAristocrats(cards),
@@ -1035,7 +1567,13 @@ function provePackage(rawCards, options = {}) {
     proveImprintUntapSpellLoop(cards),
     proveSelfUntapAbilityCopyLoop(cards),
     proveHastyCopyEtbUntapLoop(cards),
+    proveCombatCopyTokenExtraCombatLoop(cards),
     proveSpellCopyCreatureCopyLoop(cards),
+    proveDeathCopySpellEtbCopyLoop(cards),
+    proveCounterTokenEtbCounterLoop(cards),
+    proveMinusCounterDeathTokenLoop(cards),
+    proveLifegainCounterTokenEtbLoop(cards),
+    proveDeathUntapDeathtouchPingerLock(cards),
   ].filter(Boolean);
   const indexedCards = cardsById(cards);
   const faceRejections = results

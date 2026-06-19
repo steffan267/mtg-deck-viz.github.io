@@ -121,6 +121,8 @@ function faceCompatibilityWarnings(faceFacts, factSources) {
 function classifyFaceAwareCard(card, model) {
   const faceAware = CARD_FACES.toFaceAwareResolvedCard(card);
   const aggregate = model.classify({
+    name: faceAware.name,
+    id: faceAware.name,
     type_line: faceAware.type_line,
     oracle_text: faceAware.oracle_text,
     cmc: faceAware.cmc,
@@ -128,6 +130,8 @@ function classifyFaceAwareCard(card, model) {
   });
   const faceFacts = (faceAware.faces || []).map(face => {
     const classification = model.classify({
+      name: face.name || faceAware.name,
+      id: face.name || faceAware.name,
       type_line: face.type_line || faceAware.type_line,
       oracle_text: face.oracle_text || faceAware.oracle_text,
       cmc: faceAware.cmc,

@@ -60,7 +60,7 @@ function classifyCard(card) {
       segments: card.segments || [],
     });
   }
-  return Object.assign({}, card, MODEL.classify({ type_line: typeLine, oracle_text: oracleText, cmc: card.cmc, mana_cost: manaCost }));
+  return Object.assign({}, card, MODEL.classify({ name: card.name || card.id, id: card.id, type_line: typeLine, oracle_text: oracleText, cmc: card.cmc, mana_cost: manaCost }));
 }
 
 function normalizeCard(card) {

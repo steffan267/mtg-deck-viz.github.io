@@ -3,7 +3,7 @@ const MODEL = require('../src/interaction-model');
 const FACE_CLASSIFICATION = require('../src/face-classification');
 
 function node(name, type, text, cmc = undefined, manaCost = undefined) {
-  const classified = MODEL.classify({ type_line: type, oracle_text: text, cmc, mana_cost: manaCost });
+  const classified = MODEL.classify({ name, type_line: type, oracle_text: text, cmc, mana_cost: manaCost });
   return {
     id: name,
     type,
@@ -326,6 +326,14 @@ When Gilded Goose enters, create a Food token.
   assertNoEvent(activatedAbilityCopier, lowOutputSelfUntapper, 'enable:self-untap-mana→ability-copy-loop');
   const breakEvenSelfUntapper = node('Break Even Self Untapper', 'Artifact', '{T}: Add {C}{C}. {2}: Untap this artifact.');
   assertNoEvent(activatedAbilityCopier, breakEvenSelfUntapper, 'enable:self-untap-mana→ability-copy-loop');
+  const creatureBreakEvenSelfUntapper = node('Creature Break Even Self Untapper', 'Creature — Elf', '{T}: Add {G}{G}. {2}: Untap this creature.');
+  const artifactAbilityReducer = node('Artifact Ability Reducer', 'Creature — Vedalken Artificer', "Activated abilities of artifacts you control cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.");
+  assertHasCap(artifactAbilityReducer, 'is-artifact-activated-ability-cost-reducer');
+  assertNoCap(artifactAbilityReducer, 'is-cost-reducer');
+  assertHasCap(artifactAbilityReducer, 'activated-ability-cost-reduction:1');
+  assertHasCap(artifactAbilityReducer, 'activated-ability-cost-reduction-minimum:1');
+  assertHasEvent(artifactAbilityReducer, breakEvenSelfUntapper, 'enable:cost-reduction→ability');
+  assertNoEvent(artifactAbilityReducer, creatureBreakEvenSelfUntapper, 'enable:cost-reduction→ability');
 
   const repeatableHastyCopier = node('Repeatable Hasty Copier', 'Legendary Creature — Goblin Shaman', 'Haste. {T}: Create a token that’s a copy of target nonlegendary creature you control, except it has haste. Sacrifice it at the beginning of the next end step.');
   const etbPermanentUntapper = node('ETB Permanent Untapper', 'Creature — Human Warrior', 'When this creature enters the battlefield, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn.');
@@ -338,16 +346,47 @@ When Gilded Goose enters, create a Food token.
     'repeatable hasty creature-copy text plus ETB permanent untap text should be combo-critical');
   assertNoEvent(repeatableHastyCopier, legendaryEtbPermanentUntapper, 'enable:hasty-copy→etb-untap-loop');
 
+  const combatCopyEquipment = node('Combat Copy Equipment', 'Legendary Artifact — Equipment', "At the beginning of combat on your turn, create a token that's a copy of equipped creature, except the token isn't legendary. That token gains haste. Equip {5}");
+  const firstAttackExtraCombat = node('First Attack Extra Combat', 'Legendary Creature — Angel', 'Haste. Whenever this creature attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.');
+  const exertExtraCombat = node('Exert Extra Combat', 'Creature — Human Warrior', "If this creature hasn't been exerted this turn, you may exert it as it attacks. When you do, untap all other creatures you control and after this phase, there is an additional combat phase.");
+  const vanillaAttacker = node('Vanilla Attacker', 'Creature — Human Warrior', 'Haste.');
+  assertHasCap(combatCopyEquipment, 'is-combat-copy-token-equipment');
+  assertHasCap(combatCopyEquipment, 'combat-copy-token-nonlegendary');
+  assertHasCap(firstAttackExtraCombat, 'is-attack-extra-combat-source');
+  assertHasCap(exertExtraCombat, 'is-attack-extra-combat-source');
+  assertHasInteraction(combatCopyEquipment, firstAttackExtraCombat,
+    it => it.family === 'combat-copy-token→extra-combat-loop' && it.strength === 'combo-critical',
+    'combat-copy equipment plus first-attack extra combat creature should be detected generically');
+  assertHasInteraction(combatCopyEquipment, exertExtraCombat,
+    it => it.family === 'combat-copy-token→extra-combat-loop' && it.strength === 'combo-critical',
+    'combat-copy equipment plus exert extra combat creature should be detected generically');
+  assertNoEvent(combatCopyEquipment, vanillaAttacker, 'enable:combat-copy-token→extra-combat-loop');
+
   const etbSpellCopier = node('ETB Spell Copier', 'Creature — Human Wizard', 'Flash. When this creature enters the battlefield, copy target instant or sorcery spell. You may choose new targets for the copy.');
+  const legendaryEtbSpellCopier = node('Legendary ETB Spell Copier', 'Legendary Creature — Human Wizard', 'Flash. When this creature enters the battlefield, copy target instant or sorcery spell. You may choose new targets for the copy.');
   const artifactEtbSpellCopier = node('Artifact ETB Spell Copier', 'Artifact', 'When this artifact enters the battlefield, copy target instant or sorcery spell. You may choose new targets for the copy.');
   const hastyCreatureCopySpell = node('Hasty Creature Copy Spell', 'Sorcery', 'Choose any number of target creatures you control. For each of them, create a token that’s a copy of that creature, except it has haste. Exile those tokens at the beginning of the next end step.');
+  const broadHastyCreatureCopySpell = node('Broad Hasty Creature Copy Spell', 'Sorcery', 'Create a token that’s a copy of target creature, except it has haste. Exile it at the beginning of the next end step.');
+  const deathCopyCreatureSpell = node('Death-Copy Creature Spell', 'Instant', 'Destroy target creature. If that creature dies this way, its controller creates two tokens that are copies of that creature.');
   assertHasCap(etbSpellCopier, 'is-etb-spell-copier');
   assertHasCap(artifactEtbSpellCopier, 'is-etb-spell-copier');
   assertHasCap(hastyCreatureCopySpell, 'is-hasty-creature-copy-spell');
   assertHasCap(hastyCreatureCopySpell, 'hasty-copy-spell-target-creature');
+  assertHasCap(broadHastyCreatureCopySpell, 'is-hasty-creature-copy-spell');
+  assertHasCap(broadHastyCreatureCopySpell, 'hasty-copy-spell-target-creature');
+  assertHasCap(deathCopyCreatureSpell, 'is-death-copy-creature-spell');
+  assertHasCap(deathCopyCreatureSpell, 'death-copy-spell-target-creature');
   assertHasInteraction(etbSpellCopier, hastyCreatureCopySpell,
     it => it.family === 'spell-copy-etb→creature-copy-spell-loop' && it.strength === 'combo-critical',
     'ETB spell-copy creature plus hasty creature-copy spell should be combo-critical without names');
+  assertHasInteraction(etbSpellCopier, broadHastyCreatureCopySpell,
+    it => it.family === 'spell-copy-etb→creature-copy-spell-loop' && it.strength === 'combo-critical',
+    'broad hasty creature-copy spell text should still detect an ETB spell-copy creature loop');
+  assertHasInteraction(etbSpellCopier, deathCopyCreatureSpell,
+    it => it.family === 'death-copy-spell-etb-copy-loop' && it.strength === 'combo-critical',
+    'ETB spell-copy creature plus generic death-copy creature spell should be detected without card names');
+  assertNoEvent(legendaryEtbSpellCopier, broadHastyCreatureCopySpell, 'enable:spell-copy-etb→creature-copy-spell-loop');
+  assertNoEvent(legendaryEtbSpellCopier, deathCopyCreatureSpell, 'enable:death-copy-spell-etb-copy-loop');
   assertNoEvent(artifactEtbSpellCopier, hastyCreatureCopySpell, 'enable:spell-copy-etb→creature-copy-spell-loop');
 
   const topDrawArtifact = node('Self Top Draw Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.');
@@ -372,33 +411,118 @@ When Gilded Goose enters, create a Food token.
 
   const drawDamageEngine = node('Draw Damage Engine', 'Legendary Creature — Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.');
   const damageDrawAura = node('Damage Draw Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.');
+  const pairedCreatureDamageDraw = node('Paired Creature Damage Draw', 'Creature — Human Scout', 'Soulbond. As long as this creature is paired with another creature, each of those creatures has "Whenever this creature deals damage to an opponent, draw a card."');
   const noncombatDamageDrawPayoff = node('Noncombat Damage Draw Payoff', 'Creature — Dragon Wizard', 'Whenever a source you control deals noncombat damage to an opponent, you draw that many cards.');
+  const selfDamageDrawPayoff = node('Self Damage Draw Payoff', 'Creature — Human Wizard', 'Whenever this creature deals damage to an opponent, draw a card.');
   const opponentDrawDamage = node('Opponent Draw Damage Engine', 'Creature — Devil', 'Whenever an opponent draws a card, this creature deals 1 damage to any target.');
   assertHasCap(drawDamageEngine, 'is-draw-to-damage-payoff');
   assertHasCap(drawDamageEngine, 'draw-to-damage-subject:you');
   assertHasCap(damageDrawAura, 'is-damage-to-draw-payoff');
+  assertHasCap(damageDrawAura, 'damage-to-draw-scope:enchanted-creature');
+  assertHasCap(pairedCreatureDamageDraw, 'is-damage-to-draw-payoff');
+  assertHasCap(pairedCreatureDamageDraw, 'damage-to-draw-scope:paired-creature-grant');
   assertHasCap(noncombatDamageDrawPayoff, 'is-damage-to-draw-payoff');
+  assertHasCap(noncombatDamageDrawPayoff, 'damage-to-draw-scope:source-you-control');
+  assertHasCap(selfDamageDrawPayoff, 'is-damage-to-draw-payoff');
+  assertHasCap(selfDamageDrawPayoff, 'damage-to-draw-scope:this-creature');
   assertHasCap(opponentDrawDamage, 'is-draw-to-damage-payoff');
   assertHasCap(opponentDrawDamage, 'draw-to-damage-subject:opp');
   assertHasInteraction(drawDamageEngine, damageDrawAura,
     it => it.family === 'draw-damage-feedback-loop' && it.strength === 'combo-critical',
     'draw-triggered damage plus damage-triggered draw should be detected without card names');
+  assertHasInteraction(drawDamageEngine, pairedCreatureDamageDraw,
+    it => it.family === 'draw-damage-feedback-loop' && it.strength === 'combo-critical',
+    'soulbond-style granted damage draw should apply to a draw-triggered damage creature');
   assertHasInteraction(drawDamageEngine, noncombatDamageDrawPayoff,
     it => it.family === 'draw-damage-feedback-loop' && it.strength === 'combo-critical',
     'draw-triggered damage should feed source-controlled noncombat damage draw payoffs without card names');
   assertNoEvent(opponentDrawDamage, damageDrawAura, 'enable:draw-damage-feedback-loop');
+  assertNoEvent(drawDamageEngine, selfDamageDrawPayoff, 'enable:draw-damage-feedback-loop');
+
+  const selfCopyingTargetedSpell = node('Self-Copying Targeted Spell', 'Sorcery', 'Target player discards two cards. That player may copy this spell and may choose a new target for that copy.');
+  const magecraftDrainPayoff = node('Magecraft Drain Payoff', 'Creature — Human Druid', 'Magecraft — Whenever you cast or copy an instant or sorcery spell, each opponent loses 1 life and you gain 1 life.');
+  const magecraftTokenPayoff = node('Magecraft Token Payoff', 'Creature — Human Wizard', 'Magecraft — Whenever you cast or copy an instant or sorcery spell, create a 1/1 creature token.');
+  assertHasCap(selfCopyingTargetedSpell, 'is-self-copying-targeted-spell');
+  assertHasCap(magecraftDrainPayoff, 'is-magecraft-drain-payoff');
+  assertHasCap(magecraftDrainPayoff, 'magecraft-drain-amount:1');
+  assertHasInteraction(selfCopyingTargetedSpell, magecraftDrainPayoff,
+    it => it.family === 'self-copy-spell→magecraft-drain-loop' && it.strength === 'combo-critical',
+    'self-copying targeted spells plus magecraft drain should be a generic loop family');
+  assertNoEvent(selfCopyingTargetedSpell, magecraftTokenPayoff, 'enable:self-copy-spell→magecraft-drain-loop');
 
   const lifelinkCounterEngine = node('Lifelink Counter Engine', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.');
   const counterDamageCreature = node('Counter Damage Creature', 'Artifact Creature — Construct', 'This creature enters with X +1/+1 counters on it. Remove a +1/+1 counter from this creature: It deals 1 damage to any target.');
   const counterDamageArtifact = node('Counter Damage Artifact', 'Artifact', 'This artifact enters with X +1/+1 counters on it. Remove a +1/+1 counter from this artifact: It deals 1 damage to any target.');
+  const lifePaidDamageSource = node('Life-Paid Damage Source', 'Artifact', 'Pay 50 life: This artifact deals 50 damage to any target.');
+  const tappedLifePaidDamageSource = node('Tapped Life-Paid Damage Source', 'Artifact', '{T}, Pay 50 life: This artifact deals 50 damage to any target.');
+  const opponentLossLifegainPayoff = node('Opponent Loss Lifegain Payoff', 'Enchantment', 'Whenever an opponent loses life, you gain that much life.');
   assertHasCap(lifelinkCounterEngine, 'is-lifegain-to-counter-payoff');
   assertHasCap(lifelinkCounterEngine, 'grants-lifelink-to-creature');
   assertHasCap(lifelinkCounterEngine, 'is-lifelink-counter-engine');
   assertHasCap(counterDamageCreature, 'is-counter-to-damage-source');
+  assertHasCap(lifePaidDamageSource, 'is-life-paid-damage-source');
+  assertHasCap(lifePaidDamageSource, 'life-paid-damage-life-cost:50');
+  assertHasCap(lifePaidDamageSource, 'life-paid-damage-amount:50');
+  assertHasCap(lifePaidDamageSource, 'life-paid-damage-can-hit-opponent');
+  assertNoCap(tappedLifePaidDamageSource, 'is-life-paid-damage-source');
   assertHasInteraction(lifelinkCounterEngine, counterDamageCreature,
     it => it.family === 'lifelink-counter-damage-loop' && it.strength === 'combo-critical' && it.evidence.targetLegal === true,
     'lifelink grant plus lifegain counter trigger should loop with a creature that spends counters for damage');
   assertNoEvent(lifelinkCounterEngine, counterDamageArtifact, 'enable:lifelink-counter-damage-loop');
+  assertHasInteraction(lifePaidDamageSource, opponentLossLifegainPayoff,
+    it => it.family === 'life-paid-damage-lifeloss-recovery-loop' && it.strength === 'combo-critical',
+    'life-paid opponent damage plus opponent-life-loss lifegain should be detected without card names');
+
+  const counterTokenEngine = node('Counter Token Engine', 'Creature — Plant', 'Whenever one or more +1/+1 counters are put on this creature, create a 1/1 green Saproling creature token.');
+  const greenEtbCounterGranter = node('Green ETB Counter Granter', 'Creature — Elf', 'Whenever another green creature you control enters, put a +1/+1 counter on target creature.');
+  const anyEtbCounterGranter = node('Any ETB Counter Granter', 'Creature — Citizen', 'Alliance — Whenever another creature you control enters, put a +1/+1 counter on target creature you control.');
+  const colorlessCounterTokenEngine = node('Colorless Counter Token Engine', 'Creature — Eldrazi', 'Whenever one or more +1/+1 counters are put on this creature, create a 0/1 colorless Eldrazi Spawn creature token.');
+  const splitCounterAndTokenCard = node('Split Counter And Token Card', 'Creature — Weird', 'Whenever one or more +1/+1 counters are put on this creature, add one mana of any color.\n{X}, {T}: Create a 0/0 green Fractal creature token and put X +1/+1 counters on it.');
+  assertHasCap(counterTokenEngine, 'is-counter-to-creature-token-engine');
+  assertHasCap(counterTokenEngine, 'counter-token-color:g');
+  assertHasCap(greenEtbCounterGranter, 'is-creature-etb-counter-granter');
+  assertHasCap(greenEtbCounterGranter, 'etb-counter-granter-token-color:g');
+  assertHasInteraction(counterTokenEngine, greenEtbCounterGranter,
+    it => it.family === 'counter-token→etb-counter-loop' && it.strength === 'combo-critical',
+    'counter-triggered creature-token engine plus matching ETB counter granter should be detected generically');
+  assertHasInteraction(colorlessCounterTokenEngine, anyEtbCounterGranter,
+    it => it.family === 'counter-token→etb-counter-loop' && it.strength === 'combo-critical',
+    'unrestricted creature-ETB counter granters can use colorless creature tokens');
+  assertNoCap(splitCounterAndTokenCard, 'is-counter-to-creature-token-engine');
+  assertNoEvent(colorlessCounterTokenEngine, greenEtbCounterGranter, 'enable:counter-token→etb-counter-loop');
+
+  const minusCounterDeathSpreader = node('Minus Counter Death Spreader', 'Enchantment', 'Whenever a creature dies, if it had a -1/-1 counter on it, put a -1/-1 counter on target creature.');
+  const minusCounterTokenEngine = node('Minus Counter Token Engine', 'Enchantment', 'Whenever you put one or more -1/-1 counters on a creature, create that many 1/1 black Insect creature tokens.');
+  const largeMinusCounterTokenEngine = node('Large Minus Counter Token Engine', 'Enchantment', 'Whenever you put one or more -1/-1 counters on a creature, create that many 2/2 black Insect creature tokens.');
+  assertHasCap(minusCounterDeathSpreader, 'is-minus-counter-death-spreader');
+  assertHasCap(minusCounterTokenEngine, 'is-minus-counter-to-1-1-token-engine');
+  assertHasInteraction(minusCounterDeathSpreader, minusCounterTokenEngine,
+    it => it.family === 'minus-counter-death→token-loop' && it.strength === 'combo-critical',
+    '-1/-1 counter death spreader plus 1/1 counter-token payoff should be detected generically');
+  assertNoCap(largeMinusCounterTokenEngine, 'is-minus-counter-to-1-1-token-engine');
+  assertNoEvent(minusCounterDeathSpreader, largeMinusCounterTokenEngine, 'enable:minus-counter-death→token-loop');
+
+  const namedCounterTokenEngine = node('Named Counter Token Engine', 'Creature — Treefolk', 'Whenever one or more +1/+1 counters are put on Named Counter Token Engine, create a 1/1 green Squirrel creature token.');
+  const creatureEtbLifegain = node('Creature ETB Lifegain Payoff', 'Creature — Cleric', 'Whenever another creature enters the battlefield under your control, you gain 1 life.');
+  const oncePerTurnCreatureEtbLifegain = node('Once-Per-Turn ETB Lifegain Payoff', 'Creature — Cleric', 'Whenever another creature enters the battlefield under your control, you gain 1 life. This ability triggers only once each turn.');
+  assertHasCap(namedCounterTokenEngine, 'is-counter-to-creature-token-engine');
+  assertHasCap(creatureEtbLifegain, 'is-creature-etb-lifegain-payoff');
+  assertNoCap(oncePerTurnCreatureEtbLifegain, 'is-creature-etb-lifegain-payoff');
+  assertHasCap(lifelinkCounterEngine, 'lifegain-counter-target:creature-or-enchantment');
+
+  const deathUntapPinger = node('Death Untap Pinger', 'Creature — Goblin', "This creature doesn't untap during your untap step. Whenever a creature dies, untap this creature. {T}: This creature deals 1 damage to any target.");
+  const deathtouchEquipment = node('Deathtouch Equipment', 'Artifact — Equipment', 'Equipped creature has deathtouch. Equip {2}');
+  const freePingEquipment = node('Free Ping Equipment', 'Artifact — Equipment', 'Equipped creature has "{T}: This creature deals 1 damage to any target." Equip {3}');
+  const deathUntapEquipment = node('Death Untap Equipment', 'Artifact — Equipment', 'Equipped creature has "Whenever a creature dies, untap this creature." Equip {4}');
+  const oncePerTurnDeathUntapEquipment = node('Once-Per-Turn Death Untap Equipment', 'Artifact — Equipment', 'Equipped creature has "Whenever a creature dies, untap this creature. This ability triggers only once each turn." Equip {4}');
+  const costedPingEquipment = node('Costed Ping Equipment', 'Artifact — Equipment', 'Equipped creature has "{2}, {T}: This creature deals 1 damage to any target." Equip {4}');
+  assertHasCap(deathUntapPinger, 'has-free-creature-ping');
+  assertHasCap(deathUntapPinger, 'has-death-untap-self');
+  assertHasCap(deathtouchEquipment, 'grants-deathtouch-to-equipped-creature');
+  assertHasCap(freePingEquipment, 'grants-free-ping-to-equipped-creature');
+  assertHasCap(deathUntapEquipment, 'grants-death-untap-to-equipped-creature');
+  assertNoCap(oncePerTurnDeathUntapEquipment, 'grants-death-untap-to-equipped-creature');
+  assertNoCap(costedPingEquipment, 'grants-free-ping-to-equipped-creature');
 
   const recursiveBody = node('Recursive Body', 'Creature — Zombie', 'You may cast this card from your graveyard.', 1, '{B}');
   const conditionalRecursiveBody = node('Conditional Recursive Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control another creature.', 1, '{B}');
@@ -407,6 +531,9 @@ When Gilded Goose enters, create a Food token.
   const expensiveRecursiveBody = node('Expensive Recursive Body', 'Creature — Skeleton', 'You may cast this card from your graveyard.', 3);
   const coloredRecursiveBody = node('Colored Recursive Body', 'Creature — Skeleton', '{1}{B}: Return this creature from your graveyard to the battlefield.', 2);
   const colorlessSacOutlet = node('Colorless Mana Sac Outlet', 'Artifact', 'Sacrifice a creature: Add {C}{C}.', 3);
+  const recursiveExileCreature = node('Recursive Exile Creature', 'Creature — Elemental', 'You may cast this card from exile.', 3, '{2}{R}');
+  const conditionalExileCreature = node('Conditional Exile Creature', 'Creature — Elemental', 'You may cast this card from exile if it was foretold.', 3, '{2}{R}');
+  const creatureExileCastManaOutlet = node('Creature Exile Cast Mana Outlet', 'Enchantment', "Exile a creature you control: Add X mana of any one color, where X is 1 plus the exiled creature's mana value. Spend this mana only to cast creature spells.", 3);
   assertHasCap(recursiveBody, 'is-recursive-body');
   assertHasCap(recursiveBody, 'recursive-body-cost:1');
   assertHasCap(recursiveBody, 'recursive-body-color-b:1');
@@ -416,9 +543,21 @@ When Gilded Goose enters, create a Food token.
   assertHasCap(manaSacOutlet, 'sac-outlet-mana-any:1');
   assertHasCap(coloredRecursiveBody, 'recursive-body-color-b:1');
   assertHasCap(colorlessSacOutlet, 'sac-outlet-mana-c:2');
+  assertHasCap(recursiveExileCreature, 'is-recursive-exile-cast-body');
+  assertHasCap(recursiveExileCreature, 'recursive-exile-body-cost:3');
+  assertHasCap(recursiveExileCreature, 'recursive-exile-body-generic-cost:2');
+  assertHasCap(recursiveExileCreature, 'recursive-exile-body-color-r:1');
+  assertNoCap(conditionalExileCreature, 'is-recursive-exile-cast-body');
+  assertHasCap(conditionalExileCreature, 'is-origin-bound-exile-cast-body');
+  assertHasCap(creatureExileCastManaOutlet, 'is-creature-exile-cast-mana-outlet');
+  assertHasCap(creatureExileCastManaOutlet, 'creature-exile-cast-mana-surplus:1');
   assertHasInteraction(recursiveBody, manaSacOutlet,
     it => it.family === 'recursive-body-sacrifice-mana-loop' && it.strength === 'combo-critical' && it.evidence.bodyCost === 1,
     'recursive body plus mana sacrifice outlet should be detected when mana covers recursion cost');
+  assertHasInteraction(creatureExileCastManaOutlet, recursiveExileCreature,
+    it => it.family === 'exile-recast-creature-mana-loop' && it.strength === 'combo-critical',
+    'creature-only exile mana outlet plus creature castable from exile should be detected without card names');
+  assertNoEvent(creatureExileCastManaOutlet, conditionalExileCreature, 'enable:exile-recast-creature-mana-loop');
   assertHasInteraction(conditionalRecursiveBody, creatureManaSacOutlet,
     it => it.family === 'recursive-body-sacrifice-mana-loop' && it.strength === 'combo-critical' && it.evidence.recursionPreconditionSatisfied === true,
     'recursive body with another-creature precondition should require another creature in the package');
@@ -488,13 +627,19 @@ When Gilded Goose enters, create a Food token.
 
   const halfLibraryMill = node('Half-Library Mill', 'Sorcery', 'Target player mills half their library, rounded up.');
   const millMultiplier = node('Mill Multiplier', 'Enchantment', 'If an opponent would mill one or more cards, that player mills twice that many cards instead.');
+  const delayedMillEqualizer = node('Delayed Mill Equalizer', 'Enchantment — Aura Curse', "Enchant player At the beginning of each end step, enchanted player mills X cards, where X is the number of cards put into their graveyard from anywhere this turn.");
   const smallMill = node('Small Mill', 'Sorcery', 'Target player mills three cards.');
   assertHasCap(halfLibraryMill, 'is-half-library-mill-source');
   assertHasCap(millMultiplier, 'is-mill-multiplier');
+  assertHasCap(delayedMillEqualizer, 'is-delayed-same-turn-mill-payoff');
   assertHasInteraction(halfLibraryMill, millMultiplier,
     it => it.family === 'mill-multiplier-finite-mill' && it.strength === 'combo-critical',
     'half-library mill plus mill multiplier should be a finite mill threshold signal');
+  assertHasInteraction(halfLibraryMill, delayedMillEqualizer,
+    it => it.family === 'delayed-mill-equalizer-finite-mill' && it.strength === 'combo-critical',
+    'half-library mill plus delayed same-turn mill payoff should be a finite mill threshold signal');
   assertNoEvent(smallMill, millMultiplier, 'enable:mill-multiplier-finite-mill');
+  assertNoEvent(smallMill, delayedMillEqualizer, 'enable:delayed-mill-equalizer-finite-mill');
 
   const etbCreatureBlinker = node('ETB Creature Blinker', 'Creature — Angel', 'Flying When this creature enters the battlefield, exile another target creature you control, then return that card to the battlefield under its owner’s control.');
   const etbPermanentBlinker = node('ETB Permanent Blinker', 'Creature — Cat Beast', 'When this creature enters the battlefield, exile another target permanent you control, then return that card to the battlefield under its owner’s control.');

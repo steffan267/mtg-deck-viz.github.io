@@ -121,8 +121,60 @@ function seedCandidates(indexes, options) {
 
   pairCandidates(
     candidates,
+    capabilityIds(indexes, 'is-self-copying-targeted-spell'),
+    capabilityIds(indexes, 'is-magecraft-drain-payoff'),
+  );
+
+  pairCandidates(
+    candidates,
     capabilityIds(indexes, 'is-lifelink-counter-engine'),
     capabilityIds(indexes, 'is-counter-to-damage-source'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-counter-to-creature-token-engine'),
+    capabilityIds(indexes, 'is-creature-etb-counter-granter'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-minus-counter-death-spreader'),
+    capabilityIds(indexes, 'is-minus-counter-to-1-1-token-engine'),
+  );
+
+  for (const tokenEngine of capabilityIds(indexes, 'is-counter-to-creature-token-engine')) {
+    for (const counterPayoff of capabilityIds(indexes, 'is-lifegain-to-counter-payoff')) {
+      for (const lifegainer of capabilityIds(indexes, 'is-creature-etb-lifegain-payoff')) {
+        addCandidate(candidates, [tokenEngine, counterPayoff, lifegainer]);
+      }
+    }
+  }
+
+  const freePingers = sortedUnique([
+    ...capabilityIds(indexes, 'has-free-creature-ping'),
+    ...capabilityIds(indexes, 'grants-free-ping-to-equipped-creature'),
+  ]);
+  const deathUntappers = sortedUnique([
+    ...capabilityIds(indexes, 'has-death-untap-self'),
+    ...capabilityIds(indexes, 'grants-death-untap-to-equipped-creature'),
+  ]);
+  const deathtouchers = sortedUnique([
+    ...capabilityIds(indexes, 'has-deathtouch'),
+    ...capabilityIds(indexes, 'grants-deathtouch-to-equipped-creature'),
+  ]);
+  for (const pinger of freePingers) {
+    for (const untapper of deathUntappers) {
+      for (const deathtoucher of deathtouchers) {
+        addCandidate(candidates, [pinger, untapper, deathtoucher]);
+      }
+    }
+  }
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-life-paid-damage-source'),
+    capabilityIds(indexes, 'is-lifegain-from-opponent-lifeloss'),
   );
 
   pairCandidates(
@@ -135,6 +187,12 @@ function seedCandidates(indexes, options) {
     candidates,
     capabilityIds(indexes, 'is-half-library-mill-source'),
     capabilityIds(indexes, 'is-mill-multiplier'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-half-library-mill-source'),
+    capabilityIds(indexes, 'is-delayed-same-turn-mill-payoff'),
   );
 
   const recursiveBodies = capabilityIds(indexes, 'is-recursive-body');
@@ -198,14 +256,41 @@ function seedCandidates(indexes, options) {
 
   pairCandidates(
     candidates,
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-cost-reducer'),
+      ...capabilityIds(indexes, 'is-artifact-activated-ability-cost-reducer'),
+    ]),
+    capabilityIds(indexes, 'is-self-untapper'),
+  );
+
+  pairCandidates(
+    candidates,
     capabilityIds(indexes, 'is-repeatable-hasty-creature-copy'),
     capabilityIds(indexes, 'etb-untaps-permanent'),
   );
 
   pairCandidates(
     candidates,
+    capabilityIds(indexes, 'is-combat-copy-token-equipment'),
+    capabilityIds(indexes, 'is-attack-extra-combat-source'),
+  );
+
+  pairCandidates(
+    candidates,
     capabilityIds(indexes, 'is-etb-spell-copier'),
     capabilityIds(indexes, 'is-hasty-creature-copy-spell'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-etb-spell-copier'),
+    capabilityIds(indexes, 'is-death-copy-creature-spell'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-creature-exile-cast-mana-outlet'),
+    capabilityIds(indexes, 'is-recursive-exile-cast-body'),
   );
 
   for (const card of indexes.cards) {

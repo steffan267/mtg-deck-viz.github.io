@@ -49,9 +49,9 @@ const RESULT_CLASS_PATTERNS = [
   { id: 'infinite-self-discard', re: /self-discard triggers/i },
   { id: 'infinite-proliferate', re: /infinite proliferate/i },
   { id: 'infinite-pump', re: /infinitely (large|powerful).*creatures?|infinite power and toughness/i },
-  { id: 'lock', re: /\block\b|mass land denial|skip your draw steps|prevent all damage|destroy all creatures opponents control/i },
+  { id: 'lock', re: /\block\b|mass land denial|skip your draw steps|(?:target opponent |opponents?|players?) skip (?:their|all) (?:un)?tap steps|opponents skip their draw steps?|target opponent skips their draw step|prevent all damage|you (?:can'?t be attacked|have protection from everything)|counter all spells opponents cast|(?:opponents?|players?) can(?:not|'?t) (?:cast spells|draw cards|search libraries|attack|tap lands for mana)|(?:opponents?|players?) can only cast one spell per turn|creatures can(?:not|'?t) attack|activated abilities can(?:not|'?t) be activated|lands (?:do not|don'?t) untap|creatures (?:do not|don'?t) untap|lands can(?:not|'?t) enter|destroy (?:each|all) creatures? that enters? the battlefield under an opponent'?s control|destroy all creatures opponents control(?: whenever a creature enters the battlefield)?|destroy all permanents opponents control(?: on each of your turns| each turn)?/i },
   { id: 'infinite-turns', re: /infinite turns/i },
-  { id: 'mass-reanimate', re: /return all creature cards from all graveyards/i },
+  { id: 'mass-reanimate', re: /return all creature cards from (?:all|your) graveyards? to the battlefield|return some creature cards from your graveyard to the battlefield|put all creature cards from each opponent'?s graveyard onto the battlefield under your control|return all nonland permanents from your graveyard to the battlefield/i },
 ];
 
 const FAMILY_CLASS_ALIASES = {
@@ -90,6 +90,9 @@ const EDGE_RESULT_CLASS_MAP = {
   tokens: ['infinite-tokens'],
   'token-production→amplifier': ['infinite-tokens'],
   'token-production→replacement': ['infinite-tokens'],
+  'life-paid-damage-lifeloss-recovery-loop': ['infinite-damage', 'infinite-life'],
+  'exile-recast-creature-mana-loop': ['infinite-cast', 'infinite-etb', 'infinite-ltb'],
+  'counter-token→etb-counter-loop': ['infinite-counters', 'infinite-etb', 'infinite-tokens'],
   'go-wide→payoff': ['infinite-pump', 'infinite-tokens'],
   landfall: ['infinite-etb', 'infinite-landfall', 'infinite-tokens'],
   'land-recursion→landfall': ['infinite-etb', 'infinite-landfall'],
@@ -257,6 +260,16 @@ function drawToDamageAcceptsYourDraw(card) {
   return hasCap(card, 'draw-to-damage-subject:you') || hasCap(card, 'draw-to-damage-subject:each');
 }
 
+function damageToDrawAppliesToSource(damageToDraw, source) {
+  if (hasCap(damageToDraw, 'damage-to-draw-scope:source-you-control')) return true;
+  if (hasCap(damageToDraw, 'damage-to-draw-scope:enchanted-creature')
+      || hasCap(damageToDraw, 'damage-to-draw-scope:equipped-creature')
+      || hasCap(damageToDraw, 'damage-to-draw-scope:paired-creature-grant')) {
+    return MODEL.faceCompatibleCaps(source, ['is-creature-permanent', 'is-draw-to-damage-payoff']);
+  }
+  return false;
+}
+
 function etbBlinkCanTarget(blinker, target) {
   return MODEL.canEtbBlinkTarget(blinker, target);
 }
@@ -281,11 +294,10 @@ function hastyCopyCanTarget(copier, target, extraTargetCaps = []) {
 
 function hastyCopySpellCanTarget(copySpell, target, extraTargetCaps = []) {
   if (!hasCap(copySpell, 'hasty-copy-spell-target-creature')) return false;
-  const targetCaps = ['is-creature-permanent', ...extraTargetCaps];
-  if (hasCap(copySpell, 'hasty-copy-spell-target-requires-nonlegendary')) targetCaps.push('is-nonlegendary-permanent');
+  const targetCaps = ['is-creature-permanent', 'is-nonlegendary-permanent', ...extraTargetCaps];
   if (!MODEL.faceCompatibleCaps(target, targetCaps)) return false;
   if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
-  if (!target?.faceFacts?.length && hasCap(copySpell, 'hasty-copy-spell-target-requires-nonlegendary') && isLegendaryPermanent(target)) return false;
+  if (!target?.faceFacts?.length && isLegendaryPermanent(target)) return false;
   return true;
 }
 
@@ -330,6 +342,41 @@ function hasLifelinkCounterDamageLoop(cards) {
       && MODEL.faceCompatibleCaps(source, ['is-creature-permanent', 'is-counter-to-damage-source'])));
 }
 
+function capSuffixes(card, prefix) {
+  return (card.caps || [])
+    .filter(cap => cap.startsWith(prefix))
+    .map(cap => cap.slice(prefix.length));
+}
+
+function counterTokenCanTriggerGranter(tokenEngine, granter) {
+  const tokenColors = capSuffixes(tokenEngine, 'counter-token-color:');
+  const accepted = capSuffixes(granter, 'etb-counter-granter-token-color:');
+  if (!tokenColors.length || !accepted.length) return false;
+  if (accepted.includes('any')) return !tokenColors.includes('unknown');
+  return accepted.some(color => tokenColors.includes(color));
+}
+
+function hasCounterTokenEtbCounterLoop(cards) {
+  return cards.some(tokenEngine => hasCap(tokenEngine, 'is-counter-to-creature-token-engine')
+    && MODEL.faceCompatibleCaps(tokenEngine, ['is-creature-permanent', 'is-counter-to-creature-token-engine'])
+    && cards.some(granter => granter !== tokenEngine
+      && hasCap(granter, 'is-creature-etb-counter-granter')
+      && counterTokenCanTriggerGranter(tokenEngine, granter)));
+}
+
+function lifegainCounterCanTargetEngine(counterPayoff, tokenEngine) {
+  const targets = capSuffixes(counterPayoff, 'lifegain-counter-target:');
+  if (!targets.includes('creature') && !targets.includes('creature-or-enchantment')) return false;
+  return MODEL.faceCompatibleCaps(tokenEngine, ['is-creature-permanent', 'is-counter-to-creature-token-engine']);
+}
+
+function hasLifegainCounterTokenEtbLoop(cards) {
+  return cards.some(tokenEngine => hasCap(tokenEngine, 'is-counter-to-creature-token-engine')
+    && cards.some(counterPayoff => hasCap(counterPayoff, 'is-lifegain-to-counter-payoff')
+      && lifegainCounterCanTargetEngine(counterPayoff, tokenEngine)
+      && cards.some(lifegainer => hasCap(lifegainer, 'is-creature-etb-lifegain-payoff'))));
+}
+
 function detectCapabilityFamilies(nodes) {
   const cards = (nodes || []).filter(node => node && node.role !== 'zone');
   const families = new Set();
@@ -338,13 +385,35 @@ function detectCapabilityFamilies(nodes) {
   if (cards.some(c => hasCap(c, 'is-activated-ability-copier')) && cards.some(c => hasCap(c, 'is-self-untapper'))) families.add('self-untap-mana→ability-copy-loop');
   if (cards.some(copier => hasCap(copier, 'is-repeatable-hasty-creature-copy')
     && cards.some(untapper => untapper !== copier && hasCap(untapper, 'etb-untaps-permanent') && hastyCopyCanTarget(copier, untapper, ['etb-untaps-permanent'])))) families.add('hasty-copy→etb-untap-loop');
+  if (cards.some(copier => hasCap(copier, 'is-combat-copy-token-equipment') && hasCap(copier, 'combat-copy-token-haste') && hasCap(copier, 'combat-copy-token-nonlegendary')
+    && cards.some(attacker => attacker !== copier
+      && hasCap(attacker, 'is-attack-extra-combat-source')
+      && hasCap(attacker, 'extra-combat-repeatable-with-fresh-token')
+      && MODEL.faceCompatibleCaps(attacker, ['is-creature-permanent', 'is-attack-extra-combat-source'])))) families.add('combat-copy-token→extra-combat-loop');
   if (cards.some(spellCopier => hasCap(spellCopier, 'is-etb-spell-copier')
     && cards.some(copySpell => copySpell !== spellCopier && hasCap(copySpell, 'is-hasty-creature-copy-spell') && hastyCopySpellCanTarget(copySpell, spellCopier, ['is-etb-spell-copier'])))) families.add('spell-copy-etb→creature-copy-spell-loop');
-  if (cards.some(c => hasCap(c, 'is-draw-to-damage-payoff') && drawToDamageAcceptsYourDraw(c)) && cards.some(c => hasCap(c, 'is-damage-to-draw-payoff'))) families.add('draw-damage-feedback-loop');
+  if (cards.some(spellCopier => hasCap(spellCopier, 'is-etb-spell-copier')
+    && MODEL.faceCompatibleCaps(spellCopier, ['is-creature-permanent', 'is-nonlegendary-permanent', 'is-etb-spell-copier'])
+    && cards.some(copySpell => copySpell !== spellCopier && hasCap(copySpell, 'is-death-copy-creature-spell')))) families.add('death-copy-spell-etb-copy-loop');
+  if (cards.some(drawToDamage => hasCap(drawToDamage, 'is-draw-to-damage-payoff')
+    && drawToDamageAcceptsYourDraw(drawToDamage)
+    && cards.some(damageToDraw => damageToDraw !== drawToDamage
+      && hasCap(damageToDraw, 'is-damage-to-draw-payoff')
+      && damageToDrawAppliesToSource(damageToDraw, drawToDamage)))) families.add('draw-damage-feedback-loop');
+  if (cards.some(c => hasCap(c, 'is-self-copying-targeted-spell')) && cards.some(c => hasCap(c, 'is-magecraft-drain-payoff'))) families.add('self-copy-spell→magecraft-drain-loop');
   if (hasLifelinkCounterDamageLoop(cards)) families.add('lifelink-counter-damage-loop');
+  if (hasCounterTokenEtbCounterLoop(cards)) families.add('counter-token→etb-counter-loop');
+  if (hasLifegainCounterTokenEtbLoop(cards)) families.add('lifegain-counter-token-etb-loop');
+  if (cards.some(c => hasCap(c, 'is-minus-counter-death-spreader'))
+      && cards.some(c => hasCap(c, 'is-minus-counter-to-1-1-token-engine'))) families.add('minus-counter-death→token-loop');
+  if (cards.some(c => hasCap(c, 'is-life-paid-damage-source') && hasCap(c, 'life-paid-damage-can-hit-opponent'))
+      && cards.some(c => hasCap(c, 'is-lifegain-from-opponent-lifeloss'))) families.add('life-paid-damage-lifeloss-recovery-loop');
+  if (cards.some(c => hasCap(c, 'is-creature-exile-cast-mana-outlet'))
+      && cards.some(c => hasCap(c, 'is-recursive-exile-cast-body') && MODEL.faceCompatibleCaps(c, ['is-creature-permanent', 'is-recursive-exile-cast-body']))) families.add('exile-recast-creature-mana-loop');
   if (cards.some(c => hasCap(c, 'is-mill-to-lifeloss-payoff')) && cards.some(c => hasCap(c, 'is-lifeloss-to-mill-payoff'))) families.add('mill-lifeloss-feedback-loop');
   if (cards.some(c => hasCap(c, 'is-mass-opponent-draw-source')) && cards.some(c => hasCap(c, 'is-opponent-draw-punisher'))) families.add('opponent-draw-punisher-win');
   if (cards.some(c => hasCap(c, 'is-half-library-mill-source')) && cards.some(c => hasCap(c, 'is-mill-multiplier'))) families.add('mill-multiplier-finite-mill');
+  if (cards.some(c => hasCap(c, 'is-half-library-mill-source')) && cards.some(c => hasCap(c, 'is-delayed-same-turn-mill-payoff'))) families.add('delayed-mill-equalizer-finite-mill');
   if (hasMutualEtbBlinkReset(cards)) families.add('mutual-etb-blink-reset-loop');
   if (hasAmplifiedSelfUntapLoop(cards)) families.add('self-untap-mana-loop');
   if (hasTokenReplacementSacrificeManaLoop(cards)) families.add('token-replacement-sacrifice-mana-loop');
@@ -394,6 +463,7 @@ const PROOF_DELTA_CLASS_MAP = {
   ltbTriggers: 'infinite-ltb',
   casts: 'infinite-cast',
   untaps: 'infinite-untap',
+  combatPhases: 'combat',
 };
 
 function classesForProofDeltas(proofs) {
@@ -532,6 +602,7 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
     resolvedResultCoverage: { considered: 0, coveredAny: 0, missedAll: 0 },
     expectedClassCoverage: { considered: 0, coveredAny: 0, missedAll: 0, unclassifiedExpected: 0 },
     proofOnlyExpectedClassCoverage: { considered: 0, coveredAny: 0, missedAll: 0, unclassifiedExpected: 0 },
+    coverageBlockers: { totalExpectedMisses: 0, byBlocker: {}, byResolvedBlocker: {}, topMissedClassByBlocker: {} },
   };
   for (const item of evaluations) {
     if (item.resolvedAll) {
@@ -554,7 +625,15 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
     if (item.expectedClasses.length) {
       summary.expectedClassCoverage.considered++;
       if (item.resultCoverage.coveredAny) summary.expectedClassCoverage.coveredAny++;
-      else summary.expectedClassCoverage.missedAll++;
+      else {
+        summary.expectedClassCoverage.missedAll++;
+        const blocker = coverageBlockerForItem(item);
+        summary.coverageBlockers.totalExpectedMisses++;
+        increment(summary.coverageBlockers.byBlocker, blocker);
+        if (item.resolvedAll) increment(summary.coverageBlockers.byResolvedBlocker, blocker);
+        if (!summary.coverageBlockers.topMissedClassByBlocker[blocker]) summary.coverageBlockers.topMissedClassByBlocker[blocker] = {};
+        for (const cls of item.resultCoverage.missed || []) increment(summary.coverageBlockers.topMissedClassByBlocker[blocker], cls);
+      }
       summary.proofOnlyExpectedClassCoverage.considered++;
       if (item.proofOnlyResultCoverage.coveredAny) summary.proofOnlyExpectedClassCoverage.coveredAny++;
       else summary.proofOnlyExpectedClassCoverage.missedAll++;
@@ -571,7 +650,22 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
   summary.proofOnlyExpectedClassCoverage.coveredAnyPct = percent(summary.proofOnlyExpectedClassCoverage.coveredAny, summary.proofOnlyExpectedClassCoverage.considered);
   summary.topFamilySignals = Object.fromEntries(Object.entries(summary.topFamilySignals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
   summary.unmappedResultLabels.topLabels = Object.fromEntries(Object.entries(summary.unmappedResultLabels.topLabels).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+  summary.coverageBlockers.byBlocker = Object.fromEntries(Object.entries(summary.coverageBlockers.byBlocker).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+  summary.coverageBlockers.byResolvedBlocker = Object.fromEntries(Object.entries(summary.coverageBlockers.byResolvedBlocker).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+  summary.coverageBlockers.topMissedClassByBlocker = Object.fromEntries(Object.entries(summary.coverageBlockers.topMissedClassByBlocker)
+    .map(([blocker, classes]) => [blocker, Object.fromEntries(Object.entries(classes).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12))])
+    .sort((a, b) => a[0].localeCompare(b[0])));
   return summary;
+}
+
+function coverageBlockerForItem(item) {
+  if (!item.expectedClasses.length || item.resultCoverage.coveredAny !== false) return null;
+  if (!item.resolvedAll) return 'missing-card-data';
+  if (item.proofStatus === 'bounded-out' || item.bucket === 'bounded-out') return 'proof-size-bound';
+  if (item.bucket === 'proved') return 'proved-result-axis-mismatch';
+  if (item.familySignals.length && item.proofStatus !== 'proven') return 'semantic-system-needed-classified';
+  if (item.graphEdgeCount) return 'generic-edge-no-result-class';
+  return 'no-current-signal';
 }
 
 function edgeCaseReason(item) {
@@ -653,6 +747,12 @@ function renderMarkdown(payload) {
   lines.push('');
   lines.push(markdownTable(countRows(summary.byProofStatus), ['key', 'count']));
   lines.push('');
+  lines.push('## Coverage blockers for expected misses');
+  lines.push('');
+  lines.push(`Every expected-class miss is assigned to exactly one blocker category. Reconciled misses: **${summary.coverageBlockers.totalExpectedMisses}/${summary.expectedClassCoverage.missedAll}**.`);
+  lines.push('');
+  lines.push(markdownTable(countRows(summary.coverageBlockers.byBlocker), ['key', 'count']));
+  lines.push('');
   lines.push('## Card counts');
   lines.push('');
   lines.push(markdownTable(countRows(summary.byCardCount), ['key', 'count']));
@@ -723,6 +823,7 @@ else module.exports = {
   classifyResultLabelsDetailed,
   classesForEdgeFamilies,
   classesForProofDeltas,
+  coverageBlockerForItem,
   detectCapabilityFamilies,
   evaluateCombo,
   resultCoverage,

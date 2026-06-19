@@ -90,12 +90,40 @@ const noncombatDrawDamageLoop = provePackage([
 assert.equal(noncombatDrawDamageLoop.status, 'proven');
 assert.ok(proofByFamily(noncombatDrawDamageLoop, 'draw-damage-feedback-loop'));
 
+const pairedCreatureDrawDamageLoop = provePackage([
+  card('Draw Damage Creature', 'Legendary Creature — Dragon Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.', 6),
+  card('Paired Creature Damage Draw', 'Creature — Human Scout', 'Soulbond. As long as this creature is paired with another creature, each of those creatures has "Whenever this creature deals damage to an opponent, draw a card."', 3),
+]);
+assert.equal(pairedCreatureDrawDamageLoop.status, 'proven');
+assert.ok(proofByFamily(pairedCreatureDrawDamageLoop, 'draw-damage-feedback-loop'));
+
 const opponentDrawDamageNearMiss = provePackage([
   card('Opponent Draw Damage Engine', 'Creature — Devil', 'Whenever an opponent draws a card, this creature deals 1 damage to any target.', 3),
   card('Damage Draw Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.', 1),
 ]);
 assert.equal(opponentDrawDamageNearMiss.status, 'not-repeatable');
 assert.ok(opponentDrawDamageNearMiss.rejections.some(rejection => /does not react to your draws/.test(rejection.reason)));
+
+const drawDamageScopeNearMiss = provePackage([
+  card('Draw Damage Engine', 'Legendary Creature — Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.', 6),
+  card('Self Damage Draw Payoff', 'Creature — Human Wizard', 'Whenever this creature deals damage to an opponent, draw a card.', 2),
+]);
+assert.equal(drawDamageScopeNearMiss.status, 'not-repeatable');
+assert.ok(drawDamageScopeNearMiss.rejections.some(rejection => /does not apply/.test(rejection.reason)));
+
+const selfCopySpellMagecraftDrainLoop = provePackage([
+  card('Self-Copying Targeted Spell', 'Sorcery', 'Target player discards two cards. That player may copy this spell and may choose a new target for that copy.', 2),
+  card('Magecraft Drain Payoff', 'Creature — Human Druid', 'Magecraft — Whenever you cast or copy an instant or sorcery spell, each opponent loses 1 life and you gain 1 life.', 2),
+]);
+assert.equal(selfCopySpellMagecraftDrainLoop.status, 'proven');
+assert.ok(proofByFamily(selfCopySpellMagecraftDrainLoop, 'self-copy-spell→magecraft-drain-loop'));
+assert.ok(proofByFamily(selfCopySpellMagecraftDrainLoop, 'self-copy-spell→magecraft-drain-loop').positiveDeltas.some(delta => delta.resource === 'opponentLife'));
+
+const selfCopySpellNonDrainNearMiss = provePackage([
+  card('Self-Copying Targeted Spell', 'Sorcery', 'Target player discards two cards. That player may copy this spell and may choose a new target for that copy.', 2),
+  card('Magecraft Token Payoff', 'Creature — Human Wizard', 'Magecraft — Whenever you cast or copy an instant or sorcery spell, create a 1/1 creature token.', 2),
+]);
+assert.notEqual(selfCopySpellNonDrainNearMiss.status, 'proven');
 
 const lifelinkCounterDamageLoop = provePackage([
   card('Lifelink Counter Engine', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.', 3),
@@ -110,6 +138,105 @@ const lifelinkCounterDamageNearMiss = provePackage([
   card('Counter Damage Artifact', 'Artifact', 'This artifact enters with X +1/+1 counters on it. Remove a +1/+1 counter from this artifact: It deals 1 damage to any target.', 0),
 ]);
 assert.notEqual(lifelinkCounterDamageNearMiss.status, 'proven');
+
+const lifePaidDamageRecoveryLoop = provePackage([
+  card('Life-Paid Damage Source', 'Artifact', 'Pay 50 life: This artifact deals 50 damage to any target.', 4),
+  card('Opponent Loss Lifegain Payoff', 'Enchantment', 'Whenever an opponent loses life, you gain that much life.', 5),
+]);
+assert.equal(lifePaidDamageRecoveryLoop.status, 'proven');
+assert.ok(proofByFamily(lifePaidDamageRecoveryLoop, 'life-paid-damage-lifeloss-recovery-loop'));
+assert.ok(proofByFamily(lifePaidDamageRecoveryLoop, 'life-paid-damage-lifeloss-recovery-loop').positiveDeltas.some(delta => delta.resource === 'damage'));
+
+const tappedLifePaidDamageNearMiss = provePackage([
+  card('Tapped Life-Paid Damage Source', 'Artifact', '{T}, Pay 50 life: This artifact deals 50 damage to any target.', 4),
+  card('Opponent Loss Lifegain Payoff', 'Enchantment', 'Whenever an opponent loses life, you gain that much life.', 5),
+]);
+assert.notEqual(tappedLifePaidDamageNearMiss.status, 'proven');
+assert.equal(proofByFamily(tappedLifePaidDamageNearMiss, 'life-paid-damage-lifeloss-recovery-loop'), undefined);
+
+const counterTokenEtbCounterLoop = provePackage([
+  card('Counter Token Engine', 'Creature — Plant', 'Whenever one or more +1/+1 counters are put on this creature, create a 1/1 green Saproling creature token.', 3),
+  card('Green ETB Counter Granter', 'Creature — Elf', 'Whenever another green creature you control enters, put a +1/+1 counter on target creature.', 4),
+]);
+assert.equal(counterTokenEtbCounterLoop.status, 'proven');
+const counterTokenProof = proofByFamily(counterTokenEtbCounterLoop, 'counter-token→etb-counter-loop');
+assert.ok(counterTokenProof);
+assert.ok(counterTokenProof.positiveDeltas.some(delta => delta.resource === 'tokens'));
+assert.ok(counterTokenProof.positiveDeltas.some(delta => delta.resource === 'counters'));
+
+const counterTokenColorNearMiss = provePackage([
+  card('Colorless Counter Token Engine', 'Creature — Eldrazi', 'Whenever one or more +1/+1 counters are put on this creature, create a 0/1 colorless Eldrazi Spawn creature token.', 2),
+  card('Green ETB Counter Granter', 'Creature — Elf', 'Whenever another green creature you control enters, put a +1/+1 counter on target creature.', 4),
+]);
+assert.notEqual(counterTokenColorNearMiss.status, 'proven');
+assert.equal(proofByFamily(counterTokenColorNearMiss, 'counter-token→etb-counter-loop'), undefined);
+
+const minusCounterDeathTokenLoop = provePackage([
+  card('Minus Counter Death Spreader', 'Enchantment', 'Whenever a creature dies, if it had a -1/-1 counter on it, put a -1/-1 counter on target creature.', 3),
+  card('Minus Counter Token Engine', 'Enchantment', 'Whenever you put one or more -1/-1 counters on a creature, create that many 1/1 black Insect creature tokens.', 3),
+]);
+assert.equal(minusCounterDeathTokenLoop.status, 'proven');
+const minusCounterProof = proofByFamily(minusCounterDeathTokenLoop, 'minus-counter-death→token-loop');
+assert.ok(minusCounterProof);
+assert.ok(minusCounterProof.positiveDeltas.some(delta => delta.resource === 'deathTriggers'));
+
+const lifegainCounterTokenEtbLoop = provePackage([
+  card('Named Counter Token Engine', 'Creature — Treefolk', 'Whenever one or more +1/+1 counters are put on Named Counter Token Engine, create a 1/1 green Squirrel creature token.', 3),
+  card('Lifegain Counter Payoff', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control.', 3),
+  card('Creature ETB Lifegain Payoff', 'Creature — Cleric', 'Whenever another creature enters the battlefield under your control, you gain 1 life.', 1),
+]);
+assert.equal(lifegainCounterTokenEtbLoop.status, 'proven');
+const lifegainCounterProof = proofByFamily(lifegainCounterTokenEtbLoop, 'lifegain-counter-token-etb-loop');
+assert.ok(lifegainCounterProof);
+assert.ok(lifegainCounterProof.positiveDeltas.some(delta => delta.resource === 'life'));
+assert.ok(lifegainCounterProof.positiveDeltas.some(delta => delta.resource === 'tokens'));
+
+const lifegainCounterOncePerTurnNearMiss = provePackage([
+  card('Named Counter Token Engine', 'Creature — Treefolk', 'Whenever one or more +1/+1 counters are put on Named Counter Token Engine, create a 1/1 green Squirrel creature token.', 3),
+  card('Lifegain Counter Payoff', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control.', 3),
+  card('Once-Per-Turn ETB Lifegain Payoff', 'Creature — Cleric', 'Whenever another creature enters the battlefield under your control, you gain 1 life. This ability triggers only once each turn.', 1),
+]);
+assert.notEqual(lifegainCounterOncePerTurnNearMiss.status, 'proven');
+assert.equal(proofByFamily(lifegainCounterOncePerTurnNearMiss, 'lifegain-counter-token-etb-loop'), undefined);
+
+const intrinsicDeathUntapPingerLock = provePackage([
+  card('Death Untap Pinger', 'Creature — Goblin', "This creature doesn't untap during your untap step. Whenever a creature dies, untap this creature. {T}: This creature deals 1 damage to any target.", 3),
+  card('Deathtouch Equipment', 'Artifact — Equipment', 'Equipped creature has deathtouch. Equip {2}', 1),
+]);
+assert.equal(intrinsicDeathUntapPingerLock.status, 'proven');
+assert.ok(proofByFamily(intrinsicDeathUntapPingerLock, 'death-untap-deathtouch-pinger-lock'));
+
+const grantedDeathUntapPingerLock = provePackage([
+  card('Death Untap Equipment', 'Artifact — Equipment', 'Equipped creature has "Whenever a creature dies, untap this creature." Equip {4}', 2),
+  card('Free Ping Equipment', 'Artifact — Equipment', 'Equipped creature has "{T}: This creature deals 1 damage to any target." Equip {3}', 1),
+  card('Deathtouch Equipment', 'Artifact — Equipment', 'Equipped creature has deathtouch. Equip {2}', 1),
+]);
+assert.equal(grantedDeathUntapPingerLock.status, 'proven');
+assert.ok(proofByFamily(grantedDeathUntapPingerLock, 'death-untap-deathtouch-pinger-lock'));
+
+const costedPingerNearMiss = provePackage([
+  card('Death Untap Equipment', 'Artifact — Equipment', 'Equipped creature has "Whenever a creature dies, untap this creature." Equip {4}', 2),
+  card('Costed Ping Equipment', 'Artifact — Equipment', 'Equipped creature has "{2}, {T}: This creature deals 1 damage to any target." Equip {4}', 2),
+  card('Deathtouch Equipment', 'Artifact — Equipment', 'Equipped creature has deathtouch. Equip {2}', 1),
+]);
+assert.notEqual(costedPingerNearMiss.status, 'proven');
+assert.equal(proofByFamily(costedPingerNearMiss, 'death-untap-deathtouch-pinger-lock'), undefined);
+
+const oncePerTurnDeathUntapNearMiss = provePackage([
+  card('Once-Per-Turn Death Untap Equipment', 'Artifact — Equipment', 'Equipped creature has "Whenever a creature dies, untap this creature. This ability triggers only once each turn." Equip {4}', 2),
+  card('Free Ping Equipment', 'Artifact — Equipment', 'Equipped creature has "{T}: This creature deals 1 damage to any target." Equip {3}', 1),
+  card('Deathtouch Equipment', 'Artifact — Equipment', 'Equipped creature has deathtouch. Equip {2}', 1),
+]);
+assert.notEqual(oncePerTurnDeathUntapNearMiss.status, 'proven');
+assert.equal(proofByFamily(oncePerTurnDeathUntapNearMiss, 'death-untap-deathtouch-pinger-lock'), undefined);
+
+const splitIntrinsicPingerUntapperNearMiss = provePackage([
+  card('Free Pinger Creature', 'Creature — Goblin', '{T}: This creature deals 1 damage to any target.', 1),
+  card('Death Untap Creature', 'Creature — Spirit', 'Whenever a creature dies, untap this creature.', 2),
+  card('Deathtouch Equipment', 'Artifact — Equipment', 'Equipped creature has deathtouch. Equip {2}', 1),
+]);
+assert.notEqual(splitIntrinsicPingerUntapperNearMiss.status, 'proven');
+assert.equal(proofByFamily(splitIntrinsicPingerUntapperNearMiss, 'death-untap-deathtouch-pinger-lock'), undefined, 'intrinsic ping and death-untap roles on different creatures must not be assembled into one source');
 
 const libraryWin = provePackage([
   card('Repeat Library Exiler', 'Instant', 'Exile the top card of your library. You may put that card into your hand unless it has the same name as another card exiled this way. Repeat this process until you put a card into your hand or exile two cards with the same name.', 2),
@@ -171,6 +298,28 @@ const colorlessAmplifierNearMiss = provePackage([
 assert.equal(colorlessAmplifierNearMiss.status, 'not-repeatable');
 assert.ok(colorlessAmplifierNearMiss.rejections.some(rejection => /self-untap cost/.test(rejection.reason)));
 
+const costReducedSelfUntapLoop = provePackage([
+  card('Self Untapping Artifact', 'Artifact', "This artifact doesn't untap during your untap step. {T}: Add {C}{C}{C}. {3}: Untap this artifact.", 3),
+  card('Artifact Ability Cost Reducer', 'Creature — Vedalken Artificer', "Activated abilities of artifacts you control cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.", 3),
+]);
+assert.equal(costReducedSelfUntapLoop.status, 'proven');
+assert.ok(proofByFamily(costReducedSelfUntapLoop, 'self-untap-mana-loop'));
+assert.deepEqual(proofByFamily(costReducedSelfUntapLoop, 'self-untap-mana-loop').positiveDeltas[0], { resource: 'mana', min: 1, max: 1 });
+
+const artifactReducerCreatureNearMiss = provePackage([
+  card('Self Untapping Creature', 'Creature — Elf Druid', '{T}: Add {G}{G}{G}. {3}: Untap this creature.', 3),
+  card('Artifact Ability Cost Reducer', 'Creature — Vedalken Artificer', "Activated abilities of artifacts you control cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.", 3),
+]);
+assert.equal(artifactReducerCreatureNearMiss.status, 'not-repeatable');
+assert.ok(artifactReducerCreatureNearMiss.rejections.some(rejection => /self-untap cost/.test(rejection.reason)));
+
+const artifactReducerMinimumCostNearMiss = provePackage([
+  card('One Mana Self Untapping Artifact', 'Artifact', '{T}: Add {C}. {1}: Untap this artifact.', 1),
+  card('Artifact Ability Cost Reducer', 'Creature — Vedalken Artificer', "Activated abilities of artifacts you control cost {3} less to activate. This effect can't reduce the mana in that cost to less than one mana.", 3),
+]);
+assert.equal(artifactReducerMinimumCostNearMiss.status, 'not-repeatable');
+assert.ok(artifactReducerMinimumCostNearMiss.rejections.some(rejection => /self-untap cost/.test(rejection.reason)));
+
 const hastyCopyLoop = provePackage([
   card('Hasty Copy Engine', 'Legendary Creature — Goblin Shaman', "{T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste.", 5),
   card('Permanent Untapper', 'Creature — Human Warrior', 'When this creature enters, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn.', 5),
@@ -209,6 +358,19 @@ const hastyCopyDfcFaceMismatch = provePackage([
 assert.equal(hastyCopyDfcFaceMismatch.status, 'not-repeatable');
 assert.ok(hastyCopyDfcFaceMismatch.rejections.some(rejection => /target restrictions|mutually exclusive faces/.test(rejection.reason)));
 
+const combatCopyExtraCombatLoop = provePackage([
+  card('Combat Copy Equipment', 'Legendary Artifact — Equipment', "At the beginning of combat on your turn, create a token that's a copy of equipped creature, except the token isn't legendary. That token gains haste. Equip {5}", 4),
+  card('First Attack Extra Combat', 'Legendary Creature — Angel', 'Haste. Whenever this creature attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.', 4),
+]);
+assert.equal(combatCopyExtraCombatLoop.status, 'proven');
+assert.ok(proofByFamily(combatCopyExtraCombatLoop, 'combat-copy-token→extra-combat-loop'));
+
+const combatCopyExtraCombatNearMiss = provePackage([
+  card('Combat Copy Equipment', 'Legendary Artifact — Equipment', "At the beginning of combat on your turn, create a token that's a copy of equipped creature, except the token isn't legendary. That token gains haste. Equip {5}", 4),
+  card('Vanilla Attacker', 'Creature — Human Warrior', 'Haste.', 2),
+]);
+assert.notEqual(combatCopyExtraCombatNearMiss.status, 'proven');
+
 const spellCopyLoop = provePackage([
   card('ETB Spell Copier', 'Creature — Human Wizard', 'Flash When this creature enters, copy target instant or sorcery spell. You may choose new targets for the copy.', 3),
   card('Hasty Creature Copy Spell', 'Sorcery', "Choose target creature you control. Create a token that's a copy of that creature, except it has haste. Exile it at the beginning of the next end step.", 2),
@@ -216,12 +378,33 @@ const spellCopyLoop = provePackage([
 assert.equal(spellCopyLoop.status, 'proven');
 assert.ok(proofByFamily(spellCopyLoop, 'spell-copy-etb→creature-copy-spell-loop'));
 
+const deathCopySpellEtbCopyLoop = provePackage([
+  card('ETB Spell Copier', 'Creature — Human Wizard', 'Flash When this creature enters, copy target instant or sorcery spell. You may choose new targets for the copy.', 3),
+  card('Death-Copy Creature Spell', 'Instant', 'Destroy target creature. If that creature dies this way, its controller creates two tokens that are copies of that creature.', 3),
+]);
+assert.equal(deathCopySpellEtbCopyLoop.status, 'proven');
+assert.ok(proofByFamily(deathCopySpellEtbCopyLoop, 'death-copy-spell-etb-copy-loop'));
+
+const deathCopyLegendaryNearMiss = provePackage([
+  card('Legendary ETB Spell Copier', 'Legendary Creature — Human Wizard', 'When this creature enters, copy target instant or sorcery spell. You may choose new targets for the copy.', 3),
+  card('Death-Copy Creature Spell', 'Instant', 'Destroy target creature. If that creature dies this way, its controller creates two tokens that are copies of that creature.', 3),
+]);
+assert.equal(deathCopyLegendaryNearMiss.status, 'not-repeatable');
+assert.ok(deathCopyLegendaryNearMiss.rejections.some(rejection => /nonlegendary/.test(rejection.reason)));
+
 const spellCopyArtifactNearMiss = provePackage([
   card('Artifact ETB Spell Copier', 'Artifact', 'When this artifact enters, copy target instant or sorcery spell. You may choose new targets for the copy.', 3),
   card('Hasty Creature Copy Spell', 'Sorcery', "Choose target creature you control. Create a token that's a copy of that creature, except it has haste. Exile it at the beginning of the next end step.", 2),
 ]);
 assert.equal(spellCopyArtifactNearMiss.status, 'not-repeatable');
 assert.ok(spellCopyArtifactNearMiss.rejections.some(rejection => /cannot target/.test(rejection.reason)));
+
+const spellCopyLegendaryNearMiss = provePackage([
+  card('Legendary ETB Spell Copier', 'Legendary Creature — Human Wizard', 'When this creature enters, copy target instant or sorcery spell. You may choose new targets for the copy.', 3),
+  card('Broad Hasty Creature Copy Spell', 'Sorcery', "Create a token that's a copy of target creature, except it has haste. Exile it at the beginning of the next end step.", 2),
+]);
+assert.equal(spellCopyLegendaryNearMiss.status, 'not-repeatable');
+assert.ok(spellCopyLegendaryNearMiss.rejections.some(rejection => /cannot target/.test(rejection.reason)));
 
 const spellCopyDfcFaceMismatch = provePackage([
   {
@@ -291,12 +474,27 @@ assert.equal(millMultiplierFinisher.status, 'proven');
 assert.ok(proofByFamily(millMultiplierFinisher, 'mill-multiplier-finite-mill'));
 assert.equal(proofByFamily(millMultiplierFinisher, 'mill-multiplier-finite-mill').proof.repeatability.status, 'non-loop-threshold');
 
+const delayedMillEqualizerFinisher = provePackage([
+  card('Half-Library Mill', 'Sorcery', 'Target player mills half their library, rounded up.', 5),
+  card('Delayed Mill Equalizer', 'Enchantment — Aura Curse', "Enchant player At the beginning of each end step, enchanted player mills X cards, where X is the number of cards put into their graveyard from anywhere this turn.", 3),
+]);
+assert.equal(delayedMillEqualizerFinisher.status, 'proven');
+assert.ok(proofByFamily(delayedMillEqualizerFinisher, 'delayed-mill-equalizer-finite-mill'));
+assert.equal(proofByFamily(delayedMillEqualizerFinisher, 'delayed-mill-equalizer-finite-mill').proof.repeatability.status, 'non-loop-threshold');
+
 const smallMillMultiplierNearMiss = provePackage([
   card('Small Mill', 'Sorcery', 'Target player mills three cards.', 2),
   card('Mill Multiplier', 'Enchantment', 'If an opponent would mill one or more cards, that player mills twice that many cards instead.', 3),
 ]);
 assert.equal(smallMillMultiplierNearMiss.status, 'not-repeatable');
 assert.ok(smallMillMultiplierNearMiss.rejections.some(rejection => /half-library/.test(rejection.reason)));
+
+const smallDelayedMillNearMiss = provePackage([
+  card('Small Mill', 'Sorcery', 'Target player mills three cards.', 2),
+  card('Delayed Mill Equalizer', 'Enchantment — Aura Curse', "Enchant player At the beginning of each end step, enchanted player mills X cards, where X is the number of cards put into their graveyard from anywhere this turn.", 3),
+]);
+assert.equal(smallDelayedMillNearMiss.status, 'not-repeatable');
+assert.ok(smallDelayedMillNearMiss.rejections.some(rejection => /half-library/.test(rejection.reason)));
 
 const mutualEtbBlinkLoop = provePackage([
   card('ETB Creature Blinker', 'Creature — Angel', 'Flying When this creature enters the battlefield, exile another target creature you control, then return that card to the battlefield under its owner’s control.', 5),
@@ -384,6 +582,21 @@ assert.equal(recursiveSacLoop.status, 'proven');
 const recursiveProof = proofByFamily(recursiveSacLoop, 'recursive-body-sacrifice-mana-loop');
 assert.ok(recursiveProof);
 assert.ok(recursiveProof.positiveDeltas.some(delta => delta.resource === 'casts'));
+
+const exileRecastCreatureManaLoop = provePackage([
+  card('Recursive Exile Creature', 'Creature — Elemental', 'You may cast this card from exile.', 3, '{2}{R}'),
+  card('Creature-Only Exile Mana Outlet', 'Enchantment', "Exile a creature you control: Add X mana of any one color, where X is 1 plus the exiled creature's mana value. Spend this mana only to cast creature spells.", 3),
+]);
+assert.equal(exileRecastCreatureManaLoop.status, 'proven');
+assert.ok(proofByFamily(exileRecastCreatureManaLoop, 'exile-recast-creature-mana-loop'));
+assert.ok(proofByFamily(exileRecastCreatureManaLoop, 'exile-recast-creature-mana-loop').positiveDeltas.some(delta => delta.resource === 'mana'));
+
+const originBoundExileNearMiss = provePackage([
+  card('Conditional Exile Creature', 'Creature — Elemental', 'You may cast this card from exile if it was foretold.', 3, '{2}{R}'),
+  card('Creature-Only Exile Mana Outlet', 'Enchantment', "Exile a creature you control: Add X mana of any one color, where X is 1 plus the exiled creature's mana value. Spend this mana only to cast creature spells.", 3),
+]);
+assert.notEqual(originBoundExileNearMiss.status, 'proven');
+assert.equal(proofByFamily(originBoundExileNearMiss, 'exile-recast-creature-mana-loop'), undefined);
 
 const lifePaidTreasureRecursiveDrainLoop = provePackage([
   card('Typed Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control a Zombie.', 1, '{B}'),

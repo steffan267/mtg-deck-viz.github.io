@@ -163,9 +163,7 @@
       ],
       "pass": true,
       "confidence": 0.75,
-      "rejectionReasons": [
-        "body is not replenished by the package"
-      ]
+      "rejectionReasons": []
     },
     {
       "id": "known-combo-library-exile-win",
@@ -293,9 +291,7 @@
       ],
       "pass": true,
       "confidence": 0.75,
-      "rejectionReasons": [
-        "self-untap cost is not below produced mana"
-      ]
+      "rejectionReasons": []
     },
     {
       "id": "known-combo-spell-copy-creature-copy",

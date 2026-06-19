@@ -934,6 +934,20 @@
     return numberWordValue(count && count[1]);
   }
 
+  const TOKEN_COLOR_WORDS = { white: "w", blue: "u", black: "b", red: "r", green: "g" };
+  function creatureTokenColors(text) {
+    const s = String(text || "").toLowerCase();
+    const colors = new Set();
+    for (const m of s.matchAll(/\bcreate\b[^.]{0,120}\bcreature tokens?\b/g)) {
+      const phrase = m[0];
+      for (const [word, color] of Object.entries(TOKEN_COLOR_WORDS)) {
+        if (new RegExp("\\b" + word + "\\b").test(phrase)) colors.add(color);
+      }
+      if (/\bcolorless\b/.test(phrase)) colors.add("colorless");
+    }
+    return [...colors];
+  }
+
   function producedManaProfile(text) {
     const s = String(text || "").toLowerCase();
     const profile = { total: maxManaProduced(s), any: 0, colorless: 0, colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])) };
@@ -979,6 +993,17 @@
       if (!NON_ACCESS_EXILE_COUNTERS.has(marker)) markers.add(marker);
     }
     return [...markers];
+  }
+
+  function selfNamePattern(name) {
+    const simple = String(name || "")
+      .split("//")[0]
+      .replace(/[^\p{L}\p{N}' -]+/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    if (!simple) return null;
+    return simple.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
   }
 
   function capsOf(segments, classified, isLand) {
@@ -1033,9 +1058,31 @@
         if (s.kind === "activated" && !/\badd \{|\badd (one|two|three|x|an amount)/.test(e))
           caps.add("has-nonmana-activated-ability");
         if (s.kind === "activated"
+            && /\{t\}/.test(c)
+            && !/\{[^}]*[1-9wubrgcx][^}]*\}/.test(c)
+            && !/\bsacrifice\b|\bpay\b|\bdiscard\b|\bexile\b|\bremove\b/.test(c)
+            && /\bthis creature deals? 1 damage to (any target|target creature)\b/.test(e))
+          caps.add("has-free-creature-ping");
+        if (s.kind === "activated"
             && /remove a \+1\/\+1 counter from (this|it|this creature)/.test(c)
             && /\bdeals? \d+ damage to (any target|target|target player|each opponent|an opponent)/.test(e)) {
           caps.add("is-counter-to-damage-source");
+        }
+        if (s.kind === "activated"
+            && /\bpay \d+ life\b/.test(c)
+            && !/\{t\}|\{q\}|\bsacrifice\b|\bdiscard\b|\bexile\b/.test(c)
+            && !/\bactivate (this ability )?only once\b|only once each turn|\bactivate only as a sorcery\b/.test(effectAndRaw)
+            && /\bdeals? \d+ damage to (any target|target opponent|target player|an opponent|each opponent)\b/.test(e)) {
+          const lifeCost = c.match(/\bpay (\d+) life\b/);
+          const damageAmount = e.match(/\bdeals? (\d+) damage\b/);
+          const paid = lifeCost ? Number(lifeCost[1]) : 0;
+          const damage = damageAmount ? Number(damageAmount[1]) : 0;
+          if (paid > 0 && damage > 0 && damage >= paid) {
+            caps.add("is-life-paid-damage-source");
+            caps.add("life-paid-damage-life-cost:" + paid);
+            caps.add("life-paid-damage-amount:" + damage);
+            caps.add("life-paid-damage-can-hit-opponent");
+          }
         }
         if (s.kind === "activated" && /\bartifact\b/.test(classified._type || "") && /draw a card/.test(e) && /put .* on top of (its owner.?s|your) library/.test(e + " " + c))
           caps.add("is-self-top-draw-artifact");
@@ -1077,6 +1124,11 @@
       // ETB: a trigger that fires when this permanent enters
       if (s.kind === "triggered" || s.kind === "etb") caps.add("has-trigger");
       if (s.kind === "etb" && /\bthis\b|^when [a-z]+ enters|enters the battlefield/.test(s.trigger)) caps.add("has-etb");
+      if (s.kind === "triggered"
+          && /\bwhenever a creature dies\b/.test(s.trigger)
+          && /\buntap this creature\b/.test(e)
+          && !/\bonly once (each|per) turn\b|\btriggers? only once (each|per) turn\b/.test(effectAndRaw))
+        caps.add("has-death-untap-self");
       // blink/flicker: exile then return to the battlefield
       if (/exile .* return (it|them|that card|those cards|the exiled)/.test(e) && /battlefield/.test(e)) caps.add("is-blink");
       if (s.kind === "etb"
@@ -1122,12 +1174,21 @@
       // cost reducer (Round-3 gate): only a reducer of ACTIVATED ABILITIES is
       // relevant to the cost-reduction→ability family. Scope-specific reducers
       // (creatures, Foods, etc.) must not fan out to all tap abilities.
+      const artifactAbilityCostReducer = /activated abilities of artifacts?.{0,60}cost \{?\d* ?[^ ]* ?less|enchanted artifacts?'?s activated abilities cost \{?\d* ?[^ ]* ?less/.test(e);
       if (/activated abilities (of |that )?foods?.{0,30}cost \{?\d* ?[^ ]* ?less|activated abilities of foods/.test(e))
         caps.add("is-food-ability-cost-reducer");
       else if (/activated abilities (of |that )?creatures?.{0,30}cost \{?\d* ?[^ ]* ?less|activated abilities of creatures/.test(e))
         caps.add("is-creature-ability-cost-reducer");
+      else if (artifactAbilityCostReducer)
+        caps.add("is-artifact-activated-ability-cost-reducer");
       else if (/activated abilities (of |that |you )?.{0,30}cost \{?\d* ?[^ ]* ?less|abilities (you activate )?.{0,60}cost \{?\d* ?[^ ]* ?less/.test(e))
         caps.add("is-cost-reducer");
+      if (/activated abilities (of |that |you |of artifacts?|of creatures?)?.{0,80}cost|abilities (you activate )?.{0,80}cost|enchanted artifacts?'?s activated abilities cost/.test(e)) {
+        const reduction = e.match(/cost \{?(\d+)\}? less/);
+        if (reduction) caps.add("activated-ability-cost-reduction:" + reduction[1]);
+        if (/can't reduce .*cost to less than (one|1) mana|can't reduce the mana in that cost to less than (one|1) mana/.test(e))
+          caps.add("activated-ability-cost-reduction-minimum:1");
+      }
       else if (/(spells?|creature spells?) .* cost \{?\d* ?[^ ]* ?less|costs? \{\d+\} less to cast/.test(e))
         caps.add("is-spell-cost-reducer");
       if (/(another target |target )creature.{0,40}gains? lifelink until end of turn/.test(e))
@@ -1154,6 +1215,25 @@
         caps.add("hasty-copy-target-creature");
         if (/target nonlegendary creature/.test(e)) caps.add("hasty-copy-target-requires-nonlegendary");
       }
+      if (/beginning of combat on your turn/.test(effectAndRaw)
+          && /create .*token that.?s a copy of equipped creature/.test(effectAndRaw)
+          && /token (isn'?t|is not) legendary/.test(effectAndRaw)
+          && /token gains? haste/.test(effectAndRaw)) {
+        caps.add("is-combat-copy-token-equipment");
+        caps.add("combat-copy-token-haste");
+        caps.add("combat-copy-token-nonlegendary");
+      }
+      if (/attacks? for the first time each turn/.test(effectAndRaw)
+          && /additional combat phase/.test(effectAndRaw)) {
+        caps.add("is-attack-extra-combat-source");
+        caps.add("extra-combat-repeatable-with-fresh-token");
+      }
+      if (/hasn'?t been exerted this turn/.test(allText)
+          && /as it attacks/.test(allText)
+          && /additional combat phase/.test(allText)) {
+        caps.add("is-attack-extra-combat-source");
+        caps.add("extra-combat-repeatable-with-fresh-token");
+      }
       if (/\bwhen\b.*enters\b.*copy target instant or sorcery spell/.test(s.raw))
         caps.add("is-etb-spell-copier");
       if (/target creatures? you control.*create .*tokens?.*copy of (that|those|it|them|the targeted|target) creatures?/.test(e) && /haste/.test(e)) {
@@ -1161,6 +1241,21 @@
         caps.add("hasty-copy-spell-target-creature");
         if (/target nonlegendary creatures?/.test(e)) caps.add("hasty-copy-spell-target-requires-nonlegendary");
       }
+      if (/create .*tokens?.*copy of target (nonlegendary )?(artifact or )?creature( you control)?/.test(e) && /haste/.test(e)) {
+        caps.add("is-hasty-creature-copy-spell");
+        caps.add("hasty-copy-spell-target-creature");
+        if (/target nonlegendary creatures?/.test(e)) caps.add("hasty-copy-spell-target-requires-nonlegendary");
+      }
+      if (/\bdestroy target creature\b/.test(e)
+          && /\bif that creature dies this way\b/.test(e)
+          && /\bcreates? two tokens? that (?:are|is) copies of that creature\b/.test(e)) {
+        caps.add("is-death-copy-creature-spell");
+        caps.add("death-copy-spell-target-creature");
+      }
+      if (/\btarget player\b/.test(e)
+          && /\bthat player may copy this spell\b/.test(e)
+          && /\bmay choose (a )?new target\b/.test(e))
+        caps.add("is-self-copying-targeted-spell");
       if (/when .* enters\b/.test(s.raw) && /if .*number of cards in your library.*you win the game/.test(e))
         caps.add("is-empty-library-win-payoff");
       if (/name a card[\s\S]{0,180}reveal cards? from the top of your library until/.test(allText)
@@ -1172,8 +1267,49 @@
         caps.add("is-lifegain-from-opponent-lifeloss");
       if (/whenever you gain life/.test(s.trigger) && /(target opponent|each opponent|opponents?).{0,40}loses? (that much|\d+) life/.test(e))
         caps.add("is-lifeloss-from-your-lifegain");
-      if (/whenever you gain life/.test(s.trigger) && /put (a|\d+) \+1\/\+1 counters? on target (creature|creature or enchantment)/.test(e))
+      if (/whenever you gain life/.test(s.trigger)
+          && !/only once each turn|triggers? only once/.test(effectAndRaw)
+          && /put (a|\d+) \+1\/\+1 counters? on target (creature|creature or enchantment)(?: you control)?/.test(e)) {
         caps.add("is-lifegain-to-counter-payoff");
+        caps.add(e.includes("target creature or enchantment") ? "lifegain-counter-target:creature-or-enchantment" : "lifegain-counter-target:creature");
+      }
+      const selfCounterTrigger = /\bwhenever one or more \+1\/\+1 counters are put on this creature\b/.test(s.trigger)
+        || (selfNamePattern(classified._name)
+          && new RegExp("\\bwhenever one or more \\+1\\/\\+1 counters are put on " + selfNamePattern(classified._name) + "\\b").test(s.trigger));
+      if (selfCounterTrigger
+          && /\bcreate\b[^.]{0,120}\bcreature tokens?\b/.test(e)) {
+        caps.add("is-counter-to-creature-token-engine");
+        const colors = creatureTokenColors(e);
+        if (colors.length) {
+          for (const color of colors) caps.add("counter-token-color:" + color);
+        } else {
+          caps.add("counter-token-color:unknown");
+        }
+      }
+      {
+        const etbCounter = effectAndRaw.match(/\bwhenever (?:another |a |one or more )?(white|blue|black|red|green)? ?creatures? you control enters?[^.]{0,160}\bput (?:a|one|\d+) \+1\/\+1 counters? on target creature(?: you control)?\b/);
+        if (etbCounter) {
+          caps.add("is-creature-etb-counter-granter");
+          caps.add("etb-counter-granter-token-color:" + (TOKEN_COLOR_WORDS[etbCounter[1]] || "any"));
+          caps.add("etb-counter-targets-creature");
+        }
+      }
+      if (s.kind === "triggered" || s.kind === "etb") {
+        const creatureEtbLifegain =
+          /\bwhenever (?:another |one or more |one or more other )?creatures? (?:you control )?enters?(?: the battlefield)?(?: under your control)?\b/.test(s.trigger)
+          || /\bwhenever (?:another |one or more |one or more other )?creatures? enters? the battlefield under your control\b/.test(s.trigger);
+        if (creatureEtbLifegain
+            && !/\bnontoken\b/.test(s.trigger)
+            && !/only once each turn|triggers? only once/.test(effectAndRaw)
+            && /\byou gain \d+ life\b/.test(e))
+          caps.add("is-creature-etb-lifegain-payoff");
+      }
+      if (/\bwhenever a creature dies\b[^.]{0,120}\bif it had a -1\/-1 counter on it\b/.test(effectAndRaw)
+          && /\bput a -1\/-1 counter on target creature\b/.test(effectAndRaw))
+        caps.add("is-minus-counter-death-spreader");
+      if (/\bwhenever (?:you put one or more -1\/-1 counters on|a -1\/-1 counter is put on) a creature\b/.test(s.trigger)
+          && /\bcreate\b[^.]{0,80}\b1\/1\b[^.]{0,80}\bcreature tokens?\b/.test(e))
+        caps.add("is-minus-counter-to-1-1-token-engine");
       if ((s.kind === "triggered" || /\bwhenever\b/.test(s.trigger))
           && /\bwhenever\b[^.]{0,100}\b(you|a player|an opponent) draws?\b/.test(s.trigger)
           && /\bdeals? (that much|\d+|x)? ?damage\b|\bdeals? damage equal\b/.test(e)) {
@@ -1184,8 +1320,17 @@
       }
       if ((s.kind === "triggered" || /\bwhenever\b/.test(s.trigger))
           && /\bdeals? (noncombat |combat )?damage to (a player|an opponent|one of your opponents|that player|any target)\b/.test(s.trigger)
-          && /draw (a card|two cards|three cards|that many cards?)/.test(e))
+          && /draw (a card|two cards|three cards|that many cards?)/.test(e)) {
         caps.add("is-damage-to-draw-payoff");
+        if (/source you control deals? noncombat damage/.test(s.trigger)) caps.add("damage-to-draw-scope:source-you-control");
+        else if (/enchanted creature deals?/.test(s.trigger)) caps.add("damage-to-draw-scope:enchanted-creature");
+        else if (/equipped creature deals?/.test(s.trigger)) caps.add("damage-to-draw-scope:equipped-creature");
+        else if (/this creature deals?/.test(s.trigger)) caps.add("damage-to-draw-scope:this-creature");
+      }
+      if (/each of those creatures has ["“]?whenever this creature deals? damage to an opponent, (you may )?draw a card/.test(allText)) {
+        caps.add("is-damage-to-draw-payoff");
+        caps.add("damage-to-draw-scope:paired-creature-grant");
+      }
       if ((s.kind === "triggered" || /\bwhenever\b/.test(s.trigger))
           && /\bwhenever\b[^.]{0,100}\b(an opponent|a player) draws?\b/.test(s.trigger)
           && /(loses? \d+ life|deals? \d+ damage|loses? that much life|deals? that much damage)/.test(e)) {
@@ -1217,6 +1362,15 @@
           caps.add("recursive-body-requires-another-creature");
         addManaCostCaps(caps, "recursive-body", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
       }
+      const castFromExileText = /\b(?:you may )?cast (?:this card|[^.]{1,80}) from (?:your graveyard or )?exile\b/.test(effectAndRaw)
+        || /\bcast this card from exile\b/.test(effectAndRaw);
+      const conditionalExilePermission = /\b(if|as long as|for as long as|during|until|with|using)\b|exiled with|exiled it/.test(effectAndRaw);
+      if (/\bcreature\b/.test(typeText) && castFromExileText && !conditionalExilePermission) {
+        caps.add("is-recursive-exile-cast-body");
+        addManaCostCaps(caps, "recursive-exile-body", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
+      } else if (/\bcreature\b/.test(typeText) && castFromExileText) {
+        caps.add("is-origin-bound-exile-cast-body");
+      }
       if (/\bcreature\b/.test(typeText)
           && s.kind === "activated"
           && /\breturn (this card|this creature|[^.,:]{1,60}) from your graveyard to (the )?battlefield\b/.test(effectAndRaw)
@@ -1230,6 +1384,12 @@
           && /\bcast\b/.test(effectAndRaw)
           && (hasCheapInstantImprint || /\binstant\b/.test(effectAndRaw) || /mana value 2 or less/.test(effectAndRaw))) {
         caps.add("is-repeatable-cheap-instant-caster");
+      }
+      if (/\bexile (a|another|target)? ?creature you control\s*:?\s*add x mana of any one color\b/.test(effectAndRaw)
+          && /\bwhere x is 1 plus (the )?exiled creature'?s mana value\b/.test(effectAndRaw)
+          && /\bspend this mana only to cast creature spells\b/.test(effectAndRaw)) {
+        caps.add("is-creature-exile-cast-mana-outlet");
+        caps.add("creature-exile-cast-mana-surplus:1");
       }
 
       // --- Wave 2: directional payoff engines the audit found missing ---
@@ -1378,11 +1538,22 @@
       // from parsing as a clean trigger segment, so we test s.raw.)
       if (/magecraft|whenever you cast (an instant or sorcery|or copy an instant or sorcery) spell/.test(s.raw))
         caps.add("is-spellcast-payoff");
+      if (/(magecraft|whenever you cast or copy an instant or sorcery spell)/.test(s.raw)
+          && /(each opponent|opponents?).{0,40}loses? \d+ life/.test(s.raw)
+          && /you gain \d+ life/.test(s.raw)) {
+        caps.add("is-magecraft-drain-payoff");
+        const amount = s.raw.match(/(?:each opponent|opponents?).{0,40}loses? (\d+) life/);
+        if (amount) caps.add("magecraft-drain-amount:" + amount[1]);
+      }
       // MILL as engine: opponent-mill source + graveyard-size payoff
       if (/(target (player|opponent)|each opponent|that player) (mills?|puts? the top)/.test(e) || /\bmills? (a|an|\d+|that many)/.test(e))
         caps.add("is-mill-source");
       if (/if (an|a) opponent would mill|if .* would mill one or more cards?.*mill twice that many|mills? twice that many cards? instead/.test(effectAndRaw))
         caps.add("is-mill-multiplier");
+      if (/beginning of each end step/.test(effectAndRaw)
+          && /mills? x cards?/.test(effectAndRaw)
+          && /x is the number of cards put into (enchanted player'?s?|that player'?s?|their) graveyard from anywhere this turn/.test(effectAndRaw))
+        caps.add("is-delayed-same-turn-mill-payoff");
       if (/(target (player|opponent)|each opponent|that player) mills? half (their|that player'?s?|that opponent'?s?) library/.test(effectAndRaw)
           || /mills? half (their|that player'?s?|that opponent'?s?) library/.test(effectAndRaw))
         caps.add("is-half-library-mill-source");
@@ -1437,6 +1608,15 @@
       if (/\blegendary\b/.test(typeText)) caps.add("is-legendary-permanent");
       else caps.add("is-nonlegendary-permanent");
     }
+    if (!isLand && /\bcreature\b/.test(typeText) && /\bdeathtouch\b/.test(allText))
+      caps.add("has-deathtouch");
+    if (/\bequipped creature (?:gets [^.]* and has|has) deathtouch\b/.test(allText))
+      caps.add("grants-deathtouch-to-equipped-creature");
+    if (/\bequipped creature has ["“]\{t\}: this creature deals? 1 damage to (any target|target creature)\b/.test(allText))
+      caps.add("grants-free-ping-to-equipped-creature");
+    if (/\bequipped creature has [^.]*whenever a creature dies, untap this creature/.test(allText)
+        && !/\bonly once (each|per) turn\b|\btriggers? only once (each|per) turn\b/.test(allText))
+      caps.add("grants-death-untap-to-equipped-creature");
     // sac fodder / blink target: real creatures and produced creature tokens
     // are bodies; noncreature tokens such as Treasure are not attackers/deaths.
     if (!isLand && (caps.has("is-creature-token-producer") || /creature/.test((classified._type || "")))) caps.add("is-body");
@@ -1466,6 +1646,7 @@
       myTypes: creatureSubtypes(card.type_line),   // this card's own creature subtypes
       tribalRefs: tribalRefs(o),                    // creature types this card scales on
       _type: (card.type_line || "").toLowerCase(),
+      _name: (card.name || card.id || "").toLowerCase(),
       _cmc: typeof card.cmc === "number" ? card.cmc : null,
       _manaCost: (card.mana_cost || "").toLowerCase(),
     };
@@ -1520,6 +1701,7 @@
     { family: "sac-fodder→outlet", from: "is-body",     to: "is-sac-outlet",    kind: "enablement", strength: "weak" },
     { family: "cost-reduction→ability", from: "is-creature-ability-cost-reducer", to: "has-creature-activated-ability", kind: "enablement", strength: "weak" },
     { family: "cost-reduction→ability", from: "is-cost-reducer", to: "has-nonmana-activated-ability", kind: "enablement", strength: "weak" },
+    { family: "cost-reduction→ability", from: "is-artifact-activated-ability-cost-reducer", to: "has-nonmana-activated-ability", kind: "enablement", strength: "weak" },
     { family: "copy→trigger",      from: "is-permanent-copy", to: "has-etb",     kind: "synergy",     strength: "moderate" },
     { family: "etb-doubler",       from: "is-etb-doubler", to: "has-etb",       kind: "synergy",     strength: "strong" },
     { family: "token-production→amplifier", from: "is-token-producer", to: "is-token-doubler", kind: "synergy", strength: "strong" },
@@ -1568,6 +1750,7 @@
     { family: "mill-lifeloss-feedback-loop", from: "is-lifeloss-to-mill-payoff", to: "is-mill-to-lifeloss-payoff", kind: "enablement", strength: "combo-critical" },
     { family: "opponent-draw-punisher-win", from: "is-mass-opponent-draw-source", to: "is-opponent-draw-punisher", kind: "enablement", strength: "combo-critical" },
     { family: "mill-multiplier-finite-mill", from: "is-half-library-mill-source", to: "is-mill-multiplier", kind: "enablement", strength: "combo-critical" },
+    { family: "delayed-mill-equalizer-finite-mill", from: "is-half-library-mill-source", to: "is-delayed-same-turn-mill-payoff", kind: "enablement", strength: "combo-critical" },
     { family: "mutual-etb-blink-reset-loop", from: "is-etb-blink", to: "is-etb-blink", kind: "enablement", strength: "combo-critical" },
     { family: "self-untap-mana-loop", from: "is-colorless-mana-amplifier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
     { family: "lifelink-counter-damage-loop", from: "is-lifelink-counter-engine", to: "is-counter-to-damage-source", kind: "enablement", strength: "combo-critical" },
@@ -1575,7 +1758,14 @@
     { family: "imprint-untap-spell-loop", from: "is-cheap-instant-nonland-permanent-untap-spell", to: "is-repeatable-cheap-instant-caster", kind: "enablement", strength: "combo-critical" },
     { family: "self-untap-mana→ability-copy-loop", from: "is-activated-ability-copier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
     { family: "hasty-copy→etb-untap-loop", from: "is-repeatable-hasty-creature-copy", to: "etb-untaps-permanent", kind: "enablement", strength: "combo-critical" },
+    { family: "combat-copy-token→extra-combat-loop", from: "is-combat-copy-token-equipment", to: "is-attack-extra-combat-source", kind: "enablement", strength: "combo-critical" },
     { family: "spell-copy-etb→creature-copy-spell-loop", from: "is-etb-spell-copier", to: "is-hasty-creature-copy-spell", kind: "enablement", strength: "combo-critical" },
+    { family: "death-copy-spell-etb-copy-loop", from: "is-etb-spell-copier", to: "is-death-copy-creature-spell", kind: "enablement", strength: "combo-critical" },
+    { family: "self-copy-spell→magecraft-drain-loop", from: "is-self-copying-targeted-spell", to: "is-magecraft-drain-payoff", kind: "enablement", strength: "combo-critical" },
+    { family: "life-paid-damage-lifeloss-recovery-loop", from: "is-life-paid-damage-source", to: "is-lifegain-from-opponent-lifeloss", kind: "enablement", strength: "combo-critical" },
+    { family: "exile-recast-creature-mana-loop", from: "is-creature-exile-cast-mana-outlet", to: "is-recursive-exile-cast-body", kind: "enablement", strength: "combo-critical" },
+    { family: "counter-token→etb-counter-loop", from: "is-counter-to-creature-token-engine", to: "is-creature-etb-counter-granter", kind: "enablement", strength: "combo-critical" },
+    { family: "minus-counter-death→token-loop", from: "is-minus-counter-death-spreader", to: "is-minus-counter-to-1-1-token-engine", kind: "enablement", strength: "combo-critical" },
     { family: "artifact-cost-reduction→top-loop-piece", from: "is-artifact-spell-cost-reducer", to: "is-self-top-draw-artifact", kind: "enablement", strength: "strong" },
     { family: "cast-from-top→top-loop-piece", from: "is-artifact-cast-from-top-enabler", to: "is-self-top-draw-artifact", kind: "enablement", strength: "strong" },
     { family: "draw-damage-feedback-loop", from: "draw-to-damage-subject:you", to: "is-damage-to-draw-payoff", kind: "enablement", strength: "combo-critical" },
@@ -1633,6 +1823,15 @@
     if (!target?.faceFacts?.length && requiredCaps.includes("is-creature-permanent") && !isCreaturePermanent(target)) return false;
     return true;
   };
+  const counterTokenColors = (node) => capSuffixes(node, "counter-token-color:");
+  const etbCounterGranterColors = (node) => capSuffixes(node, "etb-counter-granter-token-color:");
+  const counterTokenCanTriggerGranter = (tokenEngine, granter) => {
+    const tokenColors = counterTokenColors(tokenEngine);
+    const accepted = etbCounterGranterColors(granter);
+    if (!tokenColors.length || !accepted.length) return false;
+    if (accepted.includes("any")) return !tokenColors.includes("unknown");
+    return accepted.some(color => tokenColors.includes(color));
+  };
   const EXCLUSIVE_FACE_AVAILABILITIES = new Set(["either-face", "transforms", "separate-objects", "merged-multiface"]);
   const factSourcesForCap = (node, cap) => {
     const caps = node && node.factSources && node.factSources.caps;
@@ -1678,12 +1877,28 @@
   };
   const canHastyCopySpellTarget = (copySpell, target, extraTargetCaps = []) => {
     if (!hasCap(copySpell, "hasty-copy-spell-target-creature")) return false;
-    const targetCaps = ["is-creature-permanent", ...extraTargetCaps];
-    if (hasCap(copySpell, "hasty-copy-spell-target-requires-nonlegendary")) targetCaps.push("is-nonlegendary-permanent");
+    const targetCaps = ["is-creature-permanent", "is-nonlegendary-permanent", ...extraTargetCaps];
     if (!faceCompatibleCaps(target, targetCaps)) return false;
     if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
-    if (!target?.faceFacts?.length && hasCap(copySpell, "hasty-copy-spell-target-requires-nonlegendary") && isLegendaryPermanent(target)) return false;
+    if (!target?.faceFacts?.length && isLegendaryPermanent(target)) return false;
     return true;
+  };
+  const canDeathCopySpellTarget = (copySpell, target, extraTargetCaps = []) => {
+    if (!hasCap(copySpell, "death-copy-spell-target-creature")) return false;
+    const targetCaps = ["is-creature-permanent", "is-nonlegendary-permanent", ...extraTargetCaps];
+    if (!faceCompatibleCaps(target, targetCaps)) return false;
+    if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
+    if (!target?.faceFacts?.length && isLegendaryPermanent(target)) return false;
+    return true;
+  };
+  const damageToDrawAppliesToSource = (damageToDraw, source) => {
+    if (hasCap(damageToDraw, "damage-to-draw-scope:source-you-control")) return true;
+    if (hasCap(damageToDraw, "damage-to-draw-scope:enchanted-creature")
+        || hasCap(damageToDraw, "damage-to-draw-scope:equipped-creature")
+        || hasCap(damageToDraw, "damage-to-draw-scope:paired-creature-grant")) {
+      return faceCompatibleCaps(source, ["is-creature-permanent", "is-draw-to-damage-payoff"]);
+    }
+    return false;
   };
   const recursiveBodyPreconditionSatisfiedByPair = (body, outlet) =>
     !hasCap(body, "recursive-body-requires-another-creature")
@@ -1766,6 +1981,11 @@
               || (hasCap(dst, "mana-from-artifact") && hasCap(src, "untaps-artifact"));
             if (canRetap) strength = "combo-critical";
           }
+          if (f.family === "cost-reduction→ability" && f.from === "is-artifact-activated-ability-cost-reducer") {
+            const targetIsArtifact = /\bartifact\b/i.test(dst.type || dst._type || "");
+            evidence = { from: f.from, to: f.to, targetIsArtifact };
+            if (!targetIsArtifact) continue;
+          }
           // Repeatable blink + ETB land untap is capability-based. If the
           // land-untapper refreshes at least enough lands to pay the blink
           // activation, it is a loop; exact net mana may depend on land output.
@@ -1813,6 +2033,16 @@
             };
             if (!evidence.copyTargetLegal) continue;
           }
+          if (f.family === "combat-copy-token→extra-combat-loop") {
+            evidence = {
+              from: f.from,
+              to: f.to,
+              targetIsCreature: isCreaturePermanent(dst),
+              createsNonlegendaryHastyToken: hasCap(src, "combat-copy-token-haste") && hasCap(src, "combat-copy-token-nonlegendary"),
+              freshTokenRepeatsExtraCombat: hasCap(dst, "extra-combat-repeatable-with-fresh-token"),
+            };
+            if (!evidence.targetIsCreature || !evidence.createsNonlegendaryHastyToken || !evidence.freshTokenRepeatsExtraCombat) continue;
+          }
           if (f.family === "spell-copy-etb→creature-copy-spell-loop") {
             evidence = {
               from: f.from,
@@ -1823,6 +2053,38 @@
               requiresNonlegendary: hasCap(dst, "hasty-copy-spell-target-requires-nonlegendary"),
             };
             if (!evidence.copyTargetLegal) continue;
+          }
+          if (f.family === "death-copy-spell-etb-copy-loop") {
+            evidence = {
+              from: f.from,
+              to: f.to,
+              copyTargetLegal: canDeathCopySpellTarget(dst, src, ["is-etb-spell-copier"]),
+              targetIsCreature: isCreaturePermanent(src),
+              targetIsLegendary: isLegendaryPermanent(src),
+            };
+            if (!evidence.copyTargetLegal) continue;
+          }
+          if (f.family === "draw-damage-feedback-loop") {
+            const drawToDamage = hasCap(src, "is-draw-to-damage-payoff") ? src : dst;
+            const damageToDraw = hasCap(src, "is-damage-to-draw-payoff") ? src : dst;
+            evidence = {
+              from: f.from,
+              to: f.to,
+              damageToDrawScopes: (damageToDraw.caps || []).filter(cap => cap.startsWith("damage-to-draw-scope:")),
+              scopeApplies: damageToDrawAppliesToSource(damageToDraw, drawToDamage),
+            };
+            if (!evidence.scopeApplies) continue;
+          }
+          if (f.family === "counter-token→etb-counter-loop") {
+            evidence = {
+              from: f.from,
+              to: f.to,
+              targetLegal: faceCompatibleCaps(src, ["is-creature-permanent", "is-counter-to-creature-token-engine"]),
+              tokenColors: counterTokenColors(src),
+              acceptedTokenColors: etbCounterGranterColors(dst),
+              tokenCanTriggerCounterGranter: counterTokenCanTriggerGranter(src, dst),
+            };
+            if (!evidence.targetLegal || !evidence.tokenCanTriggerCounterGranter) continue;
           }
           if (f.family === "token-replacement-sacrifice-mana-loop") {
             const activationCost = manaCostProfileFromCaps(src, "sac-outlet-activation");
@@ -1957,6 +2219,7 @@
   EVENT_LABEL["enable:mill-lifeloss-feedback-loop"] = "mill ↔ life loss loop";
   EVENT_LABEL["enable:opponent-draw-punisher-win"] = "opponent mass draw → punisher win";
   EVENT_LABEL["enable:mill-multiplier-finite-mill"] = "mill multiplier → finite mill";
+  EVENT_LABEL["enable:delayed-mill-equalizer-finite-mill"] = "same-turn mill equalizer → finite mill";
   EVENT_LABEL["enable:mutual-etb-blink-reset-loop"] = "mutual ETB blink reset loop";
   EVENT_LABEL["enable:self-untap-mana-loop"] = "self-untap mana loop";
   EVENT_LABEL["enable:lifelink-counter-damage-loop"] = "lifelink counter-damage loop";
@@ -1964,7 +2227,14 @@
   EVENT_LABEL["enable:imprint-untap-spell-loop"] = "repeatable imprinted untap spell loop";
   EVENT_LABEL["enable:self-untap-mana→ability-copy-loop"] = "self-untap mana ability copy loop";
   EVENT_LABEL["enable:hasty-copy→etb-untap-loop"] = "hasty copy → ETB untap loop";
+  EVENT_LABEL["enable:combat-copy-token→extra-combat-loop"] = "combat copy token → extra combat loop";
   EVENT_LABEL["enable:spell-copy-etb→creature-copy-spell-loop"] = "ETB spell copy → creature-copy spell loop";
+  EVENT_LABEL["enable:death-copy-spell-etb-copy-loop"] = "ETB spell copy → death-copy creature spell loop";
+  EVENT_LABEL["enable:self-copy-spell→magecraft-drain-loop"] = "self-copying spell → magecraft drain loop";
+  EVENT_LABEL["enable:life-paid-damage-lifeloss-recovery-loop"] = "life-paid damage → opponent-loss lifegain recovery";
+  EVENT_LABEL["enable:exile-recast-creature-mana-loop"] = "exile creature for creature-cast mana → exile recast loop";
+  EVENT_LABEL["enable:counter-token→etb-counter-loop"] = "+1/+1 counter token engine → creature-ETB counter loop";
+  EVENT_LABEL["enable:minus-counter-death→token-loop"] = "-1/-1 counter death spreader → 1/1 token loop";
   EVENT_LABEL["enable:artifact-cost-reduction→top-loop-piece"] = "artifact cost reduction → top-loop piece";
   EVENT_LABEL["enable:cast-from-top→top-loop-piece"] = "cast from top → top-loop piece";
   EVENT_LABEL["enable:draw-damage-feedback-loop"] = "draw → damage feedback loop";

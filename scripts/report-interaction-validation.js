@@ -175,6 +175,10 @@ function evaluateCorpus(corpus) {
   for (const testCase of corpus.cases || []) {
     const result = provePackage(testCase.cards);
     const positive = expectedPositive(testCase);
+    const pass = casePassed(testCase, result);
+    const rejectionReasons = pass && result.status === 'proven'
+      ? []
+      : (result.rejections || []).map(rejection => rejection.reason).sort();
     rows.push({
       id: testCase.id,
       sourceType: testCase.sourceType,
@@ -183,9 +187,9 @@ function evaluateCorpus(corpus) {
       expectedFamilies: (testCase.expect && testCase.expect.families) || [],
       actualStatus: result.status,
       actualFamilies: proofFamilies(result),
-      pass: casePassed(testCase, result),
+      pass,
       confidence: round(confidenceForResult(result), 3),
-      rejectionReasons: (result.rejections || []).map(rejection => rejection.reason).sort(),
+      rejectionReasons,
     });
   }
 

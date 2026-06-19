@@ -19,6 +19,7 @@ const CORE_LOGIC_FILES = [
   'src/face-classification.js',
   'src/card-faces.js',
   'src/build-deck-viz.js',
+  'analysis/edhrec-combos/evaluate-edhrec-combos.js',
 ];
 const REQUIRED_CARD_NAME_SOURCES = [
   'analysis/edhrec-combos/evidence-card-names.json',
