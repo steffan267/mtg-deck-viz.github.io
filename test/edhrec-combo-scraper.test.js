@@ -3,14 +3,30 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {
+  discoverCategoriesFromIndex,
+  jsonPageUrl,
   parseArgs,
   parseCategoryPage,
+  parseCategoryPageResult,
+  parsePaginatedComboJson,
   parseComboDetailPage,
   fetchEdhrecCombos,
 } = require('../analysis/edhrec-combos/fetch-edhrec-combos');
 
 assert.deepEqual(parseArgs(['--categories', 'dimir,mono-blue', '--per-category', '3', '--max-details', '4', '--delay-ms', '1']).categories, ['dimir', 'mono-blue']);
 assert.equal(parseArgs(['--per-category', 'bogus']).perCategory, 20);
+assert.equal(parseArgs(['--all']).perCategory, Infinity);
+assert.equal(parseArgs(['--all']).fetchDetails, false);
+assert.equal(parseArgs(['--all']).fresh, true);
+assert.equal(jsonPageUrl('combos/mono-white-1.json'), 'https://json.edhrec.com/pages/combos/mono-white-1.json');
+
+const indexHtml = `
+  <a href="/combos/mono-white">Mono-White</a>
+  <a href="/combos/azorius">Azorius</a>
+  <a href="/combos/mono-white">Duplicate</a>
+  <a href="/combos/mono-white/1090-2781">Not a category</a>
+`;
+assert.deepEqual(discoverCategoriesFromIndex(indexHtml), ['mono-white', 'azorius']);
 
 const categoryHtml = `
   <div>
@@ -28,6 +44,56 @@ assert.deepEqual(categoryDetails[0], {
   url: 'https://edhrec.com/combos/dimir/742-1295',
   categories: ['early-game-2-card-combos'],
 });
+
+const nextDataCategoryHtml = `
+  <script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    props: {
+      pageProps: {
+        data: {
+          container: {
+            json_dict: {
+              more: 'combos/mono-white-1.json',
+              cardlists: [{
+                header: 'Felidar Guardian + Restoration Angel (48228 decks)',
+                href: '/combos/mono-white/1090-2781',
+                combo: { comboId: '1090-2781', count: 48228, maxCount: 4253005, rank: 34, results: ['Infinite ETB', 'Infinite LTB'] },
+                cardviews: [{ name: 'Felidar Guardian' }, { name: 'Restoration Angel' }],
+              }],
+            },
+          },
+        },
+      },
+    },
+  })}</script>
+`;
+const embeddedCategoryDetails = parseCategoryPage(nextDataCategoryHtml, 'mono-white');
+assert.equal(embeddedCategoryDetails.length, 1);
+assert.deepEqual(embeddedCategoryDetails[0].cards, ['Felidar Guardian', 'Restoration Angel']);
+assert.deepEqual(embeddedCategoryDetails[0].results, ['Infinite ETB', 'Infinite LTB']);
+assert.equal(embeddedCategoryDetails[0].metadata.deckCount, 48228);
+assert.equal(parseCategoryPageResult(nextDataCategoryHtml, 'mono-white').diagnostics.length, 0);
+
+const malformedNextDataCategoryHtml = `
+  <script id="__NEXT_DATA__" type="application/json">{"props":</script>
+  ${categoryHtml}
+`;
+const malformedCategory = parseCategoryPageResult(malformedNextDataCategoryHtml, 'dimir');
+assert.equal(malformedCategory.details.length, 2);
+assert.equal(malformedCategory.diagnostics.length, 1);
+assert.equal(malformedCategory.diagnostics[0].stage, 'category-parse');
+
+const paginated = parsePaginatedComboJson(JSON.stringify({
+  cardlists: [{
+    header: 'Omen Machine + Drannith Magistrate (2192 decks)',
+    href: '/combos/mono-white/1725-3031',
+    combo: { comboId: '1725-3031', count: 2192, rank: 2220, results: ['Lock'] },
+    cardviews: [{ name: 'Omen Machine' }, { name: 'Drannith Magistrate' }],
+  }],
+  is_paginated: true,
+  more: 'combos/mono-white-2.json',
+}), 'mono-white');
+assert.equal(paginated.more, 'combos/mono-white-2.json');
+assert.deepEqual(paginated.details[0].cards, ['Omen Machine', 'Drannith Magistrate']);
 
 const detailHtml = `
   <article>
@@ -80,6 +146,98 @@ assert.equal(parsedDetail.metadata.spellbook, 'https://commanderspellbook.com/co
   assert.equal(payload.categories.dimir.found, 2);
   assert.equal(payload.combos[0].metadata.deckCount, 143323);
   assert.equal(JSON.parse(fs.readFileSync(out, 'utf8')).meta.comboCount, 2);
+
+  const malformedOut = path.join(tmpDir, 'malformed-cache.json');
+  const malformedPayload = await fetchEdhrecCombos({
+    out: malformedOut,
+    categories: ['dimir'],
+    perCategory: 5,
+    maxDetails: 0,
+    fetchDetails: false,
+    delayMs: 0,
+    force: true,
+  }, async url => {
+    if (url === 'https://edhrec.com/combos/dimir') return malformedNextDataCategoryHtml;
+    throw new Error(`missing malformed fixture for ${url}`);
+  });
+  assert.equal(malformedPayload.categories.dimir.found, 2);
+  assert.equal(malformedPayload.meta.complete, false);
+  assert.equal(malformedPayload.failures.length, 1);
+  assert.equal(malformedPayload.failures[0].stage, 'category-parse');
+
+  const metadataOut = path.join(tmpDir, 'metadata-cache.json');
+  const summaryWithMetadataHtml = `
+    <script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+      props: {
+        pageProps: {
+          data: {
+            container: {
+              json_dict: {
+                cardlists: [{
+                  header: 'Felidar Guardian + Restoration Angel (48228 decks)',
+                  href: '/combos/mono-white/1090-2781',
+                  combo: {
+                    count: 48228,
+                    maxCount: 4253005,
+                    rank: 34,
+                    comboVote: 99,
+                    percentage: 1.13,
+                    colors: ['W'],
+                    results: ['Infinite ETB'],
+                  },
+                  cardviews: [{ name: 'Felidar Guardian' }, { name: 'Restoration Angel' }],
+                }],
+              },
+            },
+          },
+        },
+      },
+    })}</script>
+  `;
+  const metadataPayload = await fetchEdhrecCombos({
+    out: metadataOut,
+    categories: ['mono-white'],
+    perCategory: 1,
+    maxDetails: 1,
+    delayMs: 0,
+    force: true,
+  }, async url => {
+    if (url === 'https://edhrec.com/combos/mono-white') return summaryWithMetadataHtml;
+    if (url === 'https://edhrec.com/combos/mono-white/1090-2781') return detailHtml;
+    throw new Error(`missing metadata fixture for ${url}`);
+  });
+  assert.equal(metadataPayload.meta.complete, true);
+  assert.equal(metadataPayload.combos[0].metadata.deckCount, 143323, 'detail metadata should overlay non-null summary values');
+  assert.equal(metadataPayload.combos[0].metadata.comboVote, 99, 'detail fetch should preserve summary-only metadata');
+  assert.equal(metadataPayload.combos[0].metadata.percentage, 1.13);
+  assert.deepEqual(metadataPayload.combos[0].metadata.colors, ['W']);
+
+  const allOut = path.join(tmpDir, 'all-cache.json');
+  const allHtmlByUrl = new Map([
+    ['https://edhrec.com/combos', indexHtml],
+    ['https://edhrec.com/combos/mono-white', nextDataCategoryHtml],
+    ['https://json.edhrec.com/pages/combos/mono-white-1.json', JSON.stringify({
+      cardlists: [{
+        header: 'Omen Machine + Drannith Magistrate (2192 decks)',
+        href: '/combos/mono-white/1725-3031',
+        combo: { comboId: '1725-3031', count: 2192, rank: 2220, results: ['Lock'] },
+        cardviews: [{ name: 'Omen Machine' }, { name: 'Drannith Magistrate' }],
+      }],
+      is_paginated: false,
+      more: null,
+    })],
+    ['https://edhrec.com/combos/azorius', nextDataCategoryHtml.replaceAll('mono-white', 'azorius').replaceAll('Felidar Guardian', 'Displacer Kitten').replaceAll('Restoration Angel', 'Teferi, Time Raveler')],
+    ['https://json.edhrec.com/pages/combos/azorius-1.json', JSON.stringify({ cardlists: [], is_paginated: false, more: null })],
+  ]);
+  const allPayload = await fetchEdhrecCombos(parseArgs(['--all', '--out', allOut, '--delay-ms', '1']), async url => {
+    if (!allHtmlByUrl.has(url)) throw new Error(`missing all fixture for ${url}`);
+    return allHtmlByUrl.get(url);
+  });
+  assert.equal(allPayload.meta.complete, true);
+  assert.equal(allPayload.meta.options.perCategory, 'all');
+  assert.equal(allPayload.meta.options.fetchDetails, false);
+  assert.equal(allPayload.meta.comboCount, 3);
+  assert.equal(allPayload.categories['mono-white'].fetchedPages, 2);
 })().then(() => {
   process.stdout.write('EDHREC combo scraper tests passed\n');
 }).catch(err => {

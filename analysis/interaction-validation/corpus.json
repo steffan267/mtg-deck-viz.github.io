@@ -576,6 +576,78 @@
       ]
     },
     {
+      "id": "known-combo-fixed-lifegain-lifeloss",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "lifegain-lifeloss-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Fixed Gain Converts To Loss",
+          "type_line": "Creature — Cleric",
+          "oracle_text": "Whenever you gain life, each opponent loses 1 life.",
+          "cmc": 3
+        },
+        {
+          "id": "Exquisite Blood",
+          "type_line": "Enchantment",
+          "oracle_text": "Whenever an opponent loses life, you gain that much life.",
+          "cmc": 5
+        }
+      ]
+    },
+    {
+      "id": "known-combo-lifelink-counter-damage",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "lifelink-counter-damage-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Lifelink Counter Engine",
+          "type_line": "Enchantment Creature — God",
+          "oracle_text": "Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.",
+          "cmc": 3
+        },
+        {
+          "id": "Counter Damage Creature",
+          "type_line": "Artifact Creature — Construct",
+          "oracle_text": "This creature enters with X +1/+1 counters on it. Remove a +1/+1 counter from this creature: It deals 1 damage to any target.",
+          "cmc": 0
+        }
+      ]
+    },
+    {
+      "id": "known-combo-any-type-amplified-self-untap",
+      "sourceType": "known-combo-seed",
+      "expect": {
+        "status": "proven",
+        "families": [
+          "self-untap-mana-loop"
+        ]
+      },
+      "cards": [
+        {
+          "id": "Any-Type Nonland Mana Amplifier",
+          "type_line": "Legendary Creature — Druid",
+          "oracle_text": "Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.",
+          "cmc": 2
+        },
+        {
+          "id": "Break-Even Self Untapper With Colorless",
+          "type_line": "Artifact",
+          "oracle_text": "{T}: Add {C}{C}{C}. {3}: Untap this artifact.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
       "id": "negative-colorless-amplifier-colored-self-untapper",
       "sourceType": "negative-near-miss",
       "expect": {
@@ -592,6 +664,48 @@
           "id": "Colored Self Untapper",
           "type_line": "Creature — Elf",
           "oracle_text": "{T}: Add {G}{G}{G}. {3}: Untap this creature.",
+          "cmc": 3
+        }
+      ]
+    },
+    {
+      "id": "negative-lifelink-counter-noncreature-source",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Lifelink Counter Engine",
+          "type_line": "Enchantment Creature — God",
+          "oracle_text": "Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.",
+          "cmc": 3
+        },
+        {
+          "id": "Counter Damage Artifact",
+          "type_line": "Artifact",
+          "oracle_text": "This artifact enters with X +1/+1 counters on it. Remove a +1/+1 counter from this artifact: It deals 1 damage to any target.",
+          "cmc": 0
+        }
+      ]
+    },
+    {
+      "id": "negative-any-type-amplifier-break-even-only",
+      "sourceType": "negative-near-miss",
+      "expect": {
+        "status": "not-proven"
+      },
+      "cards": [
+        {
+          "id": "Any-Type Nonland Mana Amplifier",
+          "type_line": "Legendary Creature — Druid",
+          "oracle_text": "Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.",
+          "cmc": 2
+        },
+        {
+          "id": "Break-Even Low Output Untapper",
+          "type_line": "Artifact",
+          "oracle_text": "{T}: Add {C}{C}. {3}: Untap this artifact.",
           "cmc": 3
         }
       ]

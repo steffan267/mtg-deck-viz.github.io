@@ -29,12 +29,28 @@ const DEFAULT_CATEGORIES = [
   'golgari',
   'boros',
   'simic',
+  'esper',
+  'grixis',
+  'jund',
+  'naya',
+  'bant',
+  'abzan',
+  'jeskai',
+  'sultai',
+  'mardu',
+  'temur',
+  'yore-tiller',
+  'glint-eye',
+  'dune-brood',
+  'ink-treader',
+  'witch-maw',
   'five-color',
 ];
+const CATEGORY_RE = /\/combos\/(early-game-2-card-combos|late-game-2-card-combos|mono-[a-z]+|colorless|azorius|dimir|rakdos|gruul|selesnya|orzhov|izzet|golgari|boros|simic|esper|grixis|jund|naya|bant|abzan|jeskai|sultai|mardu|temur|five-color|yore-tiller|glint-eye|dune-brood|ink-treader|witch-maw)$/;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function usage() {
-  console.error('Usage: node analysis/edhrec-combos/fetch-edhrec-combos.js [--out file] [--categories a,b] [--per-category n] [--max-details n] [--delay-ms n] [--force]');
+  console.error('Usage: node analysis/edhrec-combos/fetch-edhrec-combos.js [--out file] [--categories a,b] [--discover-categories|--all] [--per-category n|all] [--max-details n|all] [--max-pages-per-category n|all] [--no-details] [--fresh] [--delay-ms n] [--force]');
   process.exit(2);
 }
 
@@ -43,27 +59,53 @@ function parsePositiveInt(value, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+function parseNonNegativeLimit(value, fallback) {
+  if (String(value).toLowerCase() === 'all') return Infinity;
+  const n = parseInt(String(value), 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
 function parseArgs(argv) {
-  const opts = {
-    out: DEFAULT_OUT,
-    categories: DEFAULT_CATEGORIES.slice(),
-    perCategory: 20,
-    maxDetails: 160,
-    delayMs: 250,
-    force: false,
-  };
+  const opts = defaultOptions();
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--out') opts.out = argv[++i];
     else if (arg === '--categories') opts.categories = String(argv[++i] || '').split(',').map(s => s.trim()).filter(Boolean);
-    else if (arg === '--per-category') opts.perCategory = parsePositiveInt(argv[++i], opts.perCategory);
-    else if (arg === '--max-details') opts.maxDetails = parsePositiveInt(argv[++i], opts.maxDetails);
+    else if (arg === '--discover-categories') opts.discoverCategories = true;
+    else if (arg === '--all') {
+      opts.discoverCategories = true;
+      opts.perCategory = Infinity;
+      opts.maxDetails = 0;
+      opts.fetchDetails = false;
+      opts.maxPagesPerCategory = Infinity;
+      opts.fresh = true;
+    }
+    else if (arg === '--per-category') opts.perCategory = parseNonNegativeLimit(argv[++i], opts.perCategory);
+    else if (arg === '--max-details') opts.maxDetails = parseNonNegativeLimit(argv[++i], opts.maxDetails);
+    else if (arg === '--max-pages-per-category') opts.maxPagesPerCategory = parseNonNegativeLimit(argv[++i], opts.maxPagesPerCategory);
+    else if (arg === '--no-details') { opts.fetchDetails = false; opts.maxDetails = 0; }
+    else if (arg === '--fresh') opts.fresh = true;
     else if (arg === '--delay-ms') opts.delayMs = parsePositiveInt(argv[++i], opts.delayMs);
     else if (arg === '--force') opts.force = true;
     else if (arg === '--help') usage();
     else usage();
   }
   return opts;
+}
+
+function defaultOptions() {
+  return {
+    out: DEFAULT_OUT,
+    categories: DEFAULT_CATEGORIES.slice(),
+    perCategory: 20,
+    maxDetails: 160,
+    maxPagesPerCategory: Infinity,
+    delayMs: 250,
+    force: false,
+    fresh: false,
+    discoverCategories: false,
+    fetchDetails: true,
+  };
 }
 
 function decodeHtml(value) {
@@ -101,11 +143,18 @@ function categoryUrl(category) {
   return `${BASE_URL}/combos/${category}`;
 }
 
+function jsonPageUrl(morePath) {
+  const clean = String(morePath || '').replace(/^\/+/, '');
+  if (!clean) return null;
+  if (/^https?:\/\//i.test(clean)) return clean;
+  return `https://json.edhrec.com/pages/${clean}`;
+}
+
 function normalizeDetailPath(href) {
   const clean = String(href || '').split('#')[0];
   if (!/^\/combos\//.test(clean)) return null;
   if (/^\/combos\/?$/.test(clean)) return null;
-  if (/\/combos\/(early-game-2-card-combos|late-game-2-card-combos|mono-|colorless|azorius|dimir|rakdos|gruul|selesnya|orzhov|izzet|golgari|boros|simic|esper|grixis|jund|naya|bant|abzan|jeskai|sultai|mardu|temur|five-color|yore-tiller|glint-eye|dune-brood|ink-treader|witch-maw)$/.test(clean)) return null;
+  if (CATEGORY_RE.test(clean)) return null;
   return clean;
 }
 
@@ -113,9 +162,131 @@ function comboIdFromPath(detailPath) {
   return String(detailPath || '').replace(/^\/combos\//, '').replace(/[^a-z0-9_-]+/gi, '-');
 }
 
-function parseCategoryPage(html, category) {
+function parseNextDataResult(html) {
+  const match = String(html || '').match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!match) return { present: false, data: null, error: null };
+  try {
+    return { present: true, data: JSON.parse(decodeHtml(match[1])), error: null };
+  } catch (err) {
+    return { present: true, data: null, error: `invalid __NEXT_DATA__: ${err.message}` };
+  }
+}
+
+function parseNextData(html) {
+  return parseNextDataResult(html).data;
+}
+
+function cardNamesFromCardlistEntry(entry) {
+  const fromViews = Array.isArray(entry && entry.cardviews)
+    ? entry.cardviews.map(card => compactText(card && card.name)).filter(Boolean)
+    : [];
+  if (fromViews.length) return [...new Set(fromViews)];
+  const header = compactText(entry && entry.header).replace(/\s*\([^)]*decks?\)\s*$/i, '');
+  return header.split(/\s+\+\s+/).map(compactText).filter(Boolean);
+}
+
+function comboFromCardlistEntry(entry, category) {
+  const detailPath = normalizeDetailPath(entry && entry.href);
+  if (!detailPath) return null;
+  const combo = entry.combo || {};
+  const cards = cardNamesFromCardlistEntry(entry);
+  return {
+    id: comboIdFromPath(detailPath),
+    detailPath,
+    url: BASE_URL + detailPath,
+    categories: [category],
+    cards,
+    cardCount: cards.length,
+    prerequisites: [],
+    steps: [],
+    results: Array.isArray(combo.results) ? combo.results.map(compactText).filter(Boolean) : [],
+    metadata: {
+      deckCount: typeof combo.count === 'number' ? combo.count : null,
+      eligibleDecks: typeof combo.maxCount === 'number' ? combo.maxCount : null,
+      rank: typeof combo.rank === 'number' ? combo.rank : null,
+      spellbook: null,
+      comboVote: combo.comboVote || null,
+      percentage: typeof combo.percentage === 'number' ? combo.percentage : null,
+      colors: combo.colors || null,
+    },
+  };
+}
+
+function mergeMetadata(existing, incoming) {
+  const merged = Object.assign({}, existing || {});
+  for (const [key, value] of Object.entries(incoming || {})) {
+    if (value !== null && value !== undefined) merged[key] = value;
+  }
+  return merged;
+}
+
+function mergeComboSeed(existing, incoming) {
+  if (!existing) return incoming;
+  return Object.assign({}, existing, incoming, {
+    categories: mergeCategories(existing.categories, incoming.categories),
+    cards: incoming.cards && incoming.cards.length ? incoming.cards : existing.cards,
+    cardCount: incoming.cardCount || existing.cardCount,
+    prerequisites: incoming.prerequisites && incoming.prerequisites.length ? incoming.prerequisites : existing.prerequisites,
+    steps: incoming.steps && incoming.steps.length ? incoming.steps : existing.steps,
+    results: incoming.results && incoming.results.length ? incoming.results : existing.results,
+    metadata: mergeMetadata(existing.metadata, incoming.metadata),
+  });
+}
+
+function parseCardlistEntries(cardlists, category) {
   const details = [];
   const seen = new Set();
+  for (const entry of cardlists || []) {
+    const combo = comboFromCardlistEntry(entry, category);
+    if (!combo || seen.has(combo.detailPath)) continue;
+    seen.add(combo.detailPath);
+    details.push(combo);
+  }
+  return details;
+}
+
+function comboPayloadFromNextData(data) {
+  return data && data.props && data.props.pageProps && data.props.pageProps.data
+    && data.props.pageProps.data.container && data.props.pageProps.data.container.json_dict || null;
+}
+
+function nextDataComboPayload(html) {
+  return comboPayloadFromNextData(parseNextData(html));
+}
+
+function discoverCategoriesFromIndex(html) {
+  const categories = [];
+  const seen = new Set();
+  const re = /href="(\/combos\/[^"#?]+)"/gi;
+  let match;
+  while ((match = re.exec(String(html || ''))) !== null) {
+    const clean = decodeHtml(match[1]).split('#')[0];
+    const category = (clean.match(CATEGORY_RE) || [])[1];
+    if (!category || seen.has(category)) continue;
+    seen.add(category);
+    categories.push(category);
+  }
+  return categories;
+}
+
+function parseCategoryPageResult(html, category) {
+  const parsed = parseNextDataResult(html);
+  const diagnostics = [];
+  let embedded = null;
+  if (parsed.error) {
+    diagnostics.push({ stage: 'category-parse', category, error: parsed.error });
+  } else if (parsed.present) {
+    embedded = comboPayloadFromNextData(parsed.data);
+    if (!embedded) {
+      diagnostics.push({
+        stage: 'category-schema',
+        category,
+        error: '__NEXT_DATA__ missing props.pageProps.data.container.json_dict',
+      });
+    }
+  }
+  const details = parseCardlistEntries(embedded && embedded.cardlists, category);
+  const seen = new Set(details.map(detail => detail.detailPath));
   const re = /<a\s+[^>]*href="([^"]+)"[^>]*>\s*<button[^>]*>\s*View combo details\s*<\/button>\s*<\/a>/gi;
   let match;
   while ((match = re.exec(String(html || ''))) !== null) {
@@ -124,7 +295,28 @@ function parseCategoryPage(html, category) {
     seen.add(detailPath);
     details.push({ id: comboIdFromPath(detailPath), detailPath, url: BASE_URL + detailPath, categories: [category] });
   }
-  return details;
+  return {
+    details,
+    more: embedded && typeof embedded.more === 'string' ? embedded.more : null,
+    diagnostics,
+  };
+}
+
+function parseCategoryPage(html, category) {
+  return parseCategoryPageResult(html, category).details;
+}
+
+function parseCategoryMorePath(html) {
+  return parseCategoryPageResult(html, '').more;
+}
+
+function parsePaginatedComboJson(text, category) {
+  const payload = JSON.parse(String(text || '{}'));
+  return {
+    details: parseCardlistEntries(payload.cardlists || [], category),
+    more: typeof payload.more === 'string' ? payload.more : null,
+    isPaginated: Boolean(payload.is_paginated),
+  };
 }
 
 function cardNamesFromDetailHtml(html) {
@@ -229,9 +421,33 @@ function normalizeCache(raw) {
   };
 }
 
+function failureKey(failure) {
+  return [
+    failure && failure.url,
+    failure && failure.stage,
+    failure && failure.category,
+    failure && failure.detailPath,
+  ].filter(Boolean).join('#');
+}
+
+function setFailure(failuresByUrl, failure) {
+  failuresByUrl.set(failureKey(failure), failure);
+}
+
+function deleteFailuresForUrlStage(failuresByUrl, url, stagePrefix) {
+  for (const [key, failure] of failuresByUrl.entries()) {
+    if (!failure || failure.url !== url) continue;
+    if (!stagePrefix || String(failure.stage || '').startsWith(stagePrefix)) failuresByUrl.delete(key);
+  }
+}
+
 function loadCache(out) {
   if (!fs.existsSync(out)) return normalizeCache(null);
   return normalizeCache(JSON.parse(fs.readFileSync(out, 'utf8')));
+}
+
+function limitForJson(value) {
+  return value === Infinity ? 'all' : value;
 }
 
 function buildOutput(opts, categories, combosByPath, failuresByUrl) {
@@ -246,9 +462,14 @@ function buildOutput(opts, categories, combosByPath, failuresByUrl) {
       failureCount: failures.length,
       options: {
         categories: opts.categories,
-        perCategory: opts.perCategory,
-        maxDetails: opts.maxDetails,
+        perCategory: limitForJson(opts.perCategory),
+        maxDetails: limitForJson(opts.maxDetails),
+        maxPagesPerCategory: limitForJson(opts.maxPagesPerCategory),
+        discoverCategories: opts.discoverCategories,
+        fetchDetails: opts.fetchDetails,
+        fresh: opts.fresh,
       },
+      detailPagesFetched: combos.filter(combo => combo.fetchedAt && combo.steps && combo.steps.length).length,
       complete: failures.length === 0,
     },
     categories,
@@ -269,46 +490,89 @@ async function httpGet(url) {
 }
 
 async function fetchEdhrecCombos(opts, fetcher = httpGet) {
-  const cache = loadCache(opts.out);
+  opts = Object.assign(defaultOptions(), opts || {});
+  const cache = opts.fresh ? normalizeCache(null) : loadCache(opts.out);
   const categories = Object.assign({}, cache.categories || {});
   const combosByPath = new Map((cache.combos || []).filter(c => c.detailPath).map(c => [c.detailPath, c]));
-  const failuresByUrl = new Map((cache.failures || []).filter(f => f.url).map(f => [f.url, f]));
+  const failuresByUrl = new Map((cache.failures || []).filter(f => f.url).map(f => [failureKey(f), f]));
+  let categoriesToFetch = opts.categories.slice();
 
-  for (const category of opts.categories) {
+  if (opts.discoverCategories) {
+    const url = BASE_URL + '/combos';
+    process.stdout.write('[index] discovering categories … ');
+    try {
+      const html = await fetcher(url);
+      const discovered = discoverCategoriesFromIndex(html);
+      if (discovered.length) categoriesToFetch = discovered;
+      deleteFailuresForUrlStage(failuresByUrl, url, 'index');
+      process.stdout.write(`${categoriesToFetch.length} categories\n`);
+    } catch (err) {
+      setFailure(failuresByUrl, { url, stage: 'index', error: err.message, failedAt: new Date().toISOString() });
+      process.stdout.write(`✗ ${err.message}; falling back to ${categoriesToFetch.length} configured categories\n`);
+    }
+  }
+
+  for (const category of categoriesToFetch) {
     const url = categoryUrl(category);
     process.stdout.write(`[category] ${category} … `);
     try {
       const html = await fetcher(url);
-      const found = parseCategoryPage(html, category).slice(0, opts.perCategory);
-      categories[category] = { url, found: found.length, fetchedAt: new Date().toISOString() };
-      for (const seed of found) {
-        const existing = combosByPath.get(seed.detailPath);
-        if (existing) existing.categories = mergeCategories(existing.categories, seed.categories);
-        else combosByPath.set(seed.detailPath, seed);
+      const parsedCategory = parseCategoryPageResult(html, category);
+      const found = parsedCategory.details;
+      let more = parsedCategory.more;
+      let pageCount = 1;
+      const seenMore = new Set();
+      while (more && found.length < opts.perCategory && pageCount < opts.maxPagesPerCategory && !seenMore.has(more)) {
+        seenMore.add(more);
+        const moreUrl = jsonPageUrl(more);
+        if (!moreUrl) break;
+        const json = await fetcher(moreUrl);
+        const page = parsePaginatedComboJson(json, category);
+        found.push(...page.details);
+        more = page.more;
+        pageCount++;
+        deleteFailuresForUrlStage(failuresByUrl, moreUrl, 'page');
+        if (opts.delayMs > 0) await sleep(opts.delayMs);
       }
-      failuresByUrl.delete(url);
-      process.stdout.write(`${found.length} detail links\n`);
+      const included = found.slice(0, opts.perCategory);
+      categories[category] = {
+        url,
+        found: included.length,
+        fetchedPages: pageCount,
+        exhausted: !more || included.length < opts.perCategory,
+        availableInFetchedPages: found.length,
+        fetchedAt: new Date().toISOString(),
+      };
+      for (const seed of included) {
+        const existing = combosByPath.get(seed.detailPath);
+        combosByPath.set(seed.detailPath, mergeComboSeed(existing, seed));
+      }
+      deleteFailuresForUrlStage(failuresByUrl, url, 'category');
+      for (const diagnostic of parsedCategory.diagnostics) {
+        setFailure(failuresByUrl, Object.assign({ url, failedAt: new Date().toISOString() }, diagnostic));
+      }
+      process.stdout.write(`${included.length} combos from ${pageCount} page(s)${more && included.length >= opts.perCategory ? ' (limit reached)' : ''}\n`);
     } catch (err) {
-      failuresByUrl.set(url, { url, category, stage: 'category', error: err.message, failedAt: new Date().toISOString() });
+      setFailure(failuresByUrl, { url, category, stage: 'category', error: err.message, failedAt: new Date().toISOString() });
       process.stdout.write(`✗ ${err.message}\n`);
     }
     writeCache(opts.out, buildOutput(opts, categories, combosByPath, failuresByUrl));
     if (opts.delayMs > 0) await sleep(opts.delayMs);
   }
 
-  const seeds = [...combosByPath.values()].slice(0, opts.maxDetails);
+  const seeds = opts.fetchDetails ? [...combosByPath.values()].slice(0, opts.maxDetails) : [];
   for (let i = 0; i < seeds.length; i++) {
     const seed = seeds[i];
-    if (!opts.force && Array.isArray(seed.cards) && seed.cards.length && Array.isArray(seed.results) && seed.results.length) continue;
+    if (!opts.force && Array.isArray(seed.steps) && seed.steps.length) continue;
     process.stdout.write(`[detail ${i + 1}/${seeds.length}] ${seed.detailPath} … `);
     try {
       const html = await fetcher(seed.url);
       const parsed = parseComboDetailPage(html, seed);
-      combosByPath.set(seed.detailPath, Object.assign({}, seed, parsed, { fetchedAt: new Date().toISOString() }));
-      failuresByUrl.delete(seed.url);
+      combosByPath.set(seed.detailPath, mergeComboSeed(seed, Object.assign({}, parsed, { fetchedAt: new Date().toISOString() })));
+      deleteFailuresForUrlStage(failuresByUrl, seed.url, 'detail');
       process.stdout.write(`${parsed.cards.length} cards, ${parsed.results.length} results\n`);
     } catch (err) {
-      failuresByUrl.set(seed.url, { url: seed.url, detailPath: seed.detailPath, stage: 'detail', error: err.message, failedAt: new Date().toISOString() });
+      setFailure(failuresByUrl, { url: seed.url, detailPath: seed.detailPath, stage: 'detail', error: err.message, failedAt: new Date().toISOString() });
       process.stdout.write(`✗ ${err.message}\n`);
     }
     writeCache(opts.out, buildOutput(opts, categories, combosByPath, failuresByUrl));
@@ -336,8 +600,13 @@ if (require.main === module) {
     DEFAULT_CATEGORIES,
     parseArgs,
     decodeHtml,
+    discoverCategoriesFromIndex,
     htmlToLines,
+    jsonPageUrl,
+    parseNextDataResult,
+    parseCategoryPageResult,
     parseCategoryPage,
+    parsePaginatedComboJson,
     parseComboDetailPage,
     fetchEdhrecCombos,
   };

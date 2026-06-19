@@ -14,9 +14,12 @@ function card(name, typeLine, oracleText, cmc = 1, mana_cost = '') {
 const idx = {
   'gain from loss': card('Gain From Loss', 'Enchantment', 'Whenever an opponent loses life, you gain that much life.', 5),
   'loss from gain': card('Loss From Gain', 'Enchantment', 'Whenever you gain life, target opponent loses that much life.', 5),
+  'fixed loss from gain': card('Fixed Loss From Gain', 'Creature — Cleric', 'Whenever you gain life, each opponent loses 1 life.', 3),
   'blank rock': card('Blank Rock', 'Artifact', '{T}: Add {C}.', 2),
   'draw damage engine': card('Draw Damage Engine', 'Legendary Creature — Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.', 6),
   'damage draw aura': card('Damage Draw Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.', 1),
+  'lifelink counter engine': card('Lifelink Counter Engine', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.', 3),
+  'counter damage creature': card('Counter Damage Creature', 'Artifact Creature — Construct', 'This creature enters with X +1/+1 counters on it. Remove a +1/+1 counter from this creature: It deals 1 damage to any target.', 0),
   'recursive body': card('Recursive Body', 'Creature — Zombie', 'You may cast this card from your graveyard.', 1, '{B}'),
   'mana sac outlet': card('Mana Sac Outlet', 'Artifact', 'Sacrifice a creature: Add one mana of any color.', 3),
   'colored recursive body': card('Colored Recursive Body', 'Creature — Skeleton', '{1}{B}: Return this creature from your graveyard to the battlefield.', 2),
@@ -25,6 +28,7 @@ const idx = {
   'hasty copy engine': card('Hasty Copy Engine', 'Legendary Creature — Goblin Shaman', "{T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste.", 5),
   'permanent untapper': card('Permanent Untapper', 'Creature — Human Warrior', 'When this creature enters, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn.', 5),
   'colorless mana amplifier': card('Colorless Mana Amplifier', 'Artifact', 'Whenever you tap a permanent for {C}, add an additional {C}.', 5),
+  'any-type nonland mana amplifier': card('Any-Type Nonland Mana Amplifier', 'Legendary Creature — Druid', 'Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.', 2),
   'break-even self untapper with colorless': card('Break-Even Self Untapper With Colorless', 'Artifact', '{T}: Add {C}{C}{C}. {3}: Untap this artifact.', 3),
   'mill to life loss payoff': card('Mill To Life Loss Payoff', 'Enchantment', "Whenever a card is put into an opponent's graveyard from anywhere, that player loses 1 life and you gain 1 life.", 1),
   'life loss to mill payoff': card('Life Loss To Mill Payoff', 'Enchantment', 'Whenever an opponent loses life, that player mills that many cards.', 3),
@@ -95,6 +99,20 @@ assert.equal(lifeLoop.bucket, 'proved');
 assert.ok(lifeLoop.familySignals.includes('lifegain-lifeloss-loop'));
 assert.equal(lifeLoop.resultCoverage.coveredAny, true);
 
+const fixedLifeLoop = evaluateCombo({
+  id: 'fixed-life-loop',
+  detailPath: '/combos/test/fixed-life-loop',
+  url: 'https://example.test/fixed-life-loop',
+  cards: ['Gain From Loss', 'Fixed Loss From Gain'],
+  cardCount: 2,
+  results: ['Infinite lifegain', 'Infinite lifeloss'],
+  categories: ['test'],
+  metadata: { deckCount: 9 },
+}, idx);
+assert.equal(fixedLifeLoop.bucket, 'proved');
+assert.ok(fixedLifeLoop.familySignals.includes('lifegain-lifeloss-loop'));
+assert.equal(fixedLifeLoop.resultCoverage.coveredAny, true);
+
 const drawDamageLoop = evaluateCombo({
   id: 'draw-damage-loop',
   detailPath: '/combos/test/draw-damage-loop',
@@ -111,6 +129,20 @@ assert.deepEqual(drawDamageLoop.proofOnlyModelClasses, ['infinite-damage', 'infi
 assert.equal(drawDamageLoop.proofOnlyResultCoverage.coveredAny, true);
 assert.deepEqual(drawDamageLoop.modelClasses, ['infinite-damage', 'infinite-draw']);
 assert.equal(drawDamageLoop.resultCoverage.coveredAny, true);
+
+const lifelinkCounterDamageLoop = evaluateCombo({
+  id: 'lifelink-counter-damage-loop',
+  detailPath: '/combos/test/lifelink-counter-damage-loop',
+  url: 'https://example.test/lifelink-counter-damage-loop',
+  cards: ['Lifelink Counter Engine', 'Counter Damage Creature'],
+  cardCount: 2,
+  results: ['Infinite damage', 'Infinite lifegain'],
+  categories: ['test'],
+  metadata: { deckCount: 8 },
+}, idx);
+assert.equal(lifelinkCounterDamageLoop.bucket, 'proved');
+assert.ok(lifelinkCounterDamageLoop.familySignals.includes('lifelink-counter-damage-loop'));
+assert.equal(lifelinkCounterDamageLoop.resultCoverage.coveredAny, true);
 
 const recursiveSacLoop = evaluateCombo({
   id: 'recursive-sac-loop',
@@ -169,6 +201,20 @@ const amplifiedSelfUntapLoop = evaluateCombo({
 assert.equal(amplifiedSelfUntapLoop.bucket, 'proved');
 assert.ok(amplifiedSelfUntapLoop.familySignals.includes('self-untap-mana-loop'));
 assert.equal(amplifiedSelfUntapLoop.resultCoverage.coveredAny, true);
+
+const anyTypeAmplifiedSelfUntapLoop = evaluateCombo({
+  id: 'any-type-amplified-self-untap-loop',
+  detailPath: '/combos/test/any-type-amplified-self-untap-loop',
+  url: 'https://example.test/any-type-amplified-self-untap-loop',
+  cards: ['Any-Type Nonland Mana Amplifier', 'Break-Even Self Untapper With Colorless'],
+  cardCount: 2,
+  results: ['Infinite mana'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(anyTypeAmplifiedSelfUntapLoop.bucket, 'proved');
+assert.ok(anyTypeAmplifiedSelfUntapLoop.familySignals.includes('self-untap-mana-loop'));
+assert.equal(anyTypeAmplifiedSelfUntapLoop.resultCoverage.coveredAny, true);
 
 const millLifeLossLoop = evaluateCombo({
   id: 'mill-lifeloss-loop',
@@ -297,11 +343,14 @@ assert.deepEqual(miss.missing, ['Missing Card']);
 
 const summary = summarizeEvaluations([
   lifeLoop,
+  fixedLifeLoop,
   drawDamageLoop,
+  lifelinkCounterDamageLoop,
   recursiveSacLoop,
   layeredRecursiveSacLoop,
   hastyCopyLoop,
   amplifiedSelfUntapLoop,
+  anyTypeAmplifiedSelfUntapLoop,
   millLifeLossLoop,
   opponentDrawPunisherWin,
   millMultiplierFinisher,
@@ -309,12 +358,12 @@ const summary = summarizeEvaluations([
   tokenReplacementSacLoop,
   miss,
 ], { source: 'fixture' });
-assert.equal(summary.totalDetailed, 12);
-assert.equal(summary.byBucket.proved, 11);
+assert.equal(summary.totalDetailed, 15);
+assert.equal(summary.byBucket.proved, 14);
 assert.equal(summary.byBucket['missing-card'], 1);
-assert.equal(summary.proofOnlyExpectedClassCoverage.considered, 12);
-assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAny, 10);
-assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAnyPct, 83.3);
+assert.equal(summary.proofOnlyExpectedClassCoverage.considered, 15);
+assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAny, 13);
+assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAnyPct, 86.7);
 assert.ok(renderMarkdown({ summary, edgeCases: [] }).includes('EDHREC combo model baseline'));
 assert.ok(renderMarkdown({ summary, edgeCases: [] }).includes('Proof-only expected result-class coverage'));
 

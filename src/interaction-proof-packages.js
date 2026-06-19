@@ -121,6 +121,12 @@ function seedCandidates(indexes, options) {
 
   pairCandidates(
     candidates,
+    capabilityIds(indexes, 'is-lifelink-counter-engine'),
+    capabilityIds(indexes, 'is-counter-to-damage-source'),
+  );
+
+  pairCandidates(
+    candidates,
     capabilityIds(indexes, 'is-mass-opponent-draw-source'),
     capabilityIds(indexes, 'is-opponent-draw-punisher'),
   );

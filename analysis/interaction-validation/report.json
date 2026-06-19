@@ -6,10 +6,10 @@
     "budgetMs": 250
   },
   "summary": {
-    "caseCount": 41,
-    "positiveCount": 21,
-    "negativeCount": 20,
-    "truePositives": 21,
+    "caseCount": 46,
+    "positiveCount": 24,
+    "negativeCount": 22,
+    "truePositives": 24,
     "falseNegatives": 0,
     "falsePositives": 0,
     "recall": 1,
@@ -21,6 +21,22 @@
     "averageProofConfidence": 0.75
   },
   "rows": [
+    {
+      "id": "known-combo-any-type-amplified-self-untap",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "self-untap-mana-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "self-untap-mana-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
     {
       "id": "known-combo-aristocrats-token",
       "sourceType": "known-combo-seed",
@@ -80,6 +96,22 @@
       "actualStatus": "proven",
       "actualFamilies": [
         "draw-damage-feedback-loop"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-fixed-lifegain-lifeloss",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "lifegain-lifeloss-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "lifegain-lifeloss-loop"
       ],
       "pass": true,
       "confidence": 0.75,
@@ -146,6 +178,22 @@
       "actualStatus": "proven",
       "actualFamilies": [
         "library-exile-empty-library-win"
+      ],
+      "pass": true,
+      "confidence": 0.75,
+      "rejectionReasons": []
+    },
+    {
+      "id": "known-combo-lifelink-counter-damage",
+      "sourceType": "known-combo-seed",
+      "cardCount": 2,
+      "expectedStatus": "proven",
+      "expectedFamilies": [
+        "lifelink-counter-damage-loop"
+      ],
+      "actualStatus": "proven",
+      "actualFamilies": [
+        "lifelink-counter-damage-loop"
       ],
       "pass": true,
       "confidence": 0.75,
@@ -298,6 +346,20 @@
       "rejectionReasons": []
     },
     {
+      "id": "negative-any-type-amplifier-break-even-only",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "self-untap cost is not below produced mana"
+      ]
+    },
+    {
       "id": "negative-colored-recursion-colorless-sac",
       "sourceType": "negative-near-miss",
       "cardCount": 2,
@@ -377,6 +439,20 @@
       "confidence": 0,
       "rejectionReasons": [
         "hasty creature-copy target restrictions cannot copy the ETB untapper"
+      ]
+    },
+    {
+      "id": "negative-lifelink-counter-noncreature-source",
+      "sourceType": "negative-near-miss",
+      "cardCount": 2,
+      "expectedStatus": "not-proven",
+      "expectedFamilies": [],
+      "actualStatus": "not-repeatable",
+      "actualFamilies": [],
+      "pass": true,
+      "confidence": 0,
+      "rejectionReasons": [
+        "lifelink/counter engine cannot legally target the counter-damage source as a creature"
       ]
     },
     {
@@ -651,7 +727,7 @@
       "status": "local-fixtures",
       "purpose": "Known combo-deck packages and regression-tracked proof families.",
       "caseSourceType": "known-combo-seed",
-      "caseCount": 17
+      "caseCount": 20
     },
     {
       "id": "negative-near-misses",
@@ -659,7 +735,7 @@
       "status": "local-fixtures",
       "purpose": "Precision guards for one-shot effects, scoped reducers, illegal targets, unmet preconditions, unreplenished bodies, and token reminder overreach.",
       "caseSourceType": "negative-near-miss",
-      "caseCount": 20
+      "caseCount": 22
     },
     {
       "id": "precon-sample-100",

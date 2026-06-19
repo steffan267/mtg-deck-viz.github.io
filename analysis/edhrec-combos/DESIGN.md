@@ -11,7 +11,10 @@ capabilities, events, and proof families rather than combo card names.
 
 `https://edhrec.com/combos` exposes category links, including bracket-relevant
 combo groups (`early-game-2-card-combos`, `late-game-2-card-combos`) and color
-combo pages. Category pages render repeated combo summaries containing:
+combo pages. Category pages render repeated combo summaries in their
+`__NEXT_DATA__` payload and continue through
+`https://json.edhrec.com/pages/combos/<category>-N.json` pagination. Those
+summary records contain enough evidence for broad evaluation:
 
 - card names
 - card count (`2 card combo`, etc.)
@@ -19,9 +22,10 @@ combo pages. Category pages render repeated combo summaries containing:
 - result labels such as `Infinite lifegain`, `Infinite colorless mana`,
   `Win the game`
 - Commander bracket link markers
-- `View combo details` links
+- `View combo details` links / stable detail paths
 
-Detail pages expose more analysis-useful fields:
+Detail pages expose additional analysis-useful fields for sampled/deep-dive
+records:
 
 - card names
 - prerequisites
@@ -31,21 +35,31 @@ Detail pages expose more analysis-useful fields:
 - Commander bracket notes
 - Commander Spellbook outbound link
 
+The scraper treats malformed or schema-shifted category `__NEXT_DATA__` payloads
+as completeness failures even when fallback HTML links still yield combo rows.
+This keeps parser drift visible instead of silently presenting a partial corpus
+as complete.
+
 ## Local artifacts
 
-Planned ignored artifacts under `analysis/edhrec-combos/`:
+Ignored generated artifacts under `analysis/edhrec-combos/`:
 
 - `edhrec-combo-cache.json` — fetched category and detail evidence records.
 - `edhrec-combo-evaluation.json` — machine-readable evaluation of model behavior.
 - `edhrec-combo-evaluation.md` — human-readable baseline and edge-case report.
 
-Planned tracked tools/tests:
+Tracked tools/tests:
 
 - `analysis/edhrec-combos/fetch-edhrec-combos.js` — polite/resumable scraper.
 - `analysis/edhrec-combos/evaluate-edhrec-combos.js` — offline evaluator.
 - `analysis/edhrec-combos/evidence-card-names.json` — generated EDHREC card-name
   evidence for the no-hardcoding guard in clean checkouts.
 - tests for parser/evaluator behavior with fixed HTML/fixture data.
+
+
+## Current full-corpus baseline
+
+As of the 2026-06-19 clean run, the scraper fetched 34 EDHREC combo categories, 54,714 unique combo summaries, and 54,710 evaluable rows. The local evaluator resolves 99.4% of those rows against the checked-in card index. After the first generalized classifier iteration, bounded proof/package logic proves 527 rows and detects 1,997 combo-family signals without runtime card-name branches.
 
 ## Evaluation approach
 
@@ -65,6 +79,12 @@ For each cached combo record:
 Card names may appear in scraped cache, output reports, and regression fixtures.
 New model/classifier logic must use text-derived facts only: events,
 capabilities, costs, trigger conditions, repeatability, and resource deltas.
-`npm run no-hardcode:interactions` scans core classifier/proof files using the
-tracked EDHREC evidence snapshot plus an optional local cache, with normalized
-case/punctuation matching so lowercase card-name branches are still caught.
+`npm run no-hardcode:interactions` auto-discovers current runtime interaction
+logic files under `src/` (while excluding declarative combo-family examples) and
+scans them using the tracked EDHREC evidence snapshot plus distinctive
+multi-token/punctuated names from any optional local exhaustive cache. The
+exhaustive cache contains card names that are also generic rules/model words
+(for example common mechanics and layout terms), so single-token optional-only
+names are excluded to avoid blocking generalized classifiers while the tracked
+evidence snapshot still catches known high-value combo card names in clean
+checkouts.

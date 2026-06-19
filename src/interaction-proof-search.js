@@ -387,6 +387,41 @@ function proveDrawDamageFeedback(cards) {
   ]);
 }
 
+function proveLifelinkCounterDamageLoop(cards) {
+  const engine = find(cards, c => hasCap(c, 'is-lifelink-counter-engine'));
+  const source = find(cards, c => c !== engine && hasCap(c, 'is-counter-to-damage-source'));
+  if (!engine || !source) return null;
+  if (!MODEL.faceCompatibleCaps(source, ['is-creature-permanent', 'is-counter-to-damage-source'])) {
+    return failure(
+      'proof:lifelink-counter-damage-target-illegal:' + sorted([engine.id, source.id]).join('|'),
+      [engine, source],
+      'lifelink/counter engine cannot legally target the counter-damage source as a creature',
+      { sourceCaps: (source.caps || []).filter(cap => /creature|counter-to-damage/.test(cap)) },
+    );
+  }
+  return success('proof:lifelink-counter-damage:' + sorted([engine.id, source.id]).join('|'), 'lifelink-counter-damage-loop', [engine, source], {
+    requiredFacts: [
+      fact(engine, 'is-lifelink-counter-engine'),
+      fact(engine, 'grants-lifelink-to-creature'),
+      fact(engine, 'is-lifegain-to-counter-payoff'),
+      fact(source, 'is-counter-to-damage-source'),
+      fact(source, 'is-creature-permanent'),
+    ],
+    steps: [
+      { card: engine.id, action: 'grants lifelink to the counter-fueled damage creature' },
+      { card: source.id, action: 'removes a +1/+1 counter to deal damage', delta: { counters: -1, damage: 1 } },
+      { card: source.id, action: 'lifelink on that damage causes you to gain life', delta: { life: 1 } },
+      { card: engine.id, action: 'lifegain trigger puts a +1/+1 counter back on the damage source', delta: { counters: 1 } },
+      { action: 'the spent counter is restored and the loop can repeat' },
+    ],
+    assumptions: ['the damage source starts with or can receive an initial +1/+1 counter', 'the lifelink grant and counter trigger target the same creature'],
+    repeatability: { status: 'repeatable-candidate', reason: 'each damage event restores the counter consumed to create it' },
+  }, [
+    { resource: 'damage', min: 1, max: Infinity },
+    { resource: 'life', min: 1, max: Infinity },
+  ]);
+}
+
 function proveOpponentDrawPunisherWin(cards) {
   const drawSource = find(cards, c => hasCap(c, 'is-mass-opponent-draw-source'));
   const punisher = find(cards, c => c !== drawSource && hasCap(c, 'is-opponent-draw-punisher'));
@@ -855,6 +890,7 @@ function provePackage(rawCards, options = {}) {
     proveLifeLoop(cards),
     proveMillLifeLossLoop(cards),
     proveDrawDamageFeedback(cards),
+    proveLifelinkCounterDamageLoop(cards),
     proveOpponentDrawPunisherWin(cards),
     proveMillMultiplierFinisher(cards),
     proveTopLoop(cards),

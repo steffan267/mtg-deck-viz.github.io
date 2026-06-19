@@ -1,55 +1,76 @@
-# EDHREC combo edge cases
+# EDHREC combo edge cases for human review
 
-This file is a concise tracked snapshot of hard or currently missed combo shapes from the local EDHREC evidence run. It is evidence for future generalized rules, not a card-name exception list. The full local report is generated at `analysis/edhrec-combos/edhrec-combo-evaluation.md`.
+This tracked snapshot comes from the clean full-corpus EDHREC run on 2026-06-19. It records hard or currently missed combo shapes for future generalized rules. Card names are examples for review only, not runtime classifier exceptions.
+
+The full local/generated report is `analysis/edhrec-combos/edhrec-combo-evaluation.md` and the machine-readable run is `analysis/edhrec-combos/edhrec-combo-evaluation.json`.
 
 ## Current baseline
 
-- Detailed combos evaluated: 120
-- Proven by bounded proof/package logic: 29/120 (24.2%) — improved from 21/120 (17.5%) in the prior baseline and 13/120 (10.8%) before the first EDHREC pass.
-- Combo-family detection: 24.2% — improved from 17.5%.
-- Expected result-class coverage (all signals): 27/111 (24.3%) — improved from 21/111 (18.9%).
-- Proof-only expected result-class coverage: 27/111 (24.3%); current signal coverage still intentionally does not count unproven capability-only hints.
-- Remaining buckets: 49 missed, 38 generic-edge-only, 4 bounded-out.
-- Newly covered generalized shapes this pass: colorless-mana amplifier + break-even self-untapper, mill↔life-loss feedback, opponent mass-draw punisher threshold wins, half-library mill + mill multiplier, mutual ETB blink reset with target-scope gates, and token-replacement + creature-sacrifice + death-mana loops.
+- EDHREC categories discovered: **34**
+- Unique combo summaries fetched: **54,714**
+- Evaluable combos: **54,710**
+- Local card resolution: **54,367/54,710** (99.4%)
+- Proven by bounded proof/package logic: **527/54,710** (1.0%), up from **508** before G003.
+- Combo-family detection: **1,997 signal hits** / **3.6%** combo-level detection.
+- Expected result-class coverage: **1,750/48,825** (3.6%); proof-only coverage: **1,747/48,825** (3.6%).
+- Unresolved buckets: **23,601** generic-edge-only, **17,620** bounded-out, **12,616** missed, **343** missing-card, **3** classified-not-proven.
 
-## Hard categories
+## Covered in G003
 
-- **no current family/capability/proof signal** — 21 sampled unique combo shape(s). Examples: Hullbreaker Horror + Sol Ring; Springheart Nantuko + Tireless Provisioner; Underworld Breach + Lion's Eye Diamond + Wheel of Fortune.
-- **generic pair edge(s) exist, but no known combo-family classification** — 16 sampled unique/partial combo shape(s). Examples: Exquisite Blood + Marauding Blight-Priest; Peregrin Took + Nuka-Cola Vending Machine; Dualcaster Mage + Molten Duplication.
-- **EDHREC result labels need richer result-class mapping** — 3 sampled unique combo shape(s). Examples: Narset's Reversal + Isochron Scepter; The One Ring + Displacer Kitten + Teferi, Time Raveler; Vraska, Betrayal's Sting + Vorinclex, Monstrous Raider.
+These were previously in the hard-case list and are now covered by generalized rules, not card-name exceptions:
 
-## Highest-priority edge cases
+- fixed lifegain→opponent-lifeloss paired with opponent-lifeloss→lifegain;
+- nonland-permanent mana amplifiers paired with compatible break-even colorless self-untappers;
+- lifelink + lifegain-to-counter + counter-to-damage creature loops with target-legality checks, reported as damage/life loops only because the counter is spent and restored rather than grown without bound.
 
-| Cards | EDHREC result labels | Current bucket | Why hard |
+## Highest-priority hard cases
+
+| Cards | EDHREC result labels | Current bucket | Proposed generalized gap |
 | --- | --- | --- | --- |
-| Hullbreaker Horror + Sol Ring | Infinite colorless mana; Infinite storm count | missed | bounce/cast-reset loop needs stack, recast, and payment modeling |
-| Springheart Nantuko + Tireless Provisioner | Infinite landfall triggers; Infinite tapped land tokens | missed | landfall creates token lands/resource loops; land-token typing and ETB accounting needed |
-| Underworld Breach + Lion's Eye Diamond + Wheel of Fortune | Infinite draw triggers; Infinite looting; Infinite looting for opponents; Near-infinite storm count | missed | graveyard escape/fuel loop needs graveyard-count, discard/draw, and recast-cost accounting |
-| Underworld Breach + Wheel of Fortune + Jeska's Will | Infinite draw triggers for all players; Infinite looting for all players; Near-infinite magecraft triggers; Near-infinite storm count | missed | graveyard escape/fuel plus ritual mana; outside current bounded resource semantics |
-| Springheart Nantuko + Lotus Cobra | Infinite landfall triggers; Infinite tapped land tokens | missed | landfall self-replacement with mana production needs land-token and payment proof |
-| Hullbreaker Horror + Mana Vault | Infinite colorless mana; Infinite storm count | missed | same bounce/cast-reset family as Hullbreaker + Sol Ring |
-| Exquisite Blood + Marauding Blight-Priest | Infinite lifegain triggers; Infinite lifeloss; Infinite lifegain | generic-edge-only | one side is lifegain→loss; the other is loss→lifegain variant not yet generalized broadly enough |
-| Peregrin Took + Nuka-Cola Vending Machine | Infinite card draw; Infinite draw triggers; Near-infinite tapped Treasure tokens | generic-edge-only | Food/Clue/Treasure replacement plus token sacrifice/card draw loop needs token-subtype accounting |
-| Aetherflux Reservoir + Exquisite Blood | Infinite damage; Infinite lifegain triggers | missed | life-payment/life-gain/damage loop needs payment affordability and life total accounting |
-| Dualcaster Mage + Molten Duplication | Infinite LTB; Infinite ETB; Infinite sacrifice triggers; Infinite death triggers; Infinite creature tokens with haste; Infinite magecraft triggers | generic-edge-only | spell-copy creature-copy loop variant needs stack target/copy-object proof |
-| Sensei's Divining Top + Aetherflux Reservoir + Bolas's Citadel | Infinite card draw; Infinite draw triggers; Near-infinite damage; Near-infinite lifegain; Near-infinite lifegain triggers; Near-infinite storm count | generic-edge-only | top-loop variant needs life-payment, library-top, and storm/lifegain payoff accounting |
-| Walking Ballista + Heliod, Sun-Crowned | Infinite damage; Infinite lifegain; Infinite lifegain triggers | generic-edge-only | counter/lifelink/damage feedback loop needs counter payment and damage/lifegain subject model |
-| Teferi, Time Raveler + Displacer Kitten + Sol Ring | Infinite card draw; Infinite draw triggers; Near-infinite colorless mana; Near-infinite storm count | missed | noncreature-spell blink reset with mana rock and draw permanent needs cast/blink/reset modeling |
-| Orcish Bowmasters + Peer into the Abyss | Infinite +1/+1 counters on a creature; Near-infinite card draw for target opponent; Near-infinite damage; Near-infinite draw triggers for target opponent; Target opponent loses the game | missed | opponent draw punisher variant includes damage/counters, not just life-loss threshold |
-| The Reaver Cleaver + Aggravated Assault | Infinite colored mana; Infinite combat damage; Infinite combat phases; Infinite mana creatures you control can produce; Infinite Treasure tokens; Infinite untap of creatures you control | missed | extra-combat treasure engine needs combat-damage connection and combat-phase payment proof |
-| Ghostly Flicker + Peregrine Drake + Archaeomancer | Infinite blinking; Infinite ETB; Infinite landfall triggers; Infinite LTB; Infinite magecraft triggers; Infinite mana lands you control can produce; Infinite storm count | generic-edge-only | spell-recursion blink loop needs stack/spell-return and mana positivity across three pieces |
-| Skirk Prospector + Goblin Warchief + Krenko, Mob Boss | Infinite commander casts; Infinite creature tokens with haste; Infinite death triggers; Infinite ETB; Infinite LTB; Infinite red mana; Infinite sacrifice triggers; Infinite storm count | generic-edge-only | tribal token factory plus cost reduction/sac mana needs count-growth and commander/cast accounting |
-| Jeska's Will + Reiterate | Infinite magecraft triggers; Infinite red mana; Infinite storm count; Exile your library with playable exiled cards | missed | spell-copy buyback/ritual loop needs stack-copy and mana threshold semantics |
-| Staff of Domination + Priest of Titania | Infinite card draw; Infinite draw triggers; Infinite lifegain; Infinite lifegain triggers; Infinite untap; Infinite green mana | missed | threshold untap engine needs variable mana source count and ability-cost sequencing |
-| Nim Deathmantle + Ashnod's Altar | Infinite LTB; Infinite ETB; Infinite sacrifice triggers; Infinite death triggers | missed | death-triggered reanimation/payment loop needs reanimation replacement and body-fodder accounting |
+| Hullbreaker Horror + Sol Ring | Infinite colorless mana; Infinite storm count | missed | cast-trigger bounce/replay with positive mana and storm/cast accounting |
+| Underworld Breach + Lotus Petal + Brain Freeze | Infinite self-mill; Near-infinite magecraft triggers; Near-infinite mill | generic-edge-only | graveyard escape fuel, self-mill, and recast-cost accounting |
+| Underworld Breach + Lion's Eye Diamond + Brain Freeze | Infinite self-mill; Near-infinite colored mana; Near-infinite magecraft triggers; Near-infinite mill; Near-infinite storm count | generic-edge-only | graveyard escape plus mana/fuel positivity |
+| Springheart Nantuko + Tireless Provisioner | Infinite landfall triggers; Infinite tapped land tokens | missed | landfall-created land-token ETB loop; token typing needed |
+| Underworld Breach + Lion's Eye Diamond + Wheel of Fortune | Infinite draw triggers; Infinite looting; Infinite looting for opponents; Near-infinite storm count | missed | wheel/discard/draw refills graveyard fuel for escape loop |
+| Underworld Breach + Wheel of Fortune + Jeska's Will | Infinite draw triggers for all players; Infinite looting for all players; Near-infinite magecraft triggers; Near-infinite storm count | missed | escape/fuel plus ritual mana and all-player draw events |
+| Springheart Nantuko + Lotus Cobra | Infinite landfall triggers; Infinite tapped land tokens | missed | landfall self-replacement with mana production and land-token accounting |
+| Hullbreaker Horror + Mana Vault | Infinite colorless mana; Infinite storm count | missed | same cast-trigger bounce/replay family with mana-value/payment gate |
+| Peregrin Took + Nuka-Cola Vending Machine | Infinite card draw; Infinite draw triggers; Near-infinite tapped Treasure tokens | generic-edge-only | Food/Clue/Treasure subtype conversion and token sacrifice/draw loop |
+| Aetherflux Reservoir + Exquisite Blood | Infinite damage; Infinite lifegain triggers | missed | life-payment/damage/lifegain feedback with affordability gate |
+| Dualcaster Mage + Molten Duplication | Infinite LTB; Infinite ETB; Infinite sacrifice triggers; Infinite death triggers; Infinite creature tokens with haste; Infinite magecraft triggers | generic-edge-only | spell-copy creature-copy stack loop with copy-object target legality |
+| The Gitrog Monster + Dakmor Salvage | Infinite self-mill; Near-infinite self-discard triggers | missed | result taxonomy + self-discard/graveyard fuel loop modeling |
+| Sensei's Divining Top + Aetherflux Reservoir + Bolas's Citadel | Infinite card draw; Infinite draw triggers; Near-infinite damage; Near-infinite lifegain; Near-infinite lifegain triggers; Near-infinite storm count | generic-edge-only | top-of-library plus life-payment and lifegain payoff accounting |
+| Teferi, Time Raveler + Displacer Kitten + Sol Ring | Infinite card draw; Infinite draw triggers; Near-infinite colorless mana; Near-infinite storm count | missed | noncreature-spell blink reset with mana-positive recast and draw permanent |
+| Orcish Bowmasters + Peer into the Abyss | Infinite +1/+1 counters on a creature; Near-infinite card draw for target opponent; Near-infinite damage; Near-infinite draw triggers for target opponent; Target opponent loses the game | missed | opponent-draw punisher variant with damage/counter results, not just life-loss threshold |
+| The Reaver Cleaver + Aggravated Assault | Infinite colored mana; Infinite combat damage; Infinite combat phases; Infinite mana creatures you control can produce; Infinite Treasure tokens; Infinite untap of creatures you control | missed | extra-combat treasure/equipment engine with combat damage payment continuity |
+| Ghostly Flicker + Peregrine Drake + Archaeomancer | Infinite blinking; Infinite ETB; Infinite landfall triggers; Infinite LTB; Infinite magecraft triggers; Infinite mana lands you control can produce; Infinite storm count; Infinite untap of lands you control | generic-edge-only | spell-recursion blink loop with stack/spell-return and land mana positivity |
+| Skirk Prospector + Goblin Warchief + Krenko, Mob Boss | Infinite commander casts; Infinite creature tokens with haste; Infinite death triggers; Infinite ETB; Infinite LTB; Infinite red mana; Infinite sacrifice triggers; Infinite storm count | generic-edge-only | token factory + cost reduction + sacrifice mana; needs count-growth accounting |
+| Jeska's Will + Reiterate | Infinite magecraft triggers; Infinite red mana; Infinite storm count; Exile your library with playable exiled cards | missed | buyback/spell-copy ritual loop plus exile/play-access result mapping |
+| Sword of Feast and Famine + Aggravated Assault | Infinite combat phases | missed | extra-combat payment loop with attacker damage/untap connection |
+| Staff of Domination + Priest of Titania | Infinite card draw; Infinite draw triggers; Infinite lifegain; Infinite lifegain triggers; Infinite untap; Infinite green mana | missed | big-mana threshold untap/modal artifact engine |
+| Blowfly Infestation + Nest of Scarabs | Infinite death triggers; Infinite ETB; Infinite LTB | generic-edge-only | counter/death/token replacement loop with creature death replenishment |
+| Narset's Reversal + Isochron Scepter | Infinite turns; Lock | missed | result taxonomy for infinite turns/lock plus spell-copy/activation loop proof |
+| Dualcaster Mage + Saw in Half | Infinite creature tokens; Infinite ETB; Infinite magecraft triggers; Infinite LTB; Infinite death triggers | missed | spell-copy/copy-token loop with death/ETB events |
+| Aetherflux Reservoir + Bloodthirsty Conqueror | Infinite damage; Infinite lifegain triggers | missed | life-payment/lifegain feedback variant |
+| Aurelia, the Warleader + Helm of the Host | Infinite combat phases; Infinite creature tokens with haste; Infinite ETB; Infinite mana creatures you control can produce; Infinite untap of creatures you control | missed | combat-token copy loop with nonlegendary/extra-combat target gates |
+| Nim Deathmantle + Ashnod's Altar | Infinite LTB; Infinite ETB; Infinite sacrifice triggers; Infinite death triggers | missed | reanimation/payment body-fodder loop; needs death-trigger and replacement accounting |
 
-## Next generalized families to investigate
+## Human-review buckets
 
-- Bounce/cast-reset permanent loops: cast trigger bounces a mana source or free/cheap permanent, recast, repeat. Needs stack/payment modeling and mana-source replay constraints.
-- Landfall token/mana self-replacement loops: landfall creates token lands or mana that creates more land ETBs. Needs land-token typing and landfall event accounting.
-- Graveyard escape/recursion loops: self-mill plus recast from graveyard. Needs graveyard-fuel, exile-cost, and recast-cost accounting.
-- Food/Clue/Treasure token-subtype loops: token replacement plus sacrifice/card-draw/mana payoff. Needs token-subtype and replacement cardinality accounting.
-- Life-payment / life-damage loops: lifegain source plus life-payment or life-spend payoff. Needs payment affordability and opponent damage/life state modeling.
-- Spell-copy / buyback / stack loops: copy effects that reproduce a spell, ETB, or ritual state. Needs stack target and copy object modeling.
-- Big-mana threshold untap engines: mana producer plus costed untap/draw engine. Needs threshold proof rather than assuming all tap/untap pairs are positive.
-- Extra-combat treasure/equipment engines: combat damage creates mana that pays for another combat. Needs combat phase, attacker connection, and mana/payment model.
+These categories are not good candidates for quick permissive rules. They need either richer semantics or explicit human acceptance criteria:
+
+1. **Graveyard fuel loops:** escape, retrace, dredge, wheel, and self-mill engines need a graveyard resource model before proof.
+2. **Stack-copy/buyback loops:** copy effects need target legality, whether the copy can copy the original spell, and buyback/additional-cost payment.
+3. **Combat continuity:** extra combat loops need an attacker/damage source that survives and untaps, plus enough resource generation to pay for the next combat.
+4. **Finite threshold wins/locks:** lock, infinite turns, alternate-win, protection/prevention, and library-access labels need evaluator taxonomy first, then separate finite-package proof semantics.
+5. **Variable-count engines:** creature-count or land-count mana sources should not be treated as positive without a conservative lower bound from package-local permanents.
+6. **Token subtype conversion:** Food, Clue, Treasure, land, and creature token loops need subtype-specific costs/results to avoid false positives.
+7. **Subject-sensitive feedback:** opponent-only, you-only, each-player, and target-player draw/life/damage triggers must remain distinct; G003 covered only the fixed-lifeloss and counter-neutral lifelink/counter/damage subset.
+
+## Regression expectations for any fix
+
+- Add positive and negative unit tests for every new generalized family/capability.
+- Add or update hardening/validation fixtures for the new family.
+- Rerun `node ./analysis/edhrec-combos/evaluate-edhrec-combos.js` and report before/after counts.
+- Keep `npm run no-hardcode:interactions` and `npm run hardening:interactions` passing.
+- Do not introduce runtime branches keyed on card names from this document.

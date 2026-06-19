@@ -29,12 +29,13 @@ const OPTIONAL_CARD_NAME_SOURCES = [
 const CARD_NAME_SOURCES = [...REQUIRED_CARD_NAME_SOURCES, ...OPTIONAL_CARD_NAME_SOURCES];
 const MIN_CARD_NAME_CHARS = 5;
 
-function repoPath(file) {
-  return path.isAbsolute(file) ? file : path.join(ROOT, file);
+function repoPath(file, root = ROOT) {
+  return path.isAbsolute(file) ? file : path.join(root, file);
 }
 
 function readJsonIfExists(relativePath, options = {}) {
-  const file = path.join(ROOT, relativePath);
+  const root = options.root || ROOT;
+  const file = path.join(root, relativePath);
   if (!fs.existsSync(file)) {
     if (options.required) throw new Error(`Required card-name evidence source is missing: ${relativePath}`);
     return null;
@@ -88,10 +89,21 @@ function normalizeNames(names) {
   return [...byCanonical.values()].sort((a, b) => a.localeCompare(b));
 }
 
-function collectEvidenceCardNames() {
+function hasDistinctiveOptionalShape(name) {
+  const canonical = canonicalizeMentionText(name);
+  if (canonical.split(' ').filter(Boolean).length >= 2) return true;
+  return /['’`,:\/-]/.test(String(name || ''));
+}
+
+function collectEvidenceCardNames(root = ROOT) {
   const names = new Set();
-  for (const source of REQUIRED_CARD_NAME_SOURCES) collectNamesFromValue(readJsonIfExists(source, { required: true }), names);
-  for (const source of OPTIONAL_CARD_NAME_SOURCES) collectNamesFromValue(readJsonIfExists(source), names);
+  for (const source of REQUIRED_CARD_NAME_SOURCES) collectNamesFromValue(readJsonIfExists(source, { required: true, root }), names);
+  for (const source of OPTIONAL_CARD_NAME_SOURCES) {
+    const optionalNames = collectNamesFromValue(readJsonIfExists(source, { root }));
+    for (const name of optionalNames) {
+      if (hasDistinctiveOptionalShape(name)) names.add(name);
+    }
+  }
   return normalizeNames(names);
 }
 
@@ -107,8 +119,40 @@ function stripJsComments(text) {
     .replace(/(^|[^:])\/\/.*$/gm, (match, prefix) => prefix + ' '.repeat(match.length - prefix.length));
 }
 
-function findNameMentions(file, names) {
-  const raw = fs.readFileSync(repoPath(file), 'utf8');
+function walkFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...walkFiles(full));
+    else if (entry.isFile()) files.push(full);
+  }
+  return files;
+}
+
+function toPosixRelative(root, file) {
+  return path.relative(root, file).split(path.sep).join('/');
+}
+
+function isCoreLogicCandidate(relativePath) {
+  if (!relativePath.startsWith('src/') || !relativePath.endsWith('.js')) return false;
+  if (relativePath === 'src/combo-family-library.js') return false;
+  return /^src\/interaction-[^/]+\.js$/.test(relativePath)
+    || CORE_LOGIC_FILES.includes(relativePath);
+}
+
+function discoverCoreLogicFiles(root = ROOT) {
+  const discovered = walkFiles(path.join(root, 'src'))
+    .map(file => toPosixRelative(root, file))
+    .filter(isCoreLogicCandidate);
+  return [...new Set([...CORE_LOGIC_FILES, ...discovered]
+    .filter(file => fs.existsSync(repoPath(file, root))))]
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function findNameMentions(file, names, root = ROOT) {
+  const raw = fs.readFileSync(repoPath(file, root), 'utf8');
   const text = stripJsComments(raw);
   const findings = [];
   const needles = normalizeNames(names).map(name => ({ name, canonical: canonicalizeMentionText(name) }));
@@ -129,9 +173,10 @@ function findNameMentions(file, names) {
 }
 
 function runNoComboNameHardcodingCheck(options = {}) {
-  const names = normalizeNames(options.names || collectEvidenceCardNames());
-  const files = options.files || CORE_LOGIC_FILES;
-  const findings = files.flatMap(file => findNameMentions(file, names));
+  const root = options.root || ROOT;
+  const names = normalizeNames(options.names || collectEvidenceCardNames(root));
+  const files = options.files || discoverCoreLogicFiles(root);
+  const findings = files.flatMap(file => findNameMentions(file, names, root));
   return {
     ok: findings.length === 0,
     checkedFiles: files,
@@ -159,6 +204,8 @@ else module.exports = {
   CARD_NAME_SOURCES,
   canonicalizeMentionText,
   collectEvidenceCardNames,
+  discoverCoreLogicFiles,
+  hasDistinctiveOptionalShape,
   runNoComboNameHardcodingCheck,
   stripJsComments,
 };

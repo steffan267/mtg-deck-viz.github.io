@@ -14,10 +14,13 @@ const fixtures = [
   { id: 'Deadeye Navigator', type_line: 'Creature — Spirit', oracle_text: '{1}{U}: Exile another target creature you control, then return it to the battlefield under your control.', cmc: 6 },
   { id: 'Peregrine Drake', type_line: 'Creature — Drake', oracle_text: 'Flying When this creature enters, untap up to five lands.', cmc: 5 },
   { id: 'Sanguine Bond', type_line: 'Enchantment', oracle_text: 'Whenever you gain life, target opponent loses that much life.', cmc: 5 },
+  { id: 'Fixed Gain Converts To Loss', type_line: 'Creature — Cleric', oracle_text: 'Whenever you gain life, each opponent loses 1 life.', cmc: 3 },
   { id: 'Exquisite Blood', type_line: 'Enchantment', oracle_text: 'Whenever an opponent loses life, you gain that much life.', cmc: 5 },
   { id: 'Draw Damage Engine', type_line: 'Legendary Creature — Wizard', oracle_text: 'Whenever you draw a card, this creature deals 1 damage to any target.', cmc: 6 },
   { id: 'Opponent Draw Damage Engine', type_line: 'Creature — Devil', oracle_text: 'Whenever an opponent draws a card, this creature deals 1 damage to any target.', cmc: 3 },
   { id: 'Damage Draw Aura', type_line: 'Enchantment — Aura', oracle_text: 'Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.', cmc: 1 },
+  { id: 'Lifelink Counter Engine', type_line: 'Enchantment Creature — God', oracle_text: 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.', cmc: 3 },
+  { id: 'Counter Damage Creature', type_line: 'Artifact Creature — Construct', oracle_text: 'This creature enters with X +1/+1 counters on it. Remove a +1/+1 counter from this creature: It deals 1 damage to any target.', cmc: 0 },
   { id: 'Self Top Draw Artifact', type_line: 'Artifact', oracle_text: '{1}: Draw a card, then put this artifact on top of its owner’s library.', cmc: 1 },
   { id: 'Artifact Spell Reducer', type_line: 'Artifact Creature — Vedalken Artificer', oracle_text: 'Artifact spells you cast cost {1} less to cast.', cmc: 2 },
   { id: 'Artifact Top Caster', type_line: 'Artifact', oracle_text: 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', cmc: 4 },
@@ -37,6 +40,7 @@ const fixtures = [
   { id: 'Token Doubler', type_line: 'Enchantment', oracle_text: 'If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.', cmc: 4 },
   { id: 'Token Payoff', type_line: 'Creature', oracle_text: 'Whenever one or more tokens you control enter, draw a card.', cmc: 3 },
   { id: 'Colorless Mana Amplifier', type_line: 'Artifact', oracle_text: 'Whenever you tap a permanent for {C}, add an additional {C}.', cmc: 5 },
+  { id: 'Any-Type Nonland Mana Amplifier', type_line: 'Legendary Creature — Druid', oracle_text: 'Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.', cmc: 2 },
   { id: 'Break-Even Self Untapper With Colorless', type_line: 'Artifact', oracle_text: '{T}: Add {C}{C}{C}. {3}: Untap this artifact.', cmc: 3 },
   { id: 'Mill To Life Loss Payoff', type_line: 'Enchantment', oracle_text: "Whenever a card is put into an opponent's graveyard from anywhere, that player loses 1 life and you gain 1 life.", cmc: 1 },
   { id: 'Life Loss To Mill Payoff', type_line: 'Enchantment', oracle_text: 'Whenever an opponent loses life, that player mills that many cards.', cmc: 3 },
@@ -57,6 +61,7 @@ assert.ok(seeded.some(candidate => candidate.cards.length === 1 && candidate.car
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Deadeye Navigator|Peregrine Drake'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Damage Draw Aura|Draw Damage Engine'));
 assert.equal(seeded.some(candidate => candidate.cards.join('|') === 'Damage Draw Aura|Opponent Draw Damage Engine'), false, 'opponent-draw punishers should not seed draw-damage feedback packages that draw only you');
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Counter Damage Creature|Lifelink Counter Engine'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Mana Sac Outlet|Recursive Body'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Empty Library Oracle|Repeat Library Exiler'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Nonland Untap Spell|Repeatable Instant Caster'));
@@ -64,6 +69,7 @@ assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Ability Copier
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Hasty Copy Engine|Permanent Untapper'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'ETB Spell Copier|Hasty Creature Copy Spell'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Break-Even Self Untapper With Colorless|Colorless Mana Amplifier'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Any-Type Nonland Mana Amplifier|Break-Even Self Untapper With Colorless'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Life Loss To Mill Payoff|Mill To Life Loss Payoff'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Opponent Draw Punisher|Opponent Half-Library Draw'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Half-Library Mill|Mill Multiplier'));
@@ -71,13 +77,14 @@ assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'ETB Creature B
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Creature-Token Replacement Outlet|Death Mana Payoff'));
 assert.ok(seeded.some(candidate => candidate.cards.includes('Artifact Top Caster') && candidate.cards.includes('Artifact Spell Reducer') && candidate.cards.includes('Self Top Draw Artifact')));
 
-const packages = buildInteractionProofPackages(fixtures);
+const packages = buildInteractionProofPackages(fixtures, { maxProofPackages: 64 });
 const byFamily = new Map(packages.map(pkg => [pkg.family, pkg]));
 
 assert.ok(byFamily.has('self-untap-mana-loop'));
 assert.ok(byFamily.has('blink-etb-land-untap-loop'));
 assert.ok(byFamily.has('lifegain-lifeloss-loop'));
 assert.ok(byFamily.has('draw-damage-feedback-loop'));
+assert.ok(byFamily.has('lifelink-counter-damage-loop'));
 assert.ok(byFamily.has('recursive-body-sacrifice-mana-loop'));
 assert.ok(byFamily.has('library-exile-empty-library-win'));
 assert.ok(byFamily.has('imprint-untap-spell-loop'));
@@ -118,6 +125,11 @@ assert.equal(drawDamageLoop.cardCount, 2);
 assert.ok(drawDamageLoop.result.includes('damage'));
 assert.ok(drawDamageLoop.assumptions.some(text => /initial draw or damage/.test(text)));
 
+const lifelinkCounterDamageLoop = byFamily.get('lifelink-counter-damage-loop');
+assert.equal(lifelinkCounterDamageLoop.cardCount, 2);
+assert.ok(lifelinkCounterDamageLoop.result.includes('damage'));
+assert.ok(lifelinkCounterDamageLoop.contributions.some(contribution => contribution.facts.includes('is-lifelink-counter-engine')));
+
 const recursiveLoop = byFamily.get('recursive-body-sacrifice-mana-loop');
 assert.equal(recursiveLoop.cardCount, 2);
 assert.ok(recursiveLoop.result.includes('deathTriggers') || recursiveLoop.result.includes('sacrifices'));
@@ -139,6 +151,9 @@ assert.ok(amplifiedSelfUntapLoop);
 assert.ok(amplifiedSelfUntapLoop.cards.includes('Break-Even Self Untapper With Colorless'));
 assert.ok(amplifiedSelfUntapLoop.cards.includes('Colorless Mana Amplifier'));
 assert.ok(amplifiedSelfUntapLoop.contributions.every(contribution => contribution.facts.length));
+const anyTypeAmplifiedSelfUntapLoop = packages.find(pkg => pkg.family === 'self-untap-mana-loop' && pkg.cards.includes('Any-Type Nonland Mana Amplifier'));
+assert.ok(anyTypeAmplifiedSelfUntapLoop);
+assert.ok(anyTypeAmplifiedSelfUntapLoop.cards.includes('Break-Even Self Untapper With Colorless'));
 
 const millLifeLossPackage = byFamily.get('mill-lifeloss-feedback-loop');
 assert.equal(millLifeLossPackage.cardCount, 2);

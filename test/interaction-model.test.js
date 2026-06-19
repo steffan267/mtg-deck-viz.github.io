@@ -272,14 +272,19 @@ When Gilded Goose enters, create a Food token.
 
   const lifegainFromOppLoss = node('Loss Converts To Gain', 'Enchantment', 'Whenever an opponent loses life, you gain that much life.');
   const oppLossFromLifeGain = node('Gain Converts To Loss', 'Enchantment', 'Whenever you gain life, target opponent loses that much life.');
+  const fixedOppLossFromLifeGain = node('Fixed Gain Converts To Loss', 'Creature — Cleric', 'Whenever you gain life, each opponent loses 1 life.');
   assertHasCap(lifegainFromOppLoss, 'is-lifegain-from-opponent-lifeloss');
   assertHasCap(oppLossFromLifeGain, 'is-lifeloss-from-your-lifegain');
+  assertHasCap(fixedOppLossFromLifeGain, 'is-lifeloss-from-your-lifegain');
   assertHasInteraction(lifegainFromOppLoss, oppLossFromLifeGain,
     it => it.family === 'lifeloss→lifegain-loop' && it.strength === 'combo-critical',
     'reciprocal opponent-life-loss/lifegain text should be detected as a loop without card names');
   assertHasInteraction(lifegainFromOppLoss, oppLossFromLifeGain,
     it => it.family === 'lifegain→lifeloss-loop' && it.strength === 'combo-critical',
     'reciprocal lifegain/opponent-life-loss text should emit the reverse loop family');
+  assertHasInteraction(lifegainFromOppLoss, fixedOppLossFromLifeGain,
+    it => it.family === 'lifegain→lifeloss-loop' && it.strength === 'combo-critical',
+    'fixed opponent life-loss from your lifegain should be treated as a reciprocal loop candidate');
 
   const impulseDraw = node('Impulse Draw', 'Artifact', '{3}: Exile the top card of your library. You may play that card this turn.');
   assertNoCap(impulseDraw, 'is-library-exile-source');
@@ -373,6 +378,18 @@ When Gilded Goose enters, create a Food token.
     'draw-triggered damage plus damage-triggered draw should be detected without card names');
   assertNoEvent(opponentDrawDamage, damageDrawAura, 'enable:draw-damage-feedback-loop');
 
+  const lifelinkCounterEngine = node('Lifelink Counter Engine', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.');
+  const counterDamageCreature = node('Counter Damage Creature', 'Artifact Creature — Construct', 'This creature enters with X +1/+1 counters on it. Remove a +1/+1 counter from this creature: It deals 1 damage to any target.');
+  const counterDamageArtifact = node('Counter Damage Artifact', 'Artifact', 'This artifact enters with X +1/+1 counters on it. Remove a +1/+1 counter from this artifact: It deals 1 damage to any target.');
+  assertHasCap(lifelinkCounterEngine, 'is-lifegain-to-counter-payoff');
+  assertHasCap(lifelinkCounterEngine, 'grants-lifelink-to-creature');
+  assertHasCap(lifelinkCounterEngine, 'is-lifelink-counter-engine');
+  assertHasCap(counterDamageCreature, 'is-counter-to-damage-source');
+  assertHasInteraction(lifelinkCounterEngine, counterDamageCreature,
+    it => it.family === 'lifelink-counter-damage-loop' && it.strength === 'combo-critical' && it.evidence.targetLegal === true,
+    'lifelink grant plus lifegain counter trigger should loop with a creature that spends counters for damage');
+  assertNoEvent(lifelinkCounterEngine, counterDamageArtifact, 'enable:lifelink-counter-damage-loop');
+
   const recursiveBody = node('Recursive Body', 'Creature — Zombie', 'You may cast this card from your graveyard.', 1, '{B}');
   const conditionalRecursiveBody = node('Conditional Recursive Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control another creature.', 1, '{B}');
   const manaSacOutlet = node('Mana Sac Outlet', 'Artifact', 'Sacrifice a creature: Add one mana of any color.', 3);
@@ -421,13 +438,18 @@ When Gilded Goose enters, create a Food token.
   assertNoEvent(coloredRecursiveBody, colorlessSacOutlet, 'enable:recursive-body-sacrifice-mana-loop');
 
   const colorlessManaAmplifier = node('Colorless Mana Amplifier', 'Artifact', 'Whenever you tap a permanent for {C}, add an additional {C}.');
+  const anyTypeNonlandManaAmplifier = node('Any-Type Nonland Mana Amplifier', 'Legendary Creature — Druid', 'Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.');
   const breakEvenSelfUntapperForAmplifier = node('Break-Even Self Untapper With Colorless', 'Artifact', '{T}: Add {C}{C}{C}. {3}: Untap this artifact.');
   const coloredSelfUntapper = node('Colored Self Untapper', 'Creature — Elf', '{T}: Add {G}{G}{G}. {3}: Untap this creature.');
   assertHasCap(colorlessManaAmplifier, 'is-colorless-mana-amplifier');
+  assertHasCap(anyTypeNonlandManaAmplifier, 'is-colorless-mana-amplifier');
   assertHasCap(breakEvenSelfUntapperForAmplifier, 'produces-colorless-mana');
   assertHasInteraction(colorlessManaAmplifier, breakEvenSelfUntapperForAmplifier,
     it => it.family === 'self-untap-mana-loop' && it.strength === 'combo-critical' && it.evidence.amplification === 1,
     'static colorless amplifier should turn a break-even colorless self-untapper into a loop');
+  assertHasInteraction(anyTypeNonlandManaAmplifier, breakEvenSelfUntapperForAmplifier,
+    it => it.family === 'self-untap-mana-loop' && it.strength === 'combo-critical' && it.evidence.amplification === 1,
+    'any-type nonland permanent mana amplifier should turn a colorless self-untapper positive when the permanent produced colorless mana');
   assertNoEvent(colorlessManaAmplifier, coloredSelfUntapper, 'enable:self-untap-mana-loop');
 
   const millToLossPayoff = node('Mill To Life Loss Payoff', 'Enchantment', "Whenever a card is put into an opponent's graveyard from anywhere, that player loses 1 life and you gain 1 life.");

@@ -32,6 +32,7 @@ assert.ok(getComboFamily('token-source-modifier-payoff').requiredFacts.some(fact
 assert.deepEqual(getComboFamily('hasty-copy→etb-untap-loop').resultClasses, ['infinite-etb', 'infinite-tokens', 'infinite-untap']);
 assert.equal(getComboFamily('hasty-copy→etb-untap-loop').resultClasses.includes('infinite-mana'), false);
 assert.deepEqual(getComboFamily('draw-damage-feedback-loop').resultClasses, ['infinite-damage', 'infinite-draw']);
+assert.deepEqual(getComboFamily('lifelink-counter-damage-loop').resultClasses, ['infinite-damage', 'infinite-life']);
 assert.ok(getComboFamily('recursive-body-sacrifice-mana-loop').requiredFacts.some(fact => fact.predicate === 'is-mana-sac-outlet'));
 assert.ok(getComboFamily('self-untap-mana-loop').optionalAccelerants.some(fact => fact.predicate === 'is-colorless-mana-amplifier'));
 assert.deepEqual(getComboFamily('mill-lifeloss-feedback-loop').resultClasses, ['mill', 'infinite-opponent-life-loss', 'infinite-life']);

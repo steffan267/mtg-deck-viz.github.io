@@ -68,6 +68,13 @@ const lifeLoop = provePackage([sanguineBond, exquisiteBlood]);
 assert.equal(lifeLoop.status, 'proven');
 assert.ok(proofByFamily(lifeLoop, 'lifegain-lifeloss-loop'));
 
+const fixedLifeLoop = provePackage([
+  card('Fixed Gain Converts To Loss', 'Creature — Cleric', 'Whenever you gain life, each opponent loses 1 life.', 3),
+  exquisiteBlood,
+]);
+assert.equal(fixedLifeLoop.status, 'proven');
+assert.ok(proofByFamily(fixedLifeLoop, 'lifegain-lifeloss-loop'));
+
 const drawDamageLoop = provePackage([
   card('Draw Damage Engine', 'Legendary Creature — Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.', 6),
   card('Damage Draw Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.', 1),
@@ -82,6 +89,20 @@ const opponentDrawDamageNearMiss = provePackage([
 ]);
 assert.equal(opponentDrawDamageNearMiss.status, 'not-repeatable');
 assert.ok(opponentDrawDamageNearMiss.rejections.some(rejection => /does not react to your draws/.test(rejection.reason)));
+
+const lifelinkCounterDamageLoop = provePackage([
+  card('Lifelink Counter Engine', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.', 3),
+  card('Counter Damage Creature', 'Artifact Creature — Construct', 'This creature enters with X +1/+1 counters on it. Remove a +1/+1 counter from this creature: It deals 1 damage to any target.', 0),
+]);
+assert.equal(lifelinkCounterDamageLoop.status, 'proven');
+assert.ok(proofByFamily(lifelinkCounterDamageLoop, 'lifelink-counter-damage-loop'));
+assert.ok(proofByFamily(lifelinkCounterDamageLoop, 'lifelink-counter-damage-loop').positiveDeltas.some(delta => delta.resource === 'damage'));
+
+const lifelinkCounterDamageNearMiss = provePackage([
+  card('Lifelink Counter Engine', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.', 3),
+  card('Counter Damage Artifact', 'Artifact', 'This artifact enters with X +1/+1 counters on it. Remove a +1/+1 counter from this artifact: It deals 1 damage to any target.', 0),
+]);
+assert.notEqual(lifelinkCounterDamageNearMiss.status, 'proven');
 
 const libraryWin = provePackage([
   card('Repeat Library Exiler', 'Instant', 'Exile the top card of your library. You may put that card into your hand unless it has the same name as another card exiled this way. Repeat this process until you put a card into your hand or exile two cards with the same name.', 2),
@@ -127,6 +148,14 @@ const colorlessAmplifiedSelfLoop = provePackage([
 assert.equal(colorlessAmplifiedSelfLoop.status, 'proven');
 assert.ok(proofByFamily(colorlessAmplifiedSelfLoop, 'self-untap-mana-loop'));
 assert.deepEqual(proofByFamily(colorlessAmplifiedSelfLoop, 'self-untap-mana-loop').positiveDeltas[0], { resource: 'mana', min: 1, max: 1 });
+
+const anyTypeAmplifiedSelfLoop = provePackage([
+  card('Any-Type Nonland Mana Amplifier', 'Legendary Creature — Druid', 'Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.', 2),
+  card('Break-Even Self Untapper With Colorless', 'Artifact', '{T}: Add {C}{C}{C}. {3}: Untap this artifact.', 3),
+]);
+assert.equal(anyTypeAmplifiedSelfLoop.status, 'proven');
+assert.ok(proofByFamily(anyTypeAmplifiedSelfLoop, 'self-untap-mana-loop'));
+assert.deepEqual(proofByFamily(anyTypeAmplifiedSelfLoop, 'self-untap-mana-loop').positiveDeltas[0], { resource: 'mana', min: 1, max: 1 });
 
 const colorlessAmplifierNearMiss = provePackage([
   card('Colorless Mana Amplifier', 'Artifact', 'Whenever you tap a permanent for {C}, add an additional {C}.', 5),

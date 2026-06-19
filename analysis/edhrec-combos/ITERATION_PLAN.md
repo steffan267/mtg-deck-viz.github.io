@@ -1,190 +1,239 @@
-# EDHREC combo iteration plan
+# EDHREC combo missing-interaction plan
 
-This pass targets the highest-impact missed/generic-edge combo shapes from the local EDHREC evaluation. Card names below are examples for human evidence only; implementation must remain generalized by text-derived capabilities, events, costs, repeatability, and resource deltas.
+Generated from the clean full-corpus EDHREC run on 2026-06-19.
 
-## Baseline before this iteration
+This document records the missing interaction families exposed by the current EDHREC combo corpus. Card names are evidence examples only; runtime classifier/proof changes must stay generalized by Oracle text, capabilities, events, costs, target legality, repeatability, and resource deltas.
 
-- Detailed combos evaluated: 120
-- Proven by bounded proof/package logic: 13/120 (10.8%)
-- Unresolved records: 107
-  - missed: 57
-  - generic-edge-only: 46
-  - bounded-out: 4
-- Largest unresolved expected classes: infinite mana (38), ETB (35), cast/storm (32), tokens (30), draw (26), death/sacrifice (16 each).
+## Corpus baseline
 
-## Selection criteria
+Source artifacts are local/ignored because they are large:
 
-1. Generalized mechanic appears across more than one EDHREC record or covers very high deck-count misses.
-2. Existing model already has nearby facts/events, so implementation can remain incremental.
-3. False-positive risk can be bounded with mechanical gates such as mana positivity, reciprocal triggers, repeatability, target scope, or zone/fuel accounting.
-4. Every implemented family gets regression tests and is added to the hardening/validation surface.
+- Fetch command: `node ./analysis/edhrec-combos/fetch-edhrec-combos.js --all --delay-ms 25 --force`
+- Evaluation command: `node ./analysis/edhrec-combos/evaluate-edhrec-combos.js`
+- Cache: `analysis/edhrec-combos/edhrec-combo-cache.json`
+- Evaluation report: `analysis/edhrec-combos/edhrec-combo-evaluation.{json,md}`
 
-## Ranked implementation opportunities
+Clean fetch/evaluation result after the first G003 classifier slice and final review corrections:
 
-### 1. Bounce/cast-reset mana loops
+- EDHREC categories discovered: **34**
+- Unique combo summaries fetched: **54,714**
+- Fetch failures: **0**
+- Evaluable combos with card names and result labels: **54,710**
+- All cards resolved locally: **54,367/54,710** (99.4%)
+- Bounded proof/package successes: **527/54,710** (1.0%), up from **508** before G003.
+- Combo-family detection: **1,997 signal hits**, **3.6%** combo-level detection, up from **1,968** hits / **3.5%**.
+- Expected result-class coverage: **1,750/48,825** (3.6%), up from **1,721/48,825**.
+- Proof-only expected result-class coverage: **1,747/48,825** (3.6%).
+- Unresolved buckets:
+  - `generic-edge-only`: **23,601**
+  - `bounded-out`: **17,620**
+  - `missed`: **12,616**
+  - `missing-card`: **343**
+  - `classified-not-proven`: **3**
 
-Mechanic: a cast trigger returns a mana-positive nonland permanent to hand; replaying that permanent triggers the bounce engine again, producing mana/storm/cast loops.
+### G003 generalized slice completed
 
-Current gap: `bounce` and `cast` events exist, but there is no combo-critical family for cast-trigger bounce plus replayable mana source. This is the highest deck-count gap.
+The first iteration intentionally targeted conservative, high-signal variants that could be proved without card-name branches:
 
-Representative evidence examples: Hullbreaker/Tidespout-style spell-bounce engines with cheap mana rocks.
+- fixed-amount lifegain-to-opponent-lifeloss triggers now participate in `lifegain-lifeloss-loop`;
+- nonland-permanent mana amplifiers that add one mana of any type produced now support break-even colorless self-untappers when the amplified source is a compatible nonland permanent;
+- `lifelink-counter-damage-loop` now proves the lifelink + gain-counter + counter-to-damage creature pattern with a creature-target legality gate; it reports infinite damage/life only because the loop spends and restores the same counter rather than growing counters without bound.
 
-Risks/gates:
-- Require a cast-trigger bounce source, not generic bounce.
-- Require a nonland permanent that taps for more mana than its mana value or cost proxy.
-- Treat as a loop candidate with assumptions about recasting/payment, not as universal proof for any bounce spell.
+Regression coverage added positive and negative unit tests, proof-package tests, evaluator fixtures, validation corpus rows, and hardening/no-hardcode checks. The validation corpus is now **46** cases (**24** positive, **22** negative) with 100% sampled recall/precision.
 
-### 2. Reciprocal draw/damage/mill/life feedback loops
+## Missing result classes
 
-Mechanic: one permanent converts event A to event B and another converts event B back to A, e.g. draw -> damage/life loss -> draw, or mill -> life loss -> mill.
+Counts below are EDHREC expected result-class instances still missed after all current model signals. One combo can contribute to multiple classes.
 
-Current gap: existing life-loop proof handles only lifegain/lifeloss reciprocity. Draw/damage and mill/lifeloss are currently generic edges or misses.
+| Missed expected result class | Missed class instances |
+| --- | ---: |
+| infinite-etb | 36,253 |
+| infinite-death | 24,372 |
+| infinite-sacrifice | 23,012 |
+| infinite-mana | 20,178 |
+| infinite-cast | 13,023 |
+| infinite-tokens | 13,021 |
+| infinite-counters | 8,833 |
+| infinite-life | 7,082 |
+| infinite-draw | 6,017 |
+| infinite-untap | 5,295 |
+| infinite-damage | 5,046 |
+| infinite-opponent-life-loss | 2,480 |
+| combat | 1,877 |
+| mill | 1,829 |
+| win | 653 |
+| empty-library | 476 |
+| bounce-loop | 432 |
+| exile-loop | 205 |
 
-Risks/gates:
-- Subject direction matters: opponent-draw payoffs are not the same as your draw engines.
-- Distinguish true reciprocal loops from large finite kill packages; finite kill packages can be documented as outliers if not safely provable.
+Overlapping high-level clusters from the same unresolved rows:
 
-### 3. Recursive sacrifice/body-to-mana-or-token loops
+| Cluster | Approx unresolved combos | Representative examples |
+| --- | ---: | --- |
+| ETB/death/sacrifice/token/reanimation loops | 37,446 | landfall token loops; recursive creature/sacrifice engines; copy-token loops |
+| Mana/cast/storm loops | 27,868 | cast-trigger bounce/replay; escape/ritual loops; buyback/copy loops |
+| Counter/life/damage feedback | 16,897 | life-payment damage loops; opponent-draw damage/counter punishers; remaining subject-specific feedback variants |
+| Draw/untap/threshold engines | 10,536 | top-of-library draw loops; big-mana untap engines; noncreature-spell blink/draw loops |
+| Mill/exile/library/win mapping | 3,023 | self-mill fuel loops; finite mill thresholds; library-exile/play-until-end-of-turn loops |
+| Combat/extra-combat engines | 1,867 | extra-combat payment loops; combat-damage treasure engines; Helm-style combat token loops |
+| Unclassified EDHREC labels | 5,865 | lock, infinite turns, self-discard, protection/prevention, direct alternate-win labels |
 
-Mechanic: a replenishable/recursive body plus a sacrifice outlet creates enough mana/token value to pay for or recreate the body, generating death/ETB/sacrifice/cast events.
+## Ranked generalized opportunities
 
-Current gap: current aristocrats proof only treats creature-token-producing bodies as replenished. Recursive graveyard bodies and mana-refund loops remain generic-edge-only.
+### 1. Cast-trigger bounce / replay mana loops
 
-Risks/gates:
-- Require explicit recursive body or replacement/reanimation source.
-- Require a sac outlet that produces mana or a death payoff that produces recast resources.
-- Do not treat arbitrary bodies as replenishable.
+**Observed gap:** high-deck-count rows where a cast trigger bounces a permanent, a cheap or mana-positive permanent is replayed, and the loop yields mana/storm/cast triggers. Current generic graph edges do not promote this to a proof family.
 
-### 4. Top-of-library artifact recast variants
+**Example evidence:** Hullbreaker/Tidespout-style bounce engines with Sol Ring or Mana Vault; noncreature-spell blink/reset variants with a mana rock and draw permanent.
 
-Mechanic: self-top draw artifact plus top-of-library artifact/colorless cast permission plus a scoped cost reducer or alternate payment/payoff.
+**Proposed generalized model additions:**
 
-Current gap: this family exists but misses several variants because cast-from-top and reducer detection are too narrow.
+- capability for cast-trigger bounce/reset of a permanent you control;
+- conservative replayability gate for nonland permanents whose mana output covers recast cost;
+- package family for positive mana delta plus repeatable cast trigger;
+- result classes: `infinite-mana`, `infinite-cast`, possibly `infinite-draw` when a reset draw permanent is in-package.
 
-Risks/gates:
-- Keep restricted to self-top artifact + cast-from-top permission + applicable cost/payment reduction.
-- Do not infer top-cast loops from top-look-only effects.
+**Regression gates:** require a true cast-trigger reset source, a recastable permanent, positive package-local mana, and target legality. Do not treat one-shot bounce spells or arbitrary mana rocks as loops.
 
-### 5. Blink/copy ETB reset loops
+### 2. Graveyard escape / recast fuel loops
 
-Mechanic: two ETB blink/copy pieces reset each other and repeat ETB/LTB/token events.
+**Observed gap:** many Underworld Breach-style rows are `generic-edge-only` or `missed`. The engine lacks graveyard fuel accounting, escape/exile costs, and self-mill/draw/discard recast accounting.
 
-Current gap: generic `etb→blink` exists, but mutual blink-reset is not promoted.
+**Example evidence:** self-mill plus escape/recast loops with ritual mana, wheels, or mill payoffs.
 
-Risks/gates:
-- One-shot blink is only repeatable if the loop returns the blinking permanent.
-- Target restrictions matter (non-Angel, another permanent, nonlegendary copy).
+**Proposed generalized model additions:**
 
-### 6. Mana-threshold untap engines
+- capability for casting nonland cards from graveyard with an exile/fuel cost;
+- resource model for graveyard cards gained/lost per loop;
+- proof family requiring package-local fuel generation plus mana cost coverage;
+- result classes: `infinite-cast`, `infinite-mana`, `mill`, `infinite-draw` when the loop source produces those events.
 
-Mechanic: a permanent with untap/draw/life modes plus a creature/permanent mana source that exceeds activation thresholds.
+**Regression gates:** avoid assuming an arbitrary graveyard is infinite; require positive or replenished graveyard fuel and package-local mana.
 
-Current gap: one-card self-untap and ability-copy loops exist, but two-card threshold engines do not.
+### 3. Landfall self-replacement / land-token loops
 
-Risks/gates:
-- Require explicit mana-produced threshold or conservative variable-mana marker.
-- Avoid proving break-even engines as positive loops.
+**Observed gap:** landfall rows that make tapped land tokens or mana are entirely missed because token typing and land ETB/resource accounting are too shallow.
 
-### Deferred/high-complexity outliers
+**Example evidence:** landfall creates land tokens or mana, which creates more landfall triggers.
 
-- Graveyard escape/wheel loops need graveyard fuel accounting.
-- Landfall self-replacement loops need land-token ETB and additional-land/drop accounting.
-- Extra-combat treasure loops need combat damage amount assumptions.
-- Lock/win-condition finite packages need non-loop game-state predicates.
+**Proposed generalized model additions:**
 
-## Proposed pass scope
+- capability for landfall-triggered land-token creation;
+- land-token ETB event production and tapped/untapped distinction;
+- landfall mana/resource deltas when a land enters;
+- result classes: `infinite-tokens`, `infinite-etb`, `infinite-mana` where mana-positive.
 
-Implement the safest high-yield subset first:
-1. top-of-library artifact recast variants,
-2. reciprocal draw/damage and mill/life feedback,
-3. conservative recursive sacrifice loops,
-4. conservative bounce/cast-reset mana loops,
-5. mutual blink ETB reset where target restrictions are explicit enough.
+**Regression gates:** require the generated token to actually be a land or an explicit land ETB source. Do not infer landfall loops from generic token creation.
 
-Then rerun EDHREC evaluation, quantify the gain, and refresh outlier docs with unresolved/deferred categories.
+### 4. Recursive body + sacrifice/reanimation engines
 
-## G002 reviewed implementation decision
+**Observed gap:** unresolved rows dominate `infinite-death`, `infinite-sacrifice`, and `infinite-etb`. Existing proof handles some recursive body/mana cases but misses body-fodder, reanimation-payment, and replacement variants.
 
-Plan review rejected the initial five-family implementation as too broad for one precision-sensitive pass. This iteration will implement a narrower reviewed scope:
+**Example evidence:** recurring creature plus sacrifice outlet plus death/life/token/mana payoff; reanimation artifact/enchantment payment loops.
 
-1. **Top-of-library artifact recast variants** — approved because the family already exists and needs capability broadening, not new speculative proof semantics.
-2. **Draw ↔ damage reciprocal feedback loops** — approved as the first reciprocal feedback family with strict subject/direction gates.
-3. **Recursive body + sacrifice outlet mana loop** — approved only in conservative form: explicit recursive/recastable body, explicit sacrifice outlet producing mana, and positive/basic cost accounting. Arbitrary bodies remain negative.
+**Proposed generalized model additions:**
 
-Explicitly deferred from implementation in this pass:
+- richer recursive-body facts: cast-from-graveyard, return-from-graveyard, death-triggered reanimation, replacement-return;
+- body-fodder accounting for loops that require another creature/token;
+- package-local mana/payment profile for reanimation costs;
+- result classes: `infinite-death`, `infinite-sacrifice`, `infinite-etb`, `infinite-mana`, `infinite-life` depending on local payoffs.
 
-- Bounce/cast-reset mana loops: highest deck-count opportunity, but needs more target/recast/payment modeling before proof.
-- Mill/lifeloss feedback: plausible but subject and finite-vs-loop semantics differ from draw/damage, so it should be separate.
-- Mutual blink reset loops: useful but target legality/subtype restrictions require a focused pass.
-- Landfall self-replacement, graveyard escape/wheel loops, extra-combat treasure loops, mana-threshold untap engines, and finite lock/win packages remain outliers.
+**Regression gates:** require explicit replenishment or reanimation and explicit payment source. Do not treat arbitrary death triggers as recursive.
 
-Required implementation gates:
+### 5. Token-subtype replacement and sacrifice loops
 
-- no card-name branches in classifier/proof/model logic;
-- family metadata in `src/combo-family-library.js`;
-- capability extraction in `src/interaction-model.js` only where generalized text facts are clear;
-- proof helpers in `src/interaction-proof-search.js` with explicit positive and negative paths;
-- proof package seeding in `src/interaction-proof-packages.js` and indexes/hypergraph only when needed;
-- validation corpus and direct unit tests for every new family/capability;
-- refreshed EDHREC evaluation and outlier docs.
+**Observed gap:** Food/Clue/Treasure/replacement loops often have pair edges but no family because token subtype, replacement cardinality, and sacrifice/payoff semantics are missing.
 
-## G005 rerun outcome
+**Example evidence:** token replacement plus Food/Clue/Treasure sacrifice; token creation converted into card draw or mana.
 
-After implementing the narrowed G002 scope and refreshing regression coverage, the offline EDHREC corpus rerun produced:
+**Proposed generalized model additions:**
 
-- Detailed combos evaluated: 120
-- Local resolution: 120/120 (unchanged, all local)
-- Proven by bounded proof/package logic: 21/120 (17.5%), up from 13/120 (10.8%)
-- Combo-family detection: 17.5%, up from 10.8%
-- Expected result-class coverage (all signals): 21/111 (18.9%), up from 13/111 (11.7%)
-- Proof-only expected result-class coverage: 21/111 (18.9%); current signal coverage does not include unproven capability-only combo credit.
-- Remaining buckets: 54 missed, 41 generic-edge-only, 4 bounded-out
+- typed token production for Food, Clue, Treasure, creature, and land tokens;
+- replacement/cardinality effects that create additional typed tokens;
+- costed sacrifice of typed tokens into draw/mana/life;
+- result classes: `infinite-tokens`, `infinite-draw`, `infinite-mana`, `infinite-etb`.
 
-Covered by this pass without card-name branches:
+**Regression gates:** preserve subtype gates; Food cannot pay Clue-only costs, Treasure cannot imply card draw without an explicit conversion.
 
-1. Top-of-library artifact recast variants, including artifact-plus-colorless top-cast wording and historic/choice artifact reducers.
-2. Draw↔damage feedback loops, including aura-style damage-to-draw trigger segmentation and subject gates so opponent-draw punishers do not loop with your-draw effects.
-3. Recursive creature body + mana sacrifice outlet loops, gated by package-local mana that covers total, colored, and colorless recursion costs.
-4. Layered recursive body + colorless sacrifice outlet + death-mana payoff loops, where the death trigger supplies the colored/any mana required by recursion.
+### 6. Life/loss/damage/counter feedback variants
 
-Tracked outliers were refreshed in `analysis/edhrec-combos/EDGE_CASES.md`. Remaining high-yield unresolved clusters are bounce/cast-reset loops, landfall token/mana loops, graveyard escape/fuel loops, mill/lifeloss reciprocal loops, token/sacrifice treasure engines, life-payment damage loops, mutual blink loops, big-mana threshold untap engines, and extra-combat treasure/equipment engines.
+**Observed gap:** G003 now covers fixed lifegain→opponent-lifeloss, nonland mana amplification, and lifelink/counter/damage creature loops that restore the spent counter. Remaining rows are broader variants: life-payment damage loops, opponent-draw damage/counter punishers, true counter-growth variants, each-player subject mismatches, and finite kill packages that lack a repeatable resource cycle.
 
-## G007 review-blocker resolution
+**Example evidence:** life-payment damage that triggers lifegain, opponent draw creating damage/counters, and subject-sensitive draw/life/damage loops.
 
-The final review identified two precision blockers, now fixed and regression-tested without card-name branches:
+**Proposed generalized model additions:**
 
-1. Draw↔damage proofs now require the draw-trigger damage piece to react to **your** draws or **each player** drawing. Opponent-only draw punishers are recorded as non-repeatable near-misses.
-2. Recursive sacrifice proofs now use package-local mana profiles instead of scalar mana. Colored and colorless recursion requirements must be paid by the sacrifice outlet or an explicit death-mana payoff in the same package; external mana bases are no longer assumed.
-3. Raw-card and face-aware classification paths now pass `mana_cost` through to the shared classifier, so cast-from-graveyard recursive bodies preserve colored mana requirements in graph/proof-package flows as well as direct classifier tests.
+- subject-aware event conversions among damage, lifegain, life loss, and counters;
+- lifelink/damage source modeling for repeatable sources;
+- payment-affordability gate for life-payment engines;
+- result classes: `infinite-life`, `infinite-opponent-life-loss`, `infinite-damage`, and only `infinite-counters` when a future generalized proof demonstrates net counter growth.
 
-## G008 generalized mechanic expansion outcome
+**Regression gates:** keep opponent-only, your-only, and each-player subjects separate. Do not prove finite kill packages as repeatable loops unless a repeatable resource cycle exists.
 
-This pass implemented the next reviewed high-safety subset from the outlier list, still with no card-name branches in classifier or proof logic:
+### 7. Spell-copy, buyback, and stack-object loops
 
-1. **Colorless-mana amplifier + self-untapper** — `self-untap-mana-loop` now supports a static colorless amplifier when the tapped permanent produces colorless mana and the package has a positive mana delta.
-2. **Mill ↔ life-loss feedback** — reciprocal mill/graveyard-drain and life-loss-to-mill triggers are proven only when both directions are present.
-3. **Opponent mass-draw punisher threshold win** — finite, non-loop win proof for large opponent-draw effects plus opponent draw punishers; small opponent draws remain negative.
-4. **Mill multiplier finite mill** — half-library mill plus a mill replacement/multiplier is treated as a finite threshold mill package; small fixed-count mill remains negative.
-5. **Mutual ETB blink reset** — two ETB blink permanents prove repeated ETB/LTB only when each target scope can legally reset the other.
-6. **Token replacement + sacrifice/death-mana loop** — creature-token replacement on a local creature-sacrifice outlet plus a death-mana payoff proves death/sacrifice/token repetition when package-local death mana pays the outlet activation.
+**Observed gap:** stack-copy rows are `missed` or `generic-edge-only`; the engine lacks copy-object targeting and buyback/ritual threshold semantics.
 
-Rerun result from `analysis/edhrec-combos/edhrec-combo-evaluation.md`:
+**Example evidence:** copy a creature-copy spell; ritual plus buyback/copy; spell recursion blink loops.
 
-- Detailed combos evaluated: 120
-- Local resolution: 120/120
-- Proven by bounded proof/package logic: 29/120 (24.2%), up from 21/120 (17.5%)
-- Combo-family detection: 24.2%, up from 17.5%
-- Expected result-class coverage (all signals): 27/111 (24.3%), up from 21/111 (18.9%)
-- Proof-only expected result-class coverage: 27/111 (24.3%)
-- Remaining buckets: 49 missed, 38 generic-edge-only, 4 bounded-out
+**Proposed generalized model additions:**
 
-Regression coverage added in:
+- copy-spell-target and copy-permanent-token facts;
+- buyback/additional-cost payment model;
+- stack object can copy/recur the spell that created it, gated by target legality;
+- result classes: `infinite-cast`, `infinite-etb`, `infinite-tokens`, `infinite-mana`.
 
-- `test/interaction-model.test.js`
-- `test/interaction-proof-search.test.js`
-- `test/interaction-proof-packages.test.js`
-- `test/combo-family-library.test.js`
-- `test/edhrec-combo-evaluator.test.js`
-- `analysis/interaction-validation/corpus.json`
+**Regression gates:** require explicit copyable spell target and positive payment threshold; avoid assuming all spell-copy effects can target themselves.
 
-Still deferred/outlier categories are unchanged in spirit but more sharply scoped: bounce/cast-reset, landfall self-replacement, graveyard escape/fuel, Food/Clue/Treasure subtype loops, life-payment loops, stack-copy/buyback loops, threshold untap engines, extra-combat engines, and body-fodder reanimation loops.
+### 8. Big-mana threshold untap and modal artifact engines
+
+**Observed gap:** rows with costed untap/draw/life modes and variable creature/permanent mana sources are missed because current proof only handles simple self-untap/amplifier shapes.
+
+**Example evidence:** Staff-style engines with mana creatures that produce more than the untap cost.
+
+**Proposed generalized model additions:**
+
+- variable mana-source cardinality facts (e.g. mana per creature/type/permanent);
+- costed modal ability sequencing: untap, draw, gain life;
+- threshold proof comparing package-local lower-bound mana production to activation costs;
+- result classes: `infinite-mana`, `infinite-untap`, `infinite-draw`, `infinite-life`.
+
+**Regression gates:** require a conservative lower bound above the threshold; break-even or unknown-count sources remain unproven.
+
+### 9. Extra-combat payment loops
+
+**Observed gap:** combat rows are mostly missed: combat damage or equipment creates mana/tokens, pays for extra combat, untaps attackers, repeats.
+
+**Example evidence:** extra-combat enchantments/equipment plus Treasure/damage mana sources or token-copy combat sources.
+
+**Proposed generalized model additions:**
+
+- extra-combat activation/payment capability;
+- combat-damage-to-mana/token event conversion;
+- attacker/untap continuity gate;
+- result classes: `combat`, `infinite-mana`, `infinite-tokens`, `infinite-untap`.
+
+**Regression gates:** require a connected attacker or equipment-bearing creature and enough combat-damage resource to pay the next combat. Do not assume all extra-combat cards are repeatable.
+
+### 10. Result-label mapping and non-loop finite/lock packages
+
+**Observed gap:** 5,865 unresolved rows have EDHREC labels not mapped to current expected classes or proof families: lock, infinite turns, self-discard, protection/prevention, direct alternate wins, library play/exile access, and similar labels.
+
+**Proposed generalized model additions:**
+
+- expand evaluator result-class mapping for common EDHREC labels (`infinite-turns`, `lock`, `self-discard`, `protection/prevention`, `play-from-exile/library-access`);
+- separate finite threshold packages from repeatable loops;
+- add human-review buckets for labels that cannot be safely proven from local text.
+
+**Regression gates:** evaluator mappings must not inflate runtime proof coverage; they should improve diagnosis and direct later generalized families.
+
+## Recommended G003 implementation order
+
+1. **Done in G003:** low-risk proof-family extensions for fixed lifegain/lifeloss, nonland mana amplification, and lifelink-counter damage loops.
+2. **Evaluator/result taxonomy next:** add missing non-runtime result classes and diagnostics so later gains are measured correctly.
+3. **Token subtype accounting:** Food/Clue/Treasure/land token distinctions that unlock several clusters without relying on names.
+4. **Recursive sacrifice/reanimation variants:** continue only with strict payment/replenishment gates.
+5. **Threshold engines:** big-mana untap and extra-combat loops only after conservative lower-bound resource accounting is in place.
+6. **High-complexity stack/graveyard/cast-reset loops:** bounce/replay, escape/fuel, buyback, and stack-copy families need dedicated regression suites before enabling.
+
+Every implementation slice must update unit tests, hardening/validation fixtures, EDHREC evaluation output, and `analysis/edhrec-combos/EDGE_CASES.md` before it is considered complete.

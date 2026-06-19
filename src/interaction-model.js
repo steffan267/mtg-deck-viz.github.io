@@ -1032,6 +1032,11 @@
         if (s.kind === "activated" && /\{t\}/.test(c)) caps.add("has-tap-ability");
         if (s.kind === "activated" && !/\badd \{|\badd (one|two|three|x|an amount)/.test(e))
           caps.add("has-nonmana-activated-ability");
+        if (s.kind === "activated"
+            && /remove a \+1\/\+1 counter from (this|it|this creature)/.test(c)
+            && /\bdeals? \d+ damage to (any target|target|target player|each opponent|an opponent)/.test(e)) {
+          caps.add("is-counter-to-damage-source");
+        }
         if (s.kind === "activated" && /\bartifact\b/.test(classified._type || "") && /draw a card/.test(e) && /put .* on top of (its owner.?s|your) library/.test(e + " " + c))
           caps.add("is-self-top-draw-artifact");
         // activated ability on a creature. Creature-scoped reducers must not
@@ -1115,12 +1120,15 @@
         caps.add("is-cost-reducer");
       else if (/(spells?|creature spells?) .* cost \{?\d* ?[^ ]* ?less|costs? \{\d+\} less to cast/.test(e))
         caps.add("is-spell-cost-reducer");
+      if (/(another target |target )creature.{0,40}gains? lifelink until end of turn/.test(e))
+        caps.add("grants-lifelink-to-creature");
       if (/\bartifact spells? you cast cost \{?\d* ?[^ ]* ?less|artifact spells? cost \{?\d* ?[^ ]* ?less/.test(e)
           || /\bhistoric spells? you cast cost \{?\d* ?[^ ]* ?less/.test(e)
           || /choose .*artifact.{0,80}spells? you cast of the chosen type cost \{?\d* ?[^ ]* ?less/.test(effectAndRaw))
         caps.add("is-artifact-spell-cost-reducer");
       if (/whenever you tap (a|an) (permanent|artifact) for \{c\}|whenever you tap (a|an) (permanent|artifact) for colorless mana/.test(effectAndRaw)
-          || /(?:tap|tapped).{0,80}(?:permanent|artifact).{0,80}(?:\{c\}|colorless mana).{0,80}(?:add an additional \{c\}|add one additional colorless mana|produces? an additional \{c\})/.test(effectAndRaw)) {
+          || /(?:tap|tapped).{0,80}(?:permanent|artifact).{0,80}(?:\{c\}|colorless mana).{0,80}(?:add an additional \{c\}|add one additional colorless mana|produces? an additional \{c\})/.test(effectAndRaw)
+          || /whenever you tap (a|an) nonland permanent for mana.{0,80}add one mana of any type that permanent produced/.test(effectAndRaw)) {
         caps.add("is-colorless-mana-amplifier");
         caps.add("colorless-mana-amplifier:1");
       }
@@ -1152,8 +1160,10 @@
         caps.add("is-library-exile-source");
       if (/whenever an opponent loses life/.test(s.trigger) && /you gain that much life/.test(e))
         caps.add("is-lifegain-from-opponent-lifeloss");
-      if (/whenever you gain life/.test(s.trigger) && /(target opponent|each opponent).*loses that much life/.test(e))
+      if (/whenever you gain life/.test(s.trigger) && /(target opponent|each opponent|opponents?).{0,40}loses? (that much|\d+) life/.test(e))
         caps.add("is-lifeloss-from-your-lifegain");
+      if (/whenever you gain life/.test(s.trigger) && /put (a|\d+) \+1\/\+1 counters? on target (creature|creature or enchantment)/.test(e))
+        caps.add("is-lifegain-to-counter-payoff");
       if (s.kind === "triggered"
           && /\bwhenever (you|a player|an opponent) draws?\b/.test(s.trigger)
           && /\bdeals? (that much|\d+|x)? ?damage\b|\bdeals? damage equal\b/.test(e)) {
@@ -1416,6 +1426,8 @@
     // sac fodder / blink target: real creatures and produced creature tokens
     // are bodies; noncreature tokens such as Treasure are not attackers/deaths.
     if (!isLand && (caps.has("is-creature-token-producer") || /creature/.test((classified._type || "")))) caps.add("is-body");
+    if (caps.has("grants-lifelink-to-creature") && caps.has("is-lifegain-to-counter-payoff"))
+      caps.add("is-lifelink-counter-engine");
     return [...caps];
   }
 
@@ -1543,6 +1555,7 @@
     { family: "mill-multiplier-finite-mill", from: "is-half-library-mill-source", to: "is-mill-multiplier", kind: "enablement", strength: "combo-critical" },
     { family: "mutual-etb-blink-reset-loop", from: "is-etb-blink", to: "is-etb-blink", kind: "enablement", strength: "combo-critical" },
     { family: "self-untap-mana-loop", from: "is-colorless-mana-amplifier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
+    { family: "lifelink-counter-damage-loop", from: "is-lifelink-counter-engine", to: "is-counter-to-damage-source", kind: "enablement", strength: "combo-critical" },
     { family: "token-replacement-sacrifice-mana-loop", from: "is-token-to-creature-token-replacer", to: "is-death-mana-payoff", kind: "enablement", strength: "combo-critical" },
     { family: "imprint-untap-spell-loop", from: "is-cheap-instant-nonland-permanent-untap-spell", to: "is-repeatable-cheap-instant-caster", kind: "enablement", strength: "combo-critical" },
     { family: "self-untap-mana→ability-copy-loop", from: "is-activated-ability-copier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
@@ -1762,6 +1775,14 @@
             evidence = { from: f.from, to: f.to, amplification, untapCost, manaProduced };
             if (!hasCap(dst, "taps-for-mana") || !hasCap(dst, "produces-colorless-mana") || manaProduced + amplification <= untapCost) continue;
           }
+          if (f.family === "lifelink-counter-damage-loop") {
+            evidence = {
+              from: f.from,
+              to: f.to,
+              targetLegal: faceCompatibleCaps(dst, ["is-creature-permanent", "is-counter-to-damage-source"]),
+            };
+            if (!evidence.targetLegal) continue;
+          }
           if (f.family === "mutual-etb-blink-reset-loop") {
             evidence = { from: f.from, to: f.to, firstCanTargetSecond: canEtbBlinkTarget(src, dst), secondCanTargetFirst: canEtbBlinkTarget(dst, src) };
             if (!evidence.firstCanTargetSecond || !evidence.secondCanTargetFirst) continue;
@@ -1922,6 +1943,7 @@
   EVENT_LABEL["enable:mill-multiplier-finite-mill"] = "mill multiplier → finite mill";
   EVENT_LABEL["enable:mutual-etb-blink-reset-loop"] = "mutual ETB blink reset loop";
   EVENT_LABEL["enable:self-untap-mana-loop"] = "self-untap mana loop";
+  EVENT_LABEL["enable:lifelink-counter-damage-loop"] = "lifelink counter-damage loop";
   EVENT_LABEL["enable:token-replacement-sacrifice-mana-loop"] = "token replacement → sacrifice/death-mana loop";
   EVENT_LABEL["enable:imprint-untap-spell-loop"] = "repeatable imprinted untap spell loop";
   EVENT_LABEL["enable:self-untap-mana→ability-copy-loop"] = "self-untap mana ability copy loop";
@@ -1934,6 +1956,7 @@
   EVENT_LABEL["artifact-top-cost-reduction-loop"] = "artifact top + cost reduction loop";
   EVENT_LABEL["draw-damage-feedback-loop"] = "draw/damage feedback loop";
   EVENT_LABEL["recursive-body-sacrifice-mana-loop"] = "recursive body sacrifice mana loop";
+  EVENT_LABEL["lifelink-counter-damage-loop"] = "lifelink counter-damage loop";
   EVENT_LABEL["copy→trigger"] = "copy → trigger";
   EVENT_LABEL["blink→land-untap-etb"] = "repeatable blink → land-untap ETB loop";
   EVENT_LABEL["lord→tribe"] = "tribal (creature-type synergy)";

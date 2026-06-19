@@ -261,6 +261,28 @@ const COMBO_FAMILIES = [
     uiExplanation: 'A draw-triggered damage source and a damage-triggered draw effect can feed each other after any legal seed draw or damage.',
   },
   {
+    id: 'lifelink-counter-damage-loop',
+    title: 'Lifelink counter-damage feedback loop',
+    maxCards: 2,
+    confidenceGate: 'pattern',
+    requiredFacts: [
+      { role: 'engine', kind: 'capability', predicate: 'is-lifelink-counter-engine' },
+      { role: 'source', kind: 'capability', predicate: 'is-counter-to-damage-source' },
+    ],
+    optionalAccelerants: [{ kind: 'event', event: 'initial +1/+1 counter', note: 'one counter starts the deterministic feedback cycle' }],
+    disqualifiers: [
+      { kind: 'target-legality', rule: 'lifelink grant and lifegain counter trigger must be able to target the counter-removing damage creature' },
+      { kind: 'cost', rule: 'damage source must spend and then regain a +1/+1 counter each loop' },
+    ],
+    repeatability: { rule: 'grant lifelink, remove a +1/+1 counter for damage, lifelink causes life gain, life gain replaces the counter' },
+    payoffCriteria: [{ resource: 'damage', comparator: '+', threshold: 1 }, { resource: 'life', comparator: '+', threshold: 1 }],
+    resultClasses: ['infinite-damage', 'infinite-life'],
+    examples: [{ name: 'lifelink/counter engine + counter damage creature', cards: ['Lifelink Counter Engine', 'Counter Damage Creature'] }],
+    negativeFixtures: [{ name: 'counter damage artifact without creature type', cards: ['Lifelink Counter Engine', 'Counter Damage Artifact'], reason: 'lifelink grant cannot target it as a creature' }],
+    knownFalsePositives: ['lifegain counter payoffs that cannot target the damage source', 'counter damage sources without a replenished +1/+1 counter'],
+    uiExplanation: 'A lifelink grant turns counter-fueled damage into life gain, and the lifegain trigger restores the spent counter.',
+  },
+  {
     id: 'opponent-draw-punisher-win',
     title: 'Opponent mass-draw punisher win',
     maxCards: 2,

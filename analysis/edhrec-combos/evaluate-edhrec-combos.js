@@ -255,6 +255,13 @@ function hasTokenReplacementSacrificeManaLoop(cards) {
   });
 }
 
+function hasLifelinkCounterDamageLoop(cards) {
+  return cards.some(engine => hasCap(engine, 'is-lifelink-counter-engine')
+    && cards.some(source => source !== engine
+      && hasCap(source, 'is-counter-to-damage-source')
+      && MODEL.faceCompatibleCaps(source, ['is-creature-permanent', 'is-counter-to-damage-source'])));
+}
+
 function detectCapabilityFamilies(nodes) {
   const cards = (nodes || []).filter(node => node && node.role !== 'zone');
   const families = new Set();
@@ -266,6 +273,7 @@ function detectCapabilityFamilies(nodes) {
   if (cards.some(spellCopier => hasCap(spellCopier, 'is-etb-spell-copier')
     && cards.some(copySpell => copySpell !== spellCopier && hasCap(copySpell, 'is-hasty-creature-copy-spell') && hastyCopySpellCanTarget(copySpell, spellCopier, ['is-etb-spell-copier'])))) families.add('spell-copy-etb→creature-copy-spell-loop');
   if (cards.some(c => hasCap(c, 'is-draw-to-damage-payoff') && drawToDamageAcceptsYourDraw(c)) && cards.some(c => hasCap(c, 'is-damage-to-draw-payoff'))) families.add('draw-damage-feedback-loop');
+  if (hasLifelinkCounterDamageLoop(cards)) families.add('lifelink-counter-damage-loop');
   if (cards.some(c => hasCap(c, 'is-mill-to-lifeloss-payoff')) && cards.some(c => hasCap(c, 'is-lifeloss-to-mill-payoff'))) families.add('mill-lifeloss-feedback-loop');
   if (cards.some(c => hasCap(c, 'is-mass-opponent-draw-source')) && cards.some(c => hasCap(c, 'is-opponent-draw-punisher'))) families.add('opponent-draw-punisher-win');
   if (cards.some(c => hasCap(c, 'is-half-library-mill-source')) && cards.some(c => hasCap(c, 'is-mill-multiplier'))) families.add('mill-multiplier-finite-mill');
