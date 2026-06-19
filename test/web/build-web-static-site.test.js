@@ -99,6 +99,12 @@ try {
     assert.match(html, /createApp|app/);
   });
 
+  test('does not leak source CommonJS loaders into browser HTML', () => {
+    const html = readGeneratedHtml();
+    assert.doesNotMatch(html, /(?:^|[;{}])module\.exports\s*=/, 'browser bundle must not assign to an undefined CommonJS module');
+    assert.doesNotMatch(html, /\brequire\s*\(/, 'browser bundle must not call CommonJS require');
+  });
+
   test('copies bundled recommendation worker JavaScript next to the docs static HTML entrypoint', () => {
     const worker = fs.readdirSync(DOCS_INDEX.endsWith('index.html') ? path.dirname(DOCS_INDEX) : DOCS_INDEX).find(name => workerPattern.test(name));
     assert.ok(worker, 'expected bundled worker asset next to docs/index.html');

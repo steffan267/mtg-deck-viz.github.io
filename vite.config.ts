@@ -10,6 +10,9 @@ export default defineConfig({
   build: {
     outDir: '../../dist/web',
     emptyOutDir: true,
+    commonjsOptions: {
+      include: [/node_modules/, /src[\\/](?:card-faces|face-classification)\.js$/],
+    },
   },
   test: {
     environment: 'jsdom',
