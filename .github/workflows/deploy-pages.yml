@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deck_sources:
+        description: "Optional newline- or comma-separated deck sources to include in the static site"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -39,6 +44,7 @@ jobs:
       - name: Build static Pages site
         env:
           MOXFIELD_PROXY: ${{ vars.MOXFIELD_PROXY }}
+          MTG_DECK_SOURCES: ${{ github.event.inputs.deck_sources || vars.MTG_DECK_SOURCES }}
         run: npm run build-web
 
       - name: Add SPA 404 fallback

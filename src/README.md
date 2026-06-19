@@ -279,8 +279,23 @@ The map can be published as a static site. The GitHub Action
 
 What it does: install deps → `npm run build-data` (downloads the Scryfall bulk
 Oracle Cards DB, which is gitignored) → `npm run build-web` (builds the
-Vue/Vite app, writes the sample deck/candidate `bootstrap-data.json`, writes
+Vue/Vite app, writes the included deck/candidate `bootstrap-data.json`, writes
 `docs/index.html` + `docs/.nojekyll`) → deploy to Pages.
+
+**Including multiple decks in the published site.** By default the Pages build
+includes `data/sample-decklist.txt`. To bake in more decks at build time, pass
+sources to the build command or set `MTG_DECK_SOURCES` to a newline- or
+comma-separated list. Each source can be a local `.txt` decklist or a Moxfield
+URL.
+
+```bash
+npm run build-web -- data/sample-decklist.txt data/another-deck.txt
+MTG_DECK_SOURCES=$'data/sample-decklist.txt\nhttps://moxfield.com/decks/AAAA' npm run build-web
+```
+
+For GitHub Pages, use **Run workflow** and fill the `deck_sources` input, or add
+an Actions repository variable named `MTG_DECK_SOURCES` for every push build.
+The included decks load as tabs and can be compared immediately.
 
 **What works on the published site**
 
@@ -310,6 +325,7 @@ To preview the exact published artifact locally:
 ```bash
 npm run build-data            # once, to fetch the card DB
 npm run build-web             # builds Vue app and writes docs/index.html (+ .nojekyll)
+npm run build-web -- deck-a.txt deck-b.txt  # preview with multiple included decks
 # open docs/index.html in a browser
 ```
 

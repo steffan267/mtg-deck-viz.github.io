@@ -1,7 +1,9 @@
 const assert = require('node:assert/strict');
 const childProcess = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { buildSources, publicSourceId, splitSourceList } = require('../../src/build-web.js');
 
 const ROOT = path.resolve(__dirname, '../..');
 const ROOT_INDEX = path.join(ROOT, 'index.html');
@@ -90,6 +92,37 @@ try {
 
   test('injects the Moxfield proxy configured at build time', () => {
     assert.match(readGeneratedHtml(), /window\.__MOXFIELD_PROXY__ = "https:\/\/proxy\.example\.test";/);
+  });
+
+  test('parses CLI and environment deck sources for static inclusion', () => {
+    assert.deepEqual(splitSourceList('one.txt, two.txt\nhttps://moxfield.com/decks/abc'), ['one.txt', 'two.txt', 'https://moxfield.com/decks/abc']);
+    assert.deepEqual(buildSources(['cli-a.txt', 'cli-b.txt'], { MTG_DECK_SOURCES: 'ignored.txt' }), ['cli-a.txt', 'cli-b.txt']);
+    assert.deepEqual(buildSources([], { MTG_DECK_SOURCES: 'env-a.txt\nenv-b.txt' }), ['env-a.txt', 'env-b.txt']);
+    assert.deepEqual(buildSources([], { MTG_DECK_SOURCES: '  ', DECK_SOURCES: 'legacy-a.txt' }), ['legacy-a.txt']);
+    assert.equal(publicSourceId(path.join(ROOT, 'data/sample-decklist.txt')), 'data/sample-decklist.txt');
+    assert.equal(publicSourceId(path.join(os.tmpdir(), 'agent-a.txt')), 'agent-a.txt');
+    assert.equal(publicSourceId('https://moxfield.com/decks/abc'), 'https://moxfield.com/decks/abc');
+  });
+
+  test('can include multiple decks in the generated static bootstrap', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mtg-build-web-'));
+    const first = path.join(dir, 'agent-a.txt');
+    const second = path.join(dir, 'agent-b.txt');
+    fs.writeFileSync(first, '1 Sol Ring\n1 Mountain\n');
+    fs.writeFileSync(second, '1 Arcane Signet\n1 Swamp\n');
+
+    childProcess.execFileSync(process.execPath, ['src/build-web.js', first, second], {
+      cwd: ROOT,
+      env: { ...process.env, MOXFIELD_PROXY: 'https://proxy.example.test' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    const bootstrap = JSON.parse(fs.readFileSync(DOCS_BOOTSTRAP, 'utf8'));
+    assert.equal(bootstrap.decks.length, 2);
+    assert.equal(bootstrap.active, 0);
+    assert.deepEqual(bootstrap.decks.map(deck => deck.title), ['agent-a', 'agent-b']);
+    assert.deepEqual(bootstrap.decks.map(deck => deck.sourceId), ['agent-a.txt', 'agent-b.txt']);
+    assert.equal(fs.existsSync(ROOT_BOOTSTRAP), true);
   });
 
   test('inlines Vite assets into the generated static HTML', () => {

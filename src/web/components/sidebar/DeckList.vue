@@ -15,7 +15,7 @@
           <span class="deck-list__qty">{{ node.qty || 1 }}</span>
           <span class="deck-list__body">
             <strong>{{ node.id }}</strong>
-            <small>{{ roleLabel(node) }} · MV {{ node.cmc || 0 }} · {{ node.degree || 0 }} links</small>
+            <small>{{ cardSummary(node) }}</small>
           </span>
         </button>
       </div>
@@ -28,6 +28,7 @@
 import { computed } from 'vue'
 import EmptyState from '../common/EmptyState.vue'
 import SectionBlock from '../common/SectionBlock.vue'
+import { cardFaceListSummary } from '../../services/cardFaceDisplay'
 import type { DeckNode } from '../../types/deck'
 
 const props = withDefaults(defineProps<{
@@ -50,6 +51,15 @@ const summary = computed(() => `${deckCards.value.length} cards · ${nonlandCoun
 
 function roleLabel(node: DeckNode): string {
   return props.roleLabels?.[node.role] || node.role
+}
+
+function cardSummary(node: DeckNode): string {
+  return [
+    roleLabel(node),
+    `MV ${node.cmc || 0}`,
+    `${node.degree || 0} links`,
+    cardFaceListSummary(node),
+  ].filter(Boolean).join(' · ')
 }
 </script>
 

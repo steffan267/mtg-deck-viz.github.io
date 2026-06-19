@@ -15,6 +15,26 @@ function deck(title = 'Fixture deck'): DeckPayloadEntry {
         { id: 'Sol Ring', role: 'ramp', degree: 2, qty: 1, text: 'Add two colorless mana.', type: 'Artifact', produces: { mana: ['you'] }, consumes: {}, zones: [], cmc: 1, mana: '{1}', ci: [], edh: null } as any,
         { id: 'Xantcha, Sleeper Agent', role: 'commander', degree: 1, qty: 1, text: 'Any player may activate this ability.', type: 'Legendary Creature', produces: {}, consumes: { mana: ['you'] }, zones: [], cmc: 3, mana: '{1}{B}{R}', ci: ['B', 'R'], edh: null } as any,
         { id: 'Rhystic Study', role: 'draw', degree: 0, qty: 1, text: 'Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.', type: 'Enchantment', produces: { draw: ['you'] }, consumes: {}, zones: [], cmc: 3, mana: '{2}{U}', ci: ['U'], edh: null } as any,
+        {
+          id: 'Heliod, the Radiant Dawn // Heliod, the Warped Eclipse',
+          role: 'utility',
+          degree: 0,
+          qty: 1,
+          text: 'When Heliod enters, return target enchantment card from your graveyard. // You may cast spells as though they had flash.',
+          type: 'Legendary Enchantment Creature — God // Legendary Enchantment Creature — Phyrexian God',
+          produces: {},
+          consumes: {},
+          zones: [],
+          cmc: 4,
+          mana: '{2}{W}{W}',
+          ci: ['W', 'U', 'B'],
+          edh: null,
+          layout: 'transform',
+          faces: [
+            { index: 0, name: 'Heliod, the Radiant Dawn', type_line: 'Legendary Enchantment Creature — God', oracle_text: 'When Heliod enters, return target enchantment card from your graveyard.', mana_cost: '{2}{W}{W}', availability: 'transforms' },
+            { index: 1, name: 'Heliod, the Warped Eclipse', type_line: 'Legendary Enchantment Creature — Phyrexian God', oracle_text: 'You may cast spells as though they had flash.', mana_cost: '', availability: 'transforms' },
+          ],
+        } as any,
         { id: 'Unlinked Card', role: 'utility', degree: 0, qty: 1, text: 'No direct interaction.', type: 'Artifact', produces: {}, consumes: {}, zones: [], cmc: 2, mana: '{2}', ci: [], edh: null } as any,
       ],
       edges: [
@@ -102,7 +122,9 @@ describe('Vue app browser smoke', () => {
     expect(wrapper.text()).toContain('Fixture deck')
     expect(wrapper.text()).toContain('Deck visualisation')
     expect(wrapper.text()).toContain('Deck breakdown')
+    expect(wrapper.text()).toContain('Decks')
     expect(wrapper.find('.deck-tabs-add').text()).toContain('2')
+    expect(wrapper.find('input[placeholder="Paste Moxfield URL + Enter…"]').exists()).toBe(true)
     expect(wrapper.findAll('details.score-card')).toHaveLength(3)
     expect(wrapper.text()).toContain('Fast mana and repeatable activated abilities.')
     const guide = wrapper.find('.deck-metrics-guide')
@@ -114,11 +136,20 @@ describe('Vue app browser smoke', () => {
     expect(wrapper.find('.score-card__salt').attributes('href')).toBe('https://edhrec.com/top/salt')
     expect(wrapper.find('.role-legend').exists()).toBe(false)
     const persistentDecklist = wrapper.get('[data-testid="persistent-decklist"]')
+    expect((wrapper.find('.deck-tabs').element.compareDocumentPosition(persistentDecklist.element) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy()
     expect(persistentDecklist.text()).toContain('Decklist')
-    expect(persistentDecklist.text()).toContain('4 cards · 4 nonlands')
+    expect(persistentDecklist.text()).toContain('5 cards · 5 nonlands')
     expect(persistentDecklist.text()).toContain('Sol Ring')
     expect(persistentDecklist.text()).toContain('Rhystic Study')
-    expect(persistentDecklist.findAll('.deck-list__card')).toHaveLength(4)
+    expect(persistentDecklist.text()).toContain('2 faces')
+    expect(persistentDecklist.findAll('.deck-list__card')).toHaveLength(5)
+
+    await persistentDecklist.findAll('.deck-list__card').find(button => button.text().includes('Heliod, the Radiant Dawn'))!.trigger('click')
+    await nextTick()
+    expect(document.body.textContent).toContain('Transform card')
+    expect(document.body.textContent).toContain('Heliod, the Radiant Dawn')
+    expect(document.body.textContent).toContain('Heliod, the Warped Eclipse')
+    expect(document.body.textContent).toContain('Shown separately so front/back or alternate faces are visible')
 
     await wrapper.findAll('button').find(button => button.text() === 'Deck breakdown')!.trigger('click')
     await nextTick()

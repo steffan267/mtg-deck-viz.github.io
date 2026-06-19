@@ -15,6 +15,7 @@ const ROOT = path.resolve(__dirname, "..");
 const DOCS = path.join(ROOT, "docs");
 const DIST = path.join(ROOT, "dist/web");
 const SAMPLE = path.join(ROOT, "data/sample-decklist.txt");
+const DEFAULT_SAMPLE_TITLE = "Sample deck — Xantcha";
 const GENERATED = path.join(ROOT, "src/web/generated");
 const ROOT_GENERATED_FILES = ["index.html", "bootstrap-data.json", ".nojekyll"];
 
@@ -44,6 +45,40 @@ function htmlJson(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
+function splitSourceList(value) {
+  return String(value || "")
+    .split(/\r?\n|,/)
+    .map(source => source.trim())
+    .filter(Boolean);
+}
+
+function buildSources(argv = process.argv.slice(2), env = process.env) {
+  const cliSources = argv.map(source => String(source).trim()).filter(Boolean);
+  if (cliSources.length) return cliSources;
+  const envSources = splitSourceList(env.MTG_DECK_SOURCES);
+  if (envSources.length) return envSources;
+  const legacySources = splitSourceList(env.DECK_SOURCES);
+  if (legacySources.length) return legacySources;
+  return [SAMPLE];
+}
+
+function sourceForResolve(source) {
+  if (/^https?:\/\//i.test(source)) return source;
+  return path.isAbsolute(source) ? source : path.join(ROOT, source);
+}
+
+function publicSourceId(source) {
+  if (/^https?:\/\//i.test(source)) return source;
+  const absolute = sourceForResolve(source);
+  const relative = path.relative(ROOT, absolute);
+  if (!relative.startsWith("..") && !path.isAbsolute(relative)) return relative.split(path.sep).join("/");
+  return path.basename(absolute);
+}
+
+function titleForSource(source, resolved) {
+  return path.resolve(sourceForResolve(source)) === SAMPLE ? DEFAULT_SAMPLE_TITLE : resolved.title;
+}
+
 function inlineBuiltAssets(html, bootstrap) {
   html = html.replace(/<link rel=\"stylesheet\" crossorigin href=\"(\.\/assets\/[^\"]+\.css)\">/g, (_, href) => {
     const css = fs.readFileSync(path.join(DIST, href.replace(/^\.\//, '')), 'utf8');
@@ -57,14 +92,20 @@ function inlineBuiltAssets(html, bootstrap) {
   return html;
 }
 
-async function writeBootstrap() {
+async function writeBootstrap(options = {}) {
+  const sources = (options.sources && options.sources.length ? options.sources : buildSources()).map(String);
   const idx = loadCards();
   const candidates = candidateIndex(idx);
-  const { decklist } = await resolveSource(SAMPLE, idx);
-  const graph = build(decklist, idx, { includeInteractionProofs: true });
-  const title = "Sample deck — Xantcha";
+  const decks = [];
+  for (const source of sources) {
+    const resolved = await resolveSource(sourceForResolve(source), idx);
+    const graph = build(resolved.decklist, idx, { includeInteractionProofs: true });
+    decks.push({ title: titleForSource(source, resolved), graph, sourceId: publicSourceId(source) });
+  }
+  if (!decks.length) throw new Error("No decks were built for the Pages bootstrap");
+  const title = decks.length === 1 ? decks[0].title : `${decks.length} deck comparison`;
   const bootstrap = {
-    decks: [{ title, graph }],
+    decks,
     active: 0,
     candidates,
     title,
@@ -77,7 +118,8 @@ async function writeBootstrap() {
 }
 
 async function main() {
-  const bootstrap = await writeBootstrap();
+  const sources = buildSources();
+  const bootstrap = await writeBootstrap({ sources });
   rmrf(DIST);
   cp.execFileSync(path.join(ROOT, "node_modules/.bin/vite"), ["build"], { cwd: ROOT, stdio: "inherit" });
   rmrf(DOCS);
@@ -91,8 +133,13 @@ async function main() {
   fs.writeFileSync(path.join(DOCS, ".nojekyll"), "");
   removeRootPagesArtifacts();
   copyDir(DOCS, ROOT);
-  console.log(`✓ Vue site built to docs/ and repository root (sample: ${bootstrap.title}, candidates: ${bootstrap.candidates.length})`);
+  console.log(`✓ Vue site built to docs/ and repository root (${bootstrap.decks.length} deck${bootstrap.decks.length === 1 ? "" : "s"}, candidates: ${bootstrap.candidates.length})`);
+  console.log(`  Included decks: ${bootstrap.decks.map(deck => deck.title).join(", ")}`);
   console.log(`  Moxfield proxy: ${process.env.MOXFIELD_PROXY || "(none — file/paste import only)"}`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+if (require.main === module) {
+  main().catch(e => { console.error(e); process.exit(1); });
+} else {
+  module.exports = { buildSources, publicSourceId, splitSourceList, sourceForResolve, titleForSource, writeBootstrap };
+}
