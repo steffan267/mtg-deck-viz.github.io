@@ -19,6 +19,11 @@ const CORE_LOGIC_FILES = [
   'src/face-classification.js',
   'src/card-faces.js',
   'src/build-deck-viz.js',
+  'src/semantic-proof-utils.js',
+  'src/combo-detection/benchmark.ts',
+  'src/combo-detection/contracts.ts',
+  'src/combo-detection/index.ts',
+  'src/combo-detection/strategies.ts',
   'analysis/edhrec-combos/evaluate-edhrec-combos.js',
 ];
 const REQUIRED_CARD_NAME_SOURCES = [
@@ -137,8 +142,10 @@ function toPosixRelative(root, file) {
 }
 
 function isCoreLogicCandidate(relativePath) {
-  if (!relativePath.startsWith('src/') || !relativePath.endsWith('.js')) return false;
+  if (!relativePath.startsWith('src/')) return false;
+  if (!/\.(js|ts)$/.test(relativePath)) return false;
   if (relativePath === 'src/combo-family-library.js') return false;
+  if (relativePath.startsWith('src/combo-detection/')) return true;
   return /^src\/interaction-[^/]+\.js$/.test(relativePath)
     || CORE_LOGIC_FILES.includes(relativePath);
 }

@@ -16,6 +16,7 @@ const names = collectEvidenceCardNames();
 assert.ok(names.includes("Thassa's Oracle"), 'tracked EDHREC evidence snapshot should provide clean-checkout combo evidence names');
 assert.equal(names.includes('Sacrifice'), false, 'exhaustive optional cache should not turn mechanic words into guard false positives');
 assert.ok(CORE_LOGIC_FILES.includes('src/interaction-model.js'));
+assert.ok(CORE_LOGIC_FILES.includes('src/combo-detection/strategies.ts'));
 assert.equal(stripJsComments('const x = 1; // card name').startsWith('const x = 1;'), true);
 assert.equal(stripJsComments('const url = "https://edhrec.com/combos";'), 'const url = "https://edhrec.com/combos";');
 assert.equal(canonicalizeMentionText("Thassa’s  Oracle"), canonicalizeMentionText("thassa's oracle"));
@@ -41,19 +42,26 @@ const result = runNoComboNameHardcodingCheck({ names });
 assert.equal(result.ok, true, result.findings.map(item => `${item.file}:${item.line} ${item.name}`).join('\n'));
 assert.equal(result.findings.length, 0);
 assert.ok(result.checkedFiles.includes('src/interaction-model.js'));
+assert.ok(result.checkedFiles.includes('src/interaction-proof-search.js'));
+assert.ok(result.checkedFiles.includes('src/interaction-proof-packages.js'));
+assert.ok(result.checkedFiles.includes('src/combo-detection/strategies.ts'));
+assert.ok(result.checkedFiles.includes('analysis/edhrec-combos/evaluate-edhrec-combos.js'));
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'no-hardcode-root-'));
 try {
   fs.mkdirSync(path.join(tmpRoot, 'src'), { recursive: true });
+  fs.mkdirSync(path.join(tmpRoot, 'src', 'combo-detection'), { recursive: true });
   fs.writeFileSync(path.join(tmpRoot, 'src', 'interaction-new.js'), 'const rule = "Thassa’s Oracle";\n');
+  fs.writeFileSync(path.join(tmpRoot, 'src', 'combo-detection', 'strategy.ts'), 'const rule = "Thassa’s Oracle";\n');
   fs.writeFileSync(path.join(tmpRoot, 'src', 'combo-family-library.js'), 'const example = "Thassa’s Oracle";\n');
   const discovered = discoverCoreLogicFiles(tmpRoot);
-  assert.deepEqual(discovered, ['src/interaction-new.js']);
+  assert.deepEqual(discovered, ['src/combo-detection/strategy.ts', 'src/interaction-new.js']);
   const autoDiscoveredHit = runNoComboNameHardcodingCheck({ root: tmpRoot, names: ["Thassa's Oracle"] });
   assert.equal(autoDiscoveredHit.ok, false, 'default guard should auto-discover new runtime interaction files');
-  assert.deepEqual(autoDiscoveredHit.findings.map(item => item.file), ['src/interaction-new.js']);
+  assert.deepEqual(autoDiscoveredHit.findings.map(item => item.file), ['src/combo-detection/strategy.ts', 'src/interaction-new.js']);
 
   fs.writeFileSync(path.join(tmpRoot, 'src', 'interaction-new.js'), 'const rule = "generic trigger";\n');
+  fs.writeFileSync(path.join(tmpRoot, 'src', 'combo-detection', 'strategy.ts'), 'const rule = "generic trigger";\n');
   const autoDiscoveredClean = runNoComboNameHardcodingCheck({ root: tmpRoot, names: ["Thassa's Oracle"] });
   assert.equal(autoDiscoveredClean.ok, true, 'declarative combo-family examples stay out of runtime hardcode scan');
 } finally {

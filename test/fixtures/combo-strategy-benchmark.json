@@ -1,0 +1,51 @@
+{
+  "cases": [
+    {
+      "id": "resource-loops",
+      "cards": [
+        {
+          "id": "self-untap-engine",
+          "name": "Synthetic Self Untap Engine",
+          "typeLine": "Creature — Druid",
+          "oracleText": "{T}: Add {G}{G}. {0}: Untap this creature."
+        },
+        {
+          "id": "repeatable-blink-engine",
+          "name": "Synthetic Repeatable Blink Engine",
+          "typeLine": "Creature — Spirit",
+          "oracleText": "{1}: Exile another target creature you control, then return it to the battlefield under your control."
+        },
+        {
+          "id": "land-untap-entry",
+          "name": "Synthetic Land Untap Entry",
+          "typeLine": "Creature — Drake",
+          "oracleText": "When this creature enters, untap up to five lands."
+        },
+        {
+          "id": "gain-to-loss",
+          "name": "Synthetic Gain Payoff",
+          "typeLine": "Enchantment",
+          "oracleText": "Whenever you gain life, each opponent loses 1 life."
+        },
+        {
+          "id": "loss-to-gain",
+          "name": "Synthetic Loss Payoff",
+          "typeLine": "Enchantment",
+          "oracleText": "Whenever an opponent loses life, you gain that much life."
+        },
+        {
+          "id": "draw-to-damage",
+          "name": "Synthetic Draw Damage Engine",
+          "typeLine": "Creature — Wizard",
+          "oracleText": "Whenever you draw a card, this creature deals 1 damage to any target."
+        },
+        {
+          "id": "damage-to-draw",
+          "name": "Synthetic Damage Draw Engine",
+          "typeLine": "Enchantment",
+          "oracleText": "Whenever a creature you control deals damage to an opponent, draw a card."
+        }
+      ]
+    }
+  ]
+}

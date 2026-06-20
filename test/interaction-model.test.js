@@ -66,6 +66,15 @@ function assertHasFamily(a, b, family) {
   );
 }
 
+function assertNoFamily(a, b, family) {
+  const interactionList = interactions(a, b);
+  assert.equal(
+    interactionList.some((it) => it.family === family),
+    false,
+    `${a.id} ↔ ${b.id} should not include family ${family}; interactions=${JSON.stringify(interactionList)}`
+  );
+}
+
 function assertHasInteraction(a, b, predicate, message) {
   const interactionList = interactions(a, b);
   assert.ok(
@@ -349,11 +358,42 @@ When Gilded Goose enters, create a Food token.
   const combatCopyEquipment = node('Combat Copy Equipment', 'Legendary Artifact — Equipment', "At the beginning of combat on your turn, create a token that's a copy of equipped creature, except the token isn't legendary. That token gains haste. Equip {5}");
   const firstAttackExtraCombat = node('First Attack Extra Combat', 'Legendary Creature — Angel', 'Haste. Whenever this creature attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.');
   const exertExtraCombat = node('Exert Extra Combat', 'Creature — Human Warrior', "If this creature hasn't been exerted this turn, you may exert it as it attacks. When you do, untap all other creatures you control and after this phase, there is an additional combat phase.");
+  const connectExtraCombat = node('Connect Extra Combat', 'Creature — Orc Pirate', "Whenever this creature deals combat damage to a player, untap each creature you control. After this phase, there is an additional combat phase. This creature can't attack a player it has already attacked this turn.");
+  const globalConnectNearMiss = node('Global Connect Near Miss', 'Creature — Human Monk', 'Whenever one or more creatures you control with power 7 or greater deal combat damage to a player, untap all creatures you control. If this is the first combat phase of the turn, after this phase, there is an additional combat phase.');
+  const creatureDamageNearMiss = node('Creature Damage Near Miss', 'Creature — Orc Pirate', 'Whenever this creature deals combat damage to a creature, untap each creature you control. After this phase, there is an additional combat phase.');
+  const restrictedConnectNearMiss = node('Restricted Connect Near Miss', 'Creature — Noble', 'Whenever this creature deals combat damage to a player, untap all lands you control. After this phase, there is an additional combat phase. Only land creatures can attack during that combat phase.');
   const vanillaAttacker = node('Vanilla Attacker', 'Creature — Human Warrior', 'Haste.');
+  const tappedAttackingCopy = node('Tapped Attacking Copy', 'Artifact — Equipment', "Whenever equipped creature attacks, create a token that's a copy of equipped creature tapped and attacking. Exile it at end of combat. Equip {4}");
+  const attachedSelfCopy = node('Attached Self Copy Aura', 'Enchantment — Aura', 'Enchant creature\nEnchanted creature has "{T}: Create a token that’s a copy of this creature, except it has haste. Exile that token at the beginning of the next end step."');
+  const extraTurnCannotAttack = node('Extra Turn Cannot Attack', 'Legendary Creature — Sphinx', "Flying Whenever Extra Turn Cannot Attack deals combat damage to a player, take an extra turn after this one. Extra Turn Cannot Attack can't attack during extra turns.");
+  const optionalSacrificeExtraTurn = node('Optional Sacrifice Extra Turn', 'Creature — Merfolk Wizard', 'Whenever this creature deals combat damage to a player, you may sacrifice a Merfolk. If you do, take an extra turn after this one.');
   assertHasCap(combatCopyEquipment, 'is-combat-copy-token-equipment');
+  assertHasCap(combatCopyEquipment, 'combat-copy-token-haste');
   assertHasCap(combatCopyEquipment, 'combat-copy-token-nonlegendary');
+  assertHasCap(combatCopyEquipment, 'is-precombat-hasty-creature-copy-source');
+  assertHasCap(combatCopyEquipment, 'precombat-copy-created-before-attack');
+  assertHasCap(combatCopyEquipment, 'precombat-copy-token-has-haste');
+  assertHasCap(combatCopyEquipment, 'precombat-copy-token-nonlegendary');
   assertHasCap(firstAttackExtraCombat, 'is-attack-extra-combat-source');
+  assertHasCap(firstAttackExtraCombat, 'fresh-token-unused-attack-trigger');
+  assertHasCap(firstAttackExtraCombat, 'attack-trigger-can-be-declared');
   assertHasCap(exertExtraCombat, 'is-attack-extra-combat-source');
+  assertHasCap(exertExtraCombat, 'fresh-token-unused-exert-state');
+  assertHasCap(connectExtraCombat, 'is-combat-damage-extra-combat-source');
+  assertHasCap(connectExtraCombat, 'combat-damage-extra-combat-requires-connect');
+  assertHasCap(connectExtraCombat, 'combat-damage-extra-combat-untaps-creatures');
+  assertNoCap(globalConnectNearMiss, 'is-combat-damage-extra-combat-source');
+  assertNoCap(creatureDamageNearMiss, 'is-combat-damage-extra-combat-source');
+  assertHasCap(restrictedConnectNearMiss, 'combat-damage-extra-combat-restricts-next-combat-attackers');
+  assertNoCap(restrictedConnectNearMiss, 'is-combat-damage-extra-combat-source');
+  assertNoCap(tappedAttackingCopy, 'is-precombat-hasty-creature-copy-source');
+  assertHasCap(attachedSelfCopy, 'is-attached-self-hasty-creature-copy');
+  assertHasCap(attachedSelfCopy, 'attached-copy-token-has-haste');
+  assertHasCap(extraTurnCannotAttack, 'is-combat-damage-extra-turn-source');
+  assertHasCap(extraTurnCannotAttack, 'extra-turn-source-cannot-attack-extra-turns');
+  assertNoCap(extraTurnCannotAttack, 'extra-turn-repeatable-with-fresh-token');
+  assertHasCap(optionalSacrificeExtraTurn, 'extra-turn-source-requires-optional-payment');
+  assertNoCap(optionalSacrificeExtraTurn, 'extra-turn-repeatable-with-fresh-token');
   assertHasInteraction(combatCopyEquipment, firstAttackExtraCombat,
     it => it.family === 'combat-copy-token→extra-combat-loop' && it.strength === 'combo-critical',
     'combat-copy equipment plus first-attack extra combat creature should be detected generically');
@@ -687,6 +727,260 @@ When Gilded Goose enters, create a Food token.
     it => it.family === 'token-replacement-sacrifice-mana-loop' && it.strength === 'combo-critical',
     'token replacement on a creature sac outlet plus death-mana payoff should be detected as a loop');
   assertNoEvent(replacementWithoutOutlet, deathManaPayoff, 'enable:token-replacement-sacrifice-mana-loop');
+
+  const graveyardEscapeEnabler = node('Graveyard Escape Enabler', 'Enchantment', "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exiling three other cards from your graveyard.");
+  const discardHandManaSource = node('Discard-Hand Mana Source', 'Artifact', '{T}, Discard your hand, Sacrifice this artifact: Add three mana of any one color.', 0, '{0}');
+  const sevenCardWheel = node('Seven-Card Wheel', 'Sorcery', 'Each player discards their hand, then draws seven cards.', 3, '{2}{R}');
+  const permanentWheel = node('Permanent Wheel', 'Artifact', '{T}, Sacrifice this artifact: Each player discards their hand, then draws seven cards.', 3, '{3}');
+  assertHasCap(graveyardEscapeEnabler, 'is-graveyard-escape-enabler');
+  assertHasCap(graveyardEscapeEnabler, 'graveyard-escape-extra-card-cost:3');
+  assertHasCap(discardHandManaSource, 'is-discard-hand-sac-mana-source');
+  assertHasCap(discardHandManaSource, 'discard-hand-sac-mana-produced:3');
+  assertHasCap(discardHandManaSource, 'discard-hand-sac-mana-any:3');
+  assertHasCap(discardHandManaSource, 'discard-hand-sac-source-cost:0');
+  assertHasCap(sevenCardWheel, 'is-wheel-draw-discard-spell');
+  assertHasCap(sevenCardWheel, 'wheel-draw-count:7');
+  assertNoCap(permanentWheel, 'is-wheel-draw-discard-spell');
+  assertHasFamily(graveyardEscapeEnabler, sevenCardWheel, 'escape-wheel-mana-loop');
+  assertHasFamily(graveyardEscapeEnabler, discardHandManaSource, 'escape-wheel-mana-loop');
+  assertHasFamily(discardHandManaSource, sevenCardWheel, 'escape-wheel-mana-loop');
+
+  const buybackSpellCopy = node('Buyback Spell Copy', 'Instant', 'Buyback {3}. Copy target instant or sorcery spell. You may choose new targets for the copy.', 3, '{1}{R}{R}');
+  const fiveManaRitual = node('Five-Mana Ritual', 'Instant', 'Add {R}{R}{R}{R}{R}.', 3, '{2}{R}');
+  const redSpellReducer = node('Red Spell Reducer', 'Artifact', 'Red spells you cast cost {1} less to cast.');
+  const spellcastManaPayoff = node('Spellcast Mana Payoff', 'Legendary Creature — God', 'Whenever you cast a spell, add {R}.');
+  assertHasCap(buybackSpellCopy, 'is-buyback-spell-copy');
+  assertHasCap(buybackSpellCopy, 'buyback-copy-cost:6');
+  assertHasCap(fiveManaRitual, 'is-ritual-mana-spell');
+  assertHasCap(fiveManaRitual, 'ritual-spell-mana-produced:5');
+  assertHasCap(redSpellReducer, 'is-spell-cost-reducer');
+  assertHasCap(redSpellReducer, 'spell-cost-reduction:1');
+  assertHasCap(redSpellReducer, 'spell-cost-reduction-scope:r');
+  assertHasCap(spellcastManaPayoff, 'is-spellcast-mana-payoff');
+  assertHasCap(spellcastManaPayoff, 'spellcast-mana-produced:1');
+  assertHasFamily(buybackSpellCopy, fiveManaRitual, 'buyback-copy-ritual-loop');
+  assertHasFamily(redSpellReducer, buybackSpellCopy, 'buyback-copy-ritual-loop');
+  assertHasFamily(spellcastManaPayoff, buybackSpellCopy, 'buyback-copy-ritual-loop');
+
+  const permanentEtbHandDropper = node('Permanent ETB Hand Dropper', 'Legendary Creature — Spirit', "Whenever another permanent you control enters, if it wasn't put onto the battlefield with this ability, you may put a permanent card with equal or lesser mana value from your hand onto the battlefield.");
+  const selfBounceLand = node('Self-Bounce Land', 'Land', "This land enters tapped. When this land enters, return a land you control to its owner's hand. {T}: Add {G}{U}.");
+  const landfallTreasurePayoff = node('Landfall Treasure Payoff', 'Creature — Scout', 'Landfall — Whenever a land you control enters, create a Food token or a Treasure token.');
+  const landfallManaPayoff = node('Landfall Mana Payoff', 'Creature — Snake', 'Landfall — Whenever a land you control enters, add one mana of any color.');
+  assertHasCap(permanentEtbHandDropper, 'is-permanent-etb-hand-dropper');
+  assertHasCap(selfBounceLand, 'is-self-bounce-land');
+  assertHasCap(landfallTreasurePayoff, 'is-landfall-payoff');
+  assertHasCap(landfallTreasurePayoff, 'is-landfall-token-payoff');
+  assertHasCap(landfallTreasurePayoff, 'is-landfall-treasure-payoff');
+  assertHasCap(landfallTreasurePayoff, 'landfall-token-mana-produced:1');
+  assertHasCap(landfallManaPayoff, 'is-landfall-mana-payoff');
+  assertHasCap(landfallManaPayoff, 'landfall-mana-produced:1');
+  assertHasFamily(permanentEtbHandDropper, selfBounceLand, 'kodama-bounce-land-landfall-loop');
+  assertHasFamily(selfBounceLand, landfallTreasurePayoff, 'kodama-bounce-land-landfall-loop');
+
+  const genericTribeCountDruid = node('Generic Tribe Count Druid', 'Creature — Elf Druid', '{T}: Add {G} for each Elf you control.');
+  const genericCreatureCountDruid = node('Generic Creature Count Druid', 'Creature — Druid', '{T}: Add {G} for each creature you control.');
+  const globalCreatureCountDruid = node('Global Creature Count Druid', 'Creature — Druid', '{T}: Add {G} for each creature on the battlefield.');
+  const opponentCountDruid = node('Opponent Count Druid', 'Creature — Druid', '{T}: Add {G} for each creature target opponent controls.');
+  const modalUntapEngine = node('Generic Modal Untap Engine', 'Artifact', '{1}: Untap this artifact. {3}, {T}: Untap target creature. {4}, {T}: Draw a card. {2}, {T}: You gain 1 life.');
+  const oneShotUntap = node('One-Shot Untap Spell', 'Instant', 'Untap target creature. Draw a card.');
+  const attachedUntapAura = node('Attached Untap Aura', 'Enchantment — Aura', 'Enchant creature {U}: Untap enchanted creature.');
+  const untapSymbolEquipment = node('Untap Symbol Equipment', 'Artifact — Equipment', 'Equipped creature has "{3}, {Q}: This creature gets +2/+2 until end of turn." Equip {0}');
+  assertHasCap(genericTribeCountDruid, 'is-variable-board-count-mana-source');
+  assertHasCap(genericTribeCountDruid, 'is-variable-creature-mana-source');
+  assertHasCap(genericTribeCountDruid, 'variable-mana-counts:elf');
+  assertHasCap(genericTribeCountDruid, 'variable-mana-unit-g:1');
+  assertHasCap(genericCreatureCountDruid, 'variable-mana-counts:creature');
+  assertHasCap(globalCreatureCountDruid, 'is-variable-board-count-mana-source');
+  assertHasCap(globalCreatureCountDruid, 'board-count-scope:creature');
+  assertNoCap(opponentCountDruid, 'is-variable-board-count-mana-source');
+  assertNoCap(opponentCountDruid, 'is-variable-creature-mana-source');
+  assertHasCap(modalUntapEngine, 'is-repeatable-creature-untap-ability');
+  assertHasCap(modalUntapEngine, 'creature-untap-ability-cost:3');
+  assertHasCap(modalUntapEngine, 'creature-untap-ability-taps-source');
+  assertHasCap(modalUntapEngine, 'self-untap-cost:1');
+  assertHasCap(modalUntapEngine, 'is-repeatable-tap-draw-ability');
+  assertHasCap(modalUntapEngine, 'tap-draw-ability-cost:4');
+  assertHasCap(modalUntapEngine, 'is-repeatable-tap-lifegain-ability');
+  assertHasCap(modalUntapEngine, 'tap-lifegain-ability-cost:2');
+  assertNoCap(oneShotUntap, 'is-repeatable-creature-untap-ability');
+  assertHasCap(attachedUntapAura, 'is-attached-creature-untapper');
+  assertHasCap(attachedUntapAura, 'attached-creature-untap-cost:1');
+  assertHasCap(untapSymbolEquipment, 'is-attached-creature-untapper');
+  assertHasCap(untapSymbolEquipment, 'attached-creature-untap-cost:3');
+  assertHasCap(untapSymbolEquipment, 'attached-untap-adds-pump');
+  assertHasFamily(genericTribeCountDruid, modalUntapEngine, 'variable-board-count-mana-loop');
+  assertHasFamily(genericTribeCountDruid, attachedUntapAura, 'variable-board-count-mana-loop');
+
+  const genericExtraCombatActivator = node('Generic Extra Combat Activator', 'Enchantment', '{3}{R}{R}: Untap all creatures you control. After this phase, there is an additional combat phase followed by an additional main phase. Activate only as a sorcery.');
+  const combatTreasureEquipment = node('Combat Treasure Equipment', 'Artifact — Equipment', 'Equipped creature has trample and "Whenever this creature deals combat damage to a player, create that many Treasure tokens." Equip {3}');
+  const combatLandUntapEquipment = node('Combat Land Untap Equipment', 'Artifact — Equipment', 'Whenever equipped creature deals combat damage to a player, untap all lands you control.');
+  const attackLandUntapAura = node('Attack Land Untap Aura', 'Enchantment — Aura', 'Enchant creature Whenever enchanted creature attacks, untap all lands you control.');
+  const fixedTreasureSaboteur = node('Fixed Treasure Saboteur', 'Creature — Rogue', 'Whenever this creature deals combat damage to a player, create a Treasure token.');
+  const randomTreasureDragon = node('Random Treasure Dragon', 'Creature — Dragon', 'Whenever this creature deals combat damage to a player, roll a d20. Create a number of Treasure tokens equal to the result.');
+  const extraCombatWithoutUntap = node('Extra Combat Without Untap', 'Enchantment', '{3}{R}{R}: After this phase, there is an additional combat phase. Activate only as a sorcery.');
+  const extraCombatWithoutMain = node('Extra Combat Without Main', 'Enchantment', '{3}{R}{R}: Untap all creatures you control. After this phase, there is an additional combat phase. Activate only as a sorcery.');
+  const attackTriggeredExtraCombat = node('Attack Triggered Extra Combat', 'Creature — Dragon', 'Whenever this creature attacks, you may pay {5}{R}{R}. If you do, untap all attacking creatures and after this phase, there is an additional combat phase.');
+  const tappedArtifactExtraCombat = node('Tapped Artifact Extra Combat', 'Artifact', '{3}{R}{R}, {T}: Untap all creatures you control. After this phase, there is an additional combat phase followed by an additional main phase.');
+  assertHasCap(genericExtraCombatActivator, 'is-repeatable-extra-combat-engine');
+  assertHasCap(genericExtraCombatActivator, 'is-repeatable-extra-combat-activator');
+  assertHasCap(genericExtraCombatActivator, 'extra-combat-cost:5');
+  assertHasCap(genericExtraCombatActivator, 'extra-combat-color-r:2');
+  assertHasCap(genericExtraCombatActivator, 'extra-combat-untaps-creatures');
+  assertHasCap(genericExtraCombatActivator, 'extra-combat-activation-window:sorcery');
+  assertHasCap(genericExtraCombatActivator, 'extra-combat-adds-main-phase');
+  assertHasCap(combatTreasureEquipment, 'is-combat-damage-treasure-engine');
+  assertHasCap(combatTreasureEquipment, 'combat-damage-treasure-per-damage:1');
+  assertHasCap(combatTreasureEquipment, 'combat-resource-requires-connect');
+  assertHasCap(combatLandUntapEquipment, 'is-combat-damage-land-untap-engine');
+  assertHasCap(attackLandUntapAura, 'is-attack-land-untap-engine');
+  assertHasCap(fixedTreasureSaboteur, 'is-fixed-combat-damage-treasure-source');
+  assertNoCap(fixedTreasureSaboteur, 'is-combat-damage-treasure-engine');
+  assertHasCap(randomTreasureDragon, 'is-random-combat-damage-treasure-source');
+  assertNoCap(randomTreasureDragon, 'is-combat-damage-treasure-engine');
+  assertHasCap(extraCombatWithoutMain, 'is-repeatable-extra-combat-activator');
+  assertHasCap(extraCombatWithoutMain, 'extra-combat-untaps-creatures');
+  assertNoCap(extraCombatWithoutMain, 'extra-combat-adds-main-phase');
+  assertHasCap(attackTriggeredExtraCombat, 'is-repeatable-extra-combat-attack-trigger');
+  assertHasCap(tappedArtifactExtraCombat, 'is-repeatable-extra-combat-engine');
+  assertHasCap(tappedArtifactExtraCombat, 'extra-combat-activation-taps-source');
+  assertHasCap(tappedArtifactExtraCombat, 'extra-combat-untaps-activating-creature');
+  assertHasFamily(combatTreasureEquipment, genericExtraCombatActivator, 'combat-resource→extra-combat-loop');
+  assertHasFamily(combatLandUntapEquipment, genericExtraCombatActivator, 'combat-resource→extra-combat-loop');
+  assertHasFamily(attackLandUntapAura, genericExtraCombatActivator, 'combat-resource→extra-combat-loop');
+  assertNoFamily(combatTreasureEquipment, extraCombatWithoutUntap, 'combat-resource→extra-combat-loop');
+  assertNoFamily(combatTreasureEquipment, extraCombatWithoutMain, 'combat-resource→extra-combat-loop');
+  assertNoFamily(combatTreasureEquipment, attackTriggeredExtraCombat, 'combat-resource→extra-combat-loop');
+  assertNoFamily(combatTreasureEquipment, tappedArtifactExtraCombat, 'combat-resource→extra-combat-loop');
+
+  const artifactSacrificeExtraTurnEngine = node('Artifact Sacrifice Extra-Turn Engine', 'Artifact', '{T}, Sacrifice five artifacts: Take an extra turn after this one.');
+  const oncePerTurnArtifactSacrificeExtraTurnEngine = node('Once Per Turn Artifact Sacrifice Extra-Turn Engine', 'Artifact', '{T}, Sacrifice five artifacts: Take an extra turn after this one. Activate only once each turn.');
+  const upkeepArtifactTokenEngine = node('Upkeep Artifact Token Engine', 'Artifact Creature — Thopter', 'At the beginning of your upkeep, create five 1/1 colorless Thopter artifact creature tokens.');
+  const oncePerTurnUpkeepArtifactTokenEngine = node('Once Per Turn Upkeep Artifact Token Engine', 'Artifact Creature — Thopter', 'At the beginning of your upkeep, create five 1/1 colorless Thopter artifact creature tokens. This ability triggers only once each turn.');
+  const fourArtifactTokenEngine = node('Four Artifact Token Engine', 'Artifact', 'At the beginning of your upkeep, create four Clue tokens.');
+  const creatureTokenEngine = node('Creature Token Engine', 'Creature', 'At the beginning of your upkeep, create five 1/1 white Soldier creature tokens.');
+  const etbArtifactTokenEngine = node('ETB Artifact Token Engine', 'Artifact', 'When this artifact enters, create five Treasure tokens.');
+  const endStepArtifactTokenEngine = node('End Step Artifact Token Engine', 'Artifact', 'At the beginning of your end step, create five Treasure tokens.');
+  assertHasCap(artifactSacrificeExtraTurnEngine, 'is-artifact-sacrifice-extra-turn-engine');
+  assertHasCap(artifactSacrificeExtraTurnEngine, 'artifact-extra-turn-sac-count:5');
+  assertNoCap(oncePerTurnArtifactSacrificeExtraTurnEngine, 'is-artifact-sacrifice-extra-turn-engine');
+  assertHasCap(upkeepArtifactTokenEngine, 'is-artifact-token-producer');
+  assertHasCap(upkeepArtifactTokenEngine, 'is-turn-cycle-artifact-token-engine');
+  assertHasCap(upkeepArtifactTokenEngine, 'artifact-tokens-produced:5');
+  assertHasCap(upkeepArtifactTokenEngine, 'artifact-tokens-per-turn:5');
+  assertNoCap(oncePerTurnUpkeepArtifactTokenEngine, 'is-turn-cycle-artifact-token-engine');
+  assertHasCap(fourArtifactTokenEngine, 'artifact-tokens-per-turn:4');
+  assertNoCap(creatureTokenEngine, 'is-artifact-token-producer');
+  assertHasCap(etbArtifactTokenEngine, 'artifact-tokens-produced:5');
+  assertNoCap(etbArtifactTokenEngine, 'is-turn-cycle-artifact-token-engine');
+  assertHasCap(endStepArtifactTokenEngine, 'artifact-tokens-produced:5');
+  assertNoCap(endStepArtifactTokenEngine, 'is-turn-cycle-artifact-token-engine');
+  assertHasFamily(upkeepArtifactTokenEngine, artifactSacrificeExtraTurnEngine, 'artifact-token→extra-turn-loop');
+  assertNoFamily(fourArtifactTokenEngine, artifactSacrificeExtraTurnEngine, 'artifact-token→extra-turn-loop');
+  assertNoFamily(creatureTokenEngine, artifactSacrificeExtraTurnEngine, 'artifact-token→extra-turn-loop');
+  assertNoFamily(etbArtifactTokenEngine, artifactSacrificeExtraTurnEngine, 'artifact-token→extra-turn-loop');
+  assertNoFamily(oncePerTurnUpkeepArtifactTokenEngine, artifactSacrificeExtraTurnEngine, 'artifact-token→extra-turn-loop');
+  assertNoFamily(endStepArtifactTokenEngine, artifactSacrificeExtraTurnEngine, 'artifact-token→extra-turn-loop');
+  assertNoFamily(upkeepArtifactTokenEngine, oncePerTurnArtifactSacrificeExtraTurnEngine, 'artifact-token→extra-turn-loop');
+
+  const combatSacrificeAura = node(
+    'Combat Sacrifice Aura',
+    'Enchantment — Aura',
+    'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice that creature and attach this Aura to another target creature you control. Untap all creatures you control. After this phase, there is an additional combat phase.'
+  );
+  const breathShapedAura = node(
+    'Breath-Shaped Aura',
+    'Enchantment — Aura',
+    'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice it and attach Breath-Shaped Aura to a creature you control. If you do, untap all creatures you control and after this phase, there is an additional combat phase.'
+  );
+  const freshCombatCarrierSource = node(
+    'Fresh Combat Carrier Source',
+    'Creature — Human Warrior',
+    'At the beginning of combat on your turn, create a 1/1 red Warrior creature token with haste. It attacks this combat if able.'
+  );
+  const auraWithoutReattach = node(
+    'Combat Sacrifice Aura Without Reattach',
+    'Enchantment — Aura',
+    'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice that creature. Untap all creatures you control. After this phase, there is an additional combat phase.'
+  );
+  const auraWithoutUntap = node(
+    'Combat Sacrifice Aura Without Untap',
+    'Enchantment — Aura',
+    'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice that creature and attach this Aura to another target creature you control. After this phase, there is an additional combat phase.'
+  );
+  const oncePerTurnAura = node(
+    'Once Per Turn Combat Sacrifice Aura',
+    'Enchantment — Aura',
+    'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice that creature and attach this Aura to another target creature you control. Untap all creatures you control. After this phase, there is an additional combat phase. This ability triggers only once each turn.'
+  );
+  const staleCarrierSource = node(
+    'Stale Carrier Source',
+    'Creature — Human Soldier',
+    'At the beginning of combat on your turn, create a 1/1 white Soldier creature token.'
+  );
+  const wrongTimingCarrierSource = node(
+    'Wrong Timing Carrier Source',
+    'Creature — Human Soldier',
+    'Whenever this creature attacks, create a 1/1 red Warrior creature token with haste.'
+  );
+  const nonHastyCarrierSource = node(
+    'Non-Hasty Carrier Source',
+    'Creature — Human Soldier',
+    'At the beginning of combat on your turn, create a 1/1 red Warrior creature token. It attacks this combat if able.'
+  );
+  const tappedAttackingCarrierSource = node(
+    'Tapped Attacking Carrier Source',
+    'Creature — Human Soldier',
+    'At the beginning of combat on your turn, create a 1/1 red Warrior creature token tapped and attacking.'
+  );
+  const hastyTappedAttackingCarrierSource = node(
+    'Hasty Tapped Attacking Carrier Source',
+    'Creature — Human Soldier',
+    'At the beginning of combat on your turn, create a 1/1 red Warrior creature token tapped and attacking. That token gains haste.'
+  );
+  const conditionalCarrierSource = node(
+    'Conditional Carrier Source',
+    'Creature — Human Soldier',
+    'At the beginning of combat on your turn, if you control a legendary creature, create a 1/1 red Warrior creature token with haste. It attacks this combat if able.'
+  );
+  const firstCombatOnlyCarrierSource = node(
+    'First Combat Only Carrier Source',
+    'Creature — Human Warrior',
+    'At the beginning of combat on your turn, if this is the first combat phase this turn, create a 1/1 red Warrior creature token with haste. It attacks this combat if able.'
+  );
+  assertHasCap(combatSacrificeAura, 'is-combat-sacrifice-extra-combat-aura');
+  assertHasCap(combatSacrificeAura, 'combat-sacrifice-aura-requires-connect');
+  assertHasCap(combatSacrificeAura, 'combat-sacrifice-aura-sacrifices-carrier');
+  assertHasCap(combatSacrificeAura, 'combat-sacrifice-aura-reattaches');
+  assertHasCap(combatSacrificeAura, 'combat-sacrifice-aura-untaps-creatures');
+  assertHasCap(combatSacrificeAura, 'combat-sacrifice-aura-adds-combat');
+  assertHasCap(breathShapedAura, 'is-combat-sacrifice-extra-combat-aura');
+  assertHasCap(breathShapedAura, 'combat-sacrifice-aura-reattaches');
+  assertHasCap(breathShapedAura, 'combat-sacrifice-aura-untaps-creatures');
+  assertHasCap(breathShapedAura, 'combat-sacrifice-aura-adds-combat');
+  assertHasCap(freshCombatCarrierSource, 'is-fresh-attack-carrier-source');
+  assertHasCap(freshCombatCarrierSource, 'fresh-carrier-token-attacks');
+  assertHasCap(freshCombatCarrierSource, 'fresh-carrier-token-has-haste');
+  assertHasCap(freshCombatCarrierSource, 'fresh-carrier-continuity');
+  assertHasCap(freshCombatCarrierSource, 'fresh-carrier-repeatable-each-combat');
+  assertHasCap(freshCombatCarrierSource, 'fresh-carrier-legal-next-reattach-target');
+  assertHasCap(freshCombatCarrierSource, 'fresh-carrier-timing:beginning-of-combat');
+  assertHasCap(freshCombatCarrierSource, 'fresh-carrier-tokens-created:1');
+  assertHasFamily(combatSacrificeAura, freshCombatCarrierSource, 'combat-sacrifice-aura→extra-combat-loop');
+  assertHasFamily(breathShapedAura, freshCombatCarrierSource, 'combat-sacrifice-aura→extra-combat-loop');
+  assertNoCap(auraWithoutReattach, 'is-combat-sacrifice-extra-combat-aura');
+  assertHasCap(auraWithoutReattach, 'combat-sacrifice-aura-sacrifices-carrier');
+  assertNoCap(auraWithoutUntap, 'is-combat-sacrifice-extra-combat-aura');
+  assertNoCap(oncePerTurnAura, 'is-combat-sacrifice-extra-combat-aura');
+  assertNoCap(staleCarrierSource, 'is-fresh-attack-carrier-source');
+  assertNoCap(wrongTimingCarrierSource, 'is-fresh-attack-carrier-source');
+  assertNoCap(nonHastyCarrierSource, 'is-fresh-attack-carrier-source');
+  assertNoCap(tappedAttackingCarrierSource, 'is-fresh-attack-carrier-source');
+  assertNoCap(hastyTappedAttackingCarrierSource, 'is-fresh-attack-carrier-source');
+  assertNoCap(conditionalCarrierSource, 'is-fresh-attack-carrier-source');
+  assertNoCap(firstCombatOnlyCarrierSource, 'is-fresh-attack-carrier-source');
+  assertNoCap(firstCombatOnlyCarrierSource, 'fresh-carrier-continuity');
+  assertNoFamily(combatSacrificeAura, staleCarrierSource, 'combat-sacrifice-aura→extra-combat-loop');
+  assertNoFamily(combatSacrificeAura, firstCombatOnlyCarrierSource, 'combat-sacrifice-aura→extra-combat-loop');
 
   const profile = MODEL.interactionProfile({
     id: 'Heartstone',

@@ -64,10 +64,49 @@ const idx = {
   'colorless mana amplifier': card('Colorless Mana Amplifier', 'Artifact', 'Whenever you tap a permanent for {C}, add an additional {C}.', 5),
   'any-type nonland mana amplifier': card('Any-Type Nonland Mana Amplifier', 'Legendary Creature — Druid', 'Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.', 2),
   'break-even self untapper with colorless': card('Break-Even Self Untapper With Colorless', 'Artifact', '{T}: Add {C}{C}{C}. {3}: Untap this artifact.', 3),
+  'generic tribe count druid': card('Generic Tribe Count Druid', 'Creature — Elf Druid', '{T}: Add {G} for each Elf you control.', 2, '{1}{G}'),
+  'generic modal untap engine': card('Generic Modal Untap Engine', 'Artifact', '{1}: Untap this artifact. {3}, {T}: Untap target creature. {4}, {T}: Draw a card. {2}, {T}: You gain 1 life.', 3, '{3}'),
+  'untap symbol equipment': card('Untap Symbol Equipment', 'Artifact — Equipment', 'Equipped creature has "{3}, {Q}: This creature gets +2/+2 until end of turn." Equip {0}', 3, '{3}'),
   'artifact ability cost reducer': card('Artifact Ability Cost Reducer', 'Creature — Vedalken Artificer', "Activated abilities of artifacts you control cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.", 3),
   'combat copy equipment': card('Combat Copy Equipment', 'Legendary Artifact — Equipment', "At the beginning of combat on your turn, create a token that's a copy of equipped creature, except the token isn't legendary. That token gains haste. Equip {5}", 4),
   'first attack extra combat': card('First Attack Extra Combat', 'Legendary Creature — Angel', 'Haste. Whenever this creature attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.', 4),
+  'exert extra combat': card('Exert Extra Combat', 'Creature — Human Warrior', "If this creature hasn't been exerted this turn, you may exert it as it attacks. When you do, untap all other creatures you control and after this phase, there is an additional combat phase.", 3),
+  'hasty copy source': card('Hasty Copy Source', 'Legendary Creature — Goblin Shaman', "Haste. {T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste. Sacrifice it at the beginning of the next end step.", 5),
+  'attached self copy aura': card('Attached Self Copy Aura', 'Enchantment — Aura', 'Enchant creature\nEnchanted creature has "{T}: Create a token that’s a copy of this creature, except it has haste. Exile that token at the beginning of the next end step."', 4),
+  'connect extra combat': card('Connect Extra Combat', 'Creature — Orc Pirate', "Whenever this creature deals combat damage to a player, untap each creature you control. After this phase, there is an additional combat phase. This creature can't attack a player it has already attacked this turn.", 5),
+  'legendary attack extra combat': card('Legendary Attack Extra Combat', 'Legendary Creature — Angel', 'Haste. Whenever this creature attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.', 4),
+  'generic precombat copy source': card('Generic Precombat Copy Source', 'Enchantment', "At the beginning of combat on your turn, create a token that's a copy of target creature you control. That token gains haste.", 4),
+  'broad hasty copy source': card('Broad Hasty Copy Source', 'Artifact Creature — Shapeshifter', "{T}: Create a token that's a copy of target creature you control, except it has haste.", 5),
+  'tapped artifact hasty copy source': card('Tapped Artifact Hasty Copy Source', 'Artifact', "{T}: Create a token that's a copy of target creature you control, except it has haste.", 5),
+  'tapped attacking copy source': card('Tapped Attacking Copy Source', 'Artifact — Equipment', "Whenever equipped creature attacks, create a token that's a copy of equipped creature tapped and attacking. Exile it at end of combat. Equip {4}", 4),
+  'restricted connect extra combat': card('Restricted Connect Extra Combat', 'Creature — Noble', 'Whenever this creature deals combat damage to a player, untap all lands you control. After this phase, there is an additional combat phase. Only land creatures can attack during that combat phase.', 5),
+  'creature damage extra combat': card('Creature Damage Extra Combat', 'Creature — Orc Pirate', 'Whenever this creature deals combat damage to a creature, untap each creature you control. After this phase, there is an additional combat phase.', 5),
+  'extra turn cannot attack': card('Extra Turn Cannot Attack', 'Legendary Creature — Sphinx', "Flying Whenever Extra Turn Cannot Attack deals combat damage to a player, take an extra turn after this one. Extra Turn Cannot Attack can't attack during extra turns.", 6),
+  'connect extra turn': card('Connect Extra Turn', 'Creature — Sphinx', 'Flying. Whenever this creature deals combat damage to a player, take an extra turn after this one.', 6),
+  'attack extra turn': card('Attack Extra Turn', 'Creature — Human Warrior', 'Whenever this creature attacks, take an extra turn after this one.', 4),
+  'optional sacrifice extra turn': card('Optional Sacrifice Extra Turn', 'Creature — Merfolk Wizard', 'Whenever this creature deals combat damage to a player, you may sacrifice a Merfolk. If you do, take an extra turn after this one.', 4),
   'vanilla attacker': card('Vanilla Attacker', 'Creature — Human Warrior', 'Haste.', 2),
+  'combat sacrifice aura': card('Combat Sacrifice Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice that creature and attach this Aura to another target creature you control. Untap all creatures you control. After this phase, there is an additional combat phase.', 3),
+  'breath-shaped aura': card('Breath-Shaped Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice it and attach Breath-Shaped Aura to a creature you control. If you do, untap all creatures you control and after this phase, there is an additional combat phase.', 3),
+  'fresh combat carrier source': card('Fresh Combat Carrier Source', 'Creature — Human Warrior', 'At the beginning of combat on your turn, create a 1/1 red Warrior creature token with haste. It attacks this combat if able.', 3),
+  'stale carrier source': card('Stale Carrier Source', 'Creature — Human Soldier', 'At the beginning of combat on your turn, create a 1/1 white Soldier creature token.', 2),
+  'first combat only carrier source': card('First Combat Only Carrier Source', 'Creature — Human Warrior', 'At the beginning of combat on your turn, if this is the first combat phase this turn, create a 1/1 red Warrior creature token with haste. It attacks this combat if able.', 2),
+  'generic extra combat activator': card('Generic Extra Combat Activator', 'Enchantment', '{3}{R}{R}: Untap all creatures you control. After this phase, there is an additional combat phase followed by an additional main phase. Activate only as a sorcery.', 3, '{3}'),
+  'combat treasure equipment': card('Combat Treasure Equipment', 'Artifact — Equipment', 'Equipped creature has trample and "Whenever this creature deals combat damage to a player, create that many Treasure tokens." Equip {3}', 3, '{3}'),
+  'combat land untap equipment': card('Combat Land Untap Equipment', 'Artifact — Equipment', 'Whenever equipped creature deals combat damage to a player, untap all lands you control.', 3, '{3}'),
+  'attack land untap aura': card('Attack Land Untap Aura', 'Enchantment — Aura', 'Enchant creature Whenever enchanted creature attacks, untap all lands you control.', 2, '{2}'),
+  'random treasure dragon': card('Random Treasure Dragon', 'Creature — Dragon', 'Whenever this creature deals combat damage to a player, roll a d20. Create a number of Treasure tokens equal to the result.', 6, '{4}{R}{R}'),
+  'extra combat without untap': card('Extra Combat Without Untap', 'Enchantment', '{3}{R}{R}: After this phase, there is an additional combat phase. Activate only as a sorcery.', 3, '{3}'),
+  'extra combat without main': card('Extra Combat Without Main', 'Enchantment', '{3}{R}{R}: Untap all creatures you control. After this phase, there is an additional combat phase. Activate only as a sorcery.', 3, '{3}'),
+  'attack triggered extra combat': card('Attack Triggered Extra Combat', 'Creature — Dragon', 'Whenever this creature attacks, you may pay {5}{R}{R}. If you do, untap all attacking creatures and after this phase, there is an additional combat phase.', 6, '{4}{R}{R}'),
+  'tapped artifact extra combat': card('Tapped Artifact Extra Combat', 'Artifact', '{3}{R}{R}, {T}: Untap all creatures you control. After this phase, there is an additional combat phase followed by an additional main phase.', 3, '{3}'),
+  'upkeep artifact token engine': card('Upkeep Artifact Token Engine', 'Artifact Creature — Thopter', 'At the beginning of your upkeep, create five 1/1 colorless Thopter artifact creature tokens.', 6, '{6}'),
+  'four artifact token engine': card('Four Artifact Token Engine', 'Artifact', 'At the beginning of your upkeep, create four Clue tokens.', 4, '{4}'),
+  'once per turn upkeep artifact token engine': card('Once Per Turn Upkeep Artifact Token Engine', 'Artifact Creature — Thopter', 'At the beginning of your upkeep, create five 1/1 colorless Thopter artifact creature tokens. This ability triggers only once each turn.', 6, '{6}'),
+  'end step artifact token engine': card('End Step Artifact Token Engine', 'Artifact', 'At the beginning of your end step, create five Treasure tokens.', 5, '{5}'),
+  'artifact sacrifice extra-turn engine': card('Artifact Sacrifice Extra-Turn Engine', 'Artifact', '{T}, Sacrifice five artifacts: Take an extra turn after this one.', 2, '{2}'),
+  'once per turn artifact sacrifice extra-turn engine': card('Once Per Turn Artifact Sacrifice Extra-Turn Engine', 'Artifact', '{T}, Sacrifice five artifacts: Take an extra turn after this one. Activate only once each turn.', 2, '{2}'),
+  'token doubler': card('Token Doubler', 'Enchantment', 'If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.', 4, '{4}'),
   'mill to life loss payoff': card('Mill To Life Loss Payoff', 'Enchantment', "Whenever a card is put into an opponent's graveyard from anywhere, that player loses 1 life and you gain 1 life.", 1),
   'life loss to mill payoff': card('Life Loss To Mill Payoff', 'Enchantment', 'Whenever an opponent loses life, that player mills that many cards.', 3),
   'opponent half-library draw': card('Opponent Half-Library Draw', 'Sorcery', 'Target opponent draws cards equal to half the number of cards in their library, rounded up.', 7),
@@ -139,6 +178,9 @@ assert.deepEqual(classesForEdgeFamilies(['sac-fodder→outlet', 'landfall', 'unk
 assert.deepEqual(classesForEdgeFamilies(['graveyard']), ['mill'], 'generic graveyard evidence must not imply self-discard without a discard edge');
 assert.deepEqual(classesForEdgeFamilies(['discard']), ['infinite-self-discard']);
 assert.deepEqual(classesForEdgeFamilies(['exile-recast-creature-mana-loop']), ['infinite-cast', 'infinite-etb', 'infinite-ltb'], 'exile-recast edge signals must not claim mana without proof deltas');
+assert.deepEqual(classesForEdgeFamilies(['combat-resource→extra-combat-loop']), [], 'combat-resource candidates need strict proof before they explain combat results');
+assert.deepEqual(classesForEdgeFamilies(['combat-copy-token→extra-combat-loop', 'hasty-copy→attack-extra-combat-loop', 'combat-copy-token→connect-extra-combat-loop', 'hasty-copy→connect-extra-combat-loop']), [], 'fresh-copy combat loops need strict proof before they explain combat results');
+assert.deepEqual(classesForEdgeFamilies(['combat-sacrifice-aura→extra-combat-loop']), [], 'combat-sacrifice Aura loops must require strict proof before covering combat results');
 assert.deepEqual(classesForProofDeltas([
   { family: 'blink-etb-land-untap-loop', positiveDeltas: [{ resource: 'mana', min: 0, max: 0 }] },
 ]), []);
@@ -146,8 +188,81 @@ assert.deepEqual(classesForProofDeltas([
   { family: 'recursive-body-sacrifice-mana-loop', positiveDeltas: [{ resource: 'mana', min: 1, max: 1 }, { resource: 'casts', min: 1, max: Infinity }] },
 ]), ['infinite-cast', 'infinite-mana']);
 assert.deepEqual(classesForProofDeltas([
+  {
+    family: 'variable-board-count-mana-loop',
+    positiveDeltas: [
+      { resource: 'mana', min: 1, max: Infinity },
+      { resource: 'untaps', min: 1, max: Infinity },
+      { resource: 'cards', min: 1, max: Infinity },
+      { resource: 'life', min: 1, max: Infinity },
+      { resource: 'pump', min: 1, max: Infinity },
+    ],
+  },
+]), ['infinite-draw', 'infinite-life', 'infinite-mana', 'infinite-pump', 'infinite-untap']);
+assert.deepEqual(classesForProofDeltas([
   { family: 'aristocrats-body-outlet-payoff', positiveDeltas: [{ resource: 'mana', min: 1, max: 1 }] },
 ]), []);
+assert.deepEqual(classesForProofDeltas([
+  {
+    family: 'combat-resource→extra-combat-loop',
+    positiveDeltas: [
+      { resource: 'combatPhases', min: 1, max: Infinity },
+      { resource: 'untaps', min: 1, max: Infinity },
+      { resource: 'mana', min: 1, max: Infinity },
+      { resource: 'tokens', min: 1, max: Infinity },
+    ],
+  },
+]), ['combat', 'infinite-untap'], 'combat-resource proof deltas must not leak mana/tokens without an allowed family result axis');
+assert.deepEqual(classesForProofDeltas([
+  {
+    family: 'artifact-token→extra-turn-loop',
+    positiveDeltas: [
+      { resource: 'turns', min: 1, max: Infinity },
+      { resource: 'tokens', min: 1, max: Infinity },
+      { resource: 'mana', min: 1, max: Infinity },
+    ],
+  },
+]), ['infinite-turns'], 'artifact-token extra-turn proof deltas must not leak mana/tokens without an allowed family result axis');
+assert.deepEqual(classesForProofDeltas([
+  {
+    family: 'combat-sacrifice-aura→extra-combat-loop',
+    positiveDeltas: [
+      { resource: 'combatPhases', min: 1, max: Infinity },
+      { resource: 'sacrifices', min: 1, max: Infinity },
+      { resource: 'deathTriggers', min: 1, max: Infinity },
+      { resource: 'ltbTriggers', min: 1, max: Infinity },
+      { resource: 'untaps', min: 1, max: Infinity },
+      { resource: 'tokens', min: 1, max: Infinity },
+      { resource: 'mana', min: 1, max: Infinity },
+      { resource: 'damage', min: 1, max: Infinity },
+    ],
+  },
+]), ['combat', 'infinite-death', 'infinite-ltb', 'infinite-sacrifice', 'infinite-untap'], 'combat-sacrifice Aura proof deltas must not leak mana/tokens/damage without an allowed family result axis');
+assert.deepEqual(classesForProofDeltas([
+  {
+    family: 'hasty-copy→connect-extra-combat-loop',
+    positiveDeltas: [
+      { resource: 'combatPhases', min: 1, max: Infinity },
+      { resource: 'tokens', min: 1, max: Infinity },
+      { resource: 'etbTriggers', min: 1, max: Infinity },
+      { resource: 'mana', min: 1, max: Infinity },
+      { resource: 'damage', min: 1, max: Infinity },
+      { resource: 'turns', min: 1, max: Infinity },
+    ],
+  },
+]), ['combat', 'infinite-etb', 'infinite-tokens'], 'fresh-copy connect extra-combat proof deltas must not leak mana/damage/turn axes');
+assert.deepEqual(classesForProofDeltas([
+  {
+    family: 'hasty-copy→connect-extra-turn-loop',
+    positiveDeltas: [
+      { resource: 'turns', min: 1, max: Infinity },
+      { resource: 'tokens', min: 1, max: Infinity },
+      { resource: 'etbTriggers', min: 1, max: Infinity },
+      { resource: 'combatPhases', min: 1, max: Infinity },
+      { resource: 'damage', min: 1, max: Infinity },
+    ],
+  },
+]), ['infinite-turns'], 'fresh-copy extra-turn proof deltas must not leak token/ETB/combat/damage axes');
 
 const lifeLoop = evaluateCombo({
   id: 'life-loop',
@@ -615,6 +730,40 @@ assert.equal(costReducedSelfUntapLoop.bucket, 'proved');
 assert.ok(costReducedSelfUntapLoop.familySignals.includes('self-untap-mana-loop'));
 assert.equal(costReducedSelfUntapLoop.resultCoverage.coveredAny, true);
 
+const variableBoardCountStaffLoop = evaluateCombo({
+  id: 'variable-board-count-staff-loop',
+  detailPath: '/combos/test/variable-board-count-staff-loop',
+  url: 'https://example.test/variable-board-count-staff-loop',
+  cards: ['Generic Tribe Count Druid', 'Generic Modal Untap Engine'],
+  cardCount: 2,
+  results: ['Infinite card draw', 'Infinite lifegain', 'Infinite untap', 'Infinite green mana'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(variableBoardCountStaffLoop.bucket, 'proved');
+assert.ok(variableBoardCountStaffLoop.familySignals.includes('variable-board-count-mana-loop'));
+assert.ok(variableBoardCountStaffLoop.proofDeltaClasses.includes('infinite-draw'));
+assert.ok(variableBoardCountStaffLoop.proofDeltaClasses.includes('infinite-life'));
+assert.ok(variableBoardCountStaffLoop.proofDeltaClasses.includes('infinite-mana'));
+assert.ok(variableBoardCountStaffLoop.proofDeltaClasses.includes('infinite-untap'));
+assert.equal(variableBoardCountStaffLoop.resultCoverage.coveredAny, true);
+
+const variableBoardCountPumpLoop = evaluateCombo({
+  id: 'variable-board-count-pump-loop',
+  detailPath: '/combos/test/variable-board-count-pump-loop',
+  url: 'https://example.test/variable-board-count-pump-loop',
+  cards: ['Generic Tribe Count Druid', 'Untap Symbol Equipment'],
+  cardCount: 2,
+  results: ['Infinitely large creatures', 'Infinite green mana'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(variableBoardCountPumpLoop.bucket, 'proved');
+assert.ok(variableBoardCountPumpLoop.familySignals.includes('variable-board-count-mana-loop'));
+assert.ok(variableBoardCountPumpLoop.proofDeltaClasses.includes('infinite-pump'));
+assert.ok(variableBoardCountPumpLoop.proofDeltaClasses.includes('infinite-mana'));
+assert.equal(variableBoardCountPumpLoop.resultCoverage.coveredAny, true);
+
 const combatCopyExtraCombatLoop = evaluateCombo({
   id: 'combat-copy-extra-combat-loop',
   detailPath: '/combos/test/combat-copy-extra-combat-loop',
@@ -628,6 +777,121 @@ const combatCopyExtraCombatLoop = evaluateCombo({
 assert.equal(combatCopyExtraCombatLoop.bucket, 'proved');
 assert.ok(combatCopyExtraCombatLoop.familySignals.includes('combat-copy-token→extra-combat-loop'));
 assert.equal(combatCopyExtraCombatLoop.resultCoverage.coveredAny, true);
+assert.deepEqual(combatCopyExtraCombatLoop.proofDeltaClasses, ['combat', 'infinite-etb', 'infinite-tokens']);
+
+const hastyCopyAttackExtraCombatLoop = evaluateCombo({
+  id: 'hasty-copy-attack-extra-combat-loop',
+  detailPath: '/combos/test/hasty-copy-attack-extra-combat-loop',
+  url: 'https://example.test/hasty-copy-attack-extra-combat-loop',
+  cards: ['Hasty Copy Source', 'Exert Extra Combat'],
+  cardCount: 2,
+  results: ['Infinite combat phases', 'Infinite creature tokens', 'Infinite ETB'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(hastyCopyAttackExtraCombatLoop.bucket, 'proved');
+assert.ok(hastyCopyAttackExtraCombatLoop.proofOnlyFamilies.includes('hasty-copy→attack-extra-combat-loop'));
+assert.deepEqual(hastyCopyAttackExtraCombatLoop.proofDeltaClasses, ['combat', 'infinite-etb', 'infinite-tokens']);
+assert.equal(hastyCopyAttackExtraCombatLoop.resultCoverage.coveredAny, true);
+
+const attachedCopyAttackExtraCombatLoop = evaluateCombo({
+  id: 'attached-copy-attack-extra-combat-loop',
+  detailPath: '/combos/test/attached-copy-attack-extra-combat-loop',
+  url: 'https://example.test/attached-copy-attack-extra-combat-loop',
+  cards: ['Attached Self Copy Aura', 'Exert Extra Combat'],
+  cardCount: 2,
+  results: ['Infinite combat phases', 'Infinite creature tokens', 'Infinite ETB'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(attachedCopyAttackExtraCombatLoop.bucket, 'proved');
+assert.ok(attachedCopyAttackExtraCombatLoop.proofOnlyFamilies.includes('hasty-copy→attack-extra-combat-loop'));
+
+const genericPrecombatAttackExtraCombatLoop = evaluateCombo({
+  id: 'generic-precombat-attack-extra-combat-loop',
+  detailPath: '/combos/test/generic-precombat-attack-extra-combat-loop',
+  url: 'https://example.test/generic-precombat-attack-extra-combat-loop',
+  cards: ['Generic Precombat Copy Source', 'Exert Extra Combat'],
+  cardCount: 2,
+  results: ['Infinite combat phases', 'Infinite creature tokens', 'Infinite ETB'],
+  categories: ['test'],
+  metadata: { deckCount: 3 },
+}, idx);
+assert.equal(genericPrecombatAttackExtraCombatLoop.bucket, 'proved');
+assert.ok(genericPrecombatAttackExtraCombatLoop.proofOnlyFamilies.includes('combat-copy-token→extra-combat-loop'));
+
+const combatCopyConnectExtraCombatLoop = evaluateCombo({
+  id: 'combat-copy-connect-extra-combat-loop',
+  detailPath: '/combos/test/combat-copy-connect-extra-combat-loop',
+  url: 'https://example.test/combat-copy-connect-extra-combat-loop',
+  cards: ['Combat Copy Equipment', 'Connect Extra Combat'],
+  cardCount: 2,
+  results: ['Infinite combat phases', 'Infinite creature tokens', 'Infinite ETB'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(combatCopyConnectExtraCombatLoop.bucket, 'proved');
+assert.ok(combatCopyConnectExtraCombatLoop.proofOnlyFamilies.includes('combat-copy-token→connect-extra-combat-loop'));
+assert.deepEqual(combatCopyConnectExtraCombatLoop.proofDeltaClasses, ['combat', 'infinite-etb', 'infinite-tokens']);
+assert.equal(combatCopyConnectExtraCombatLoop.resultCoverage.coveredAny, true);
+
+const hastyCopyConnectExtraCombatLoop = evaluateCombo({
+  id: 'hasty-copy-connect-extra-combat-loop',
+  detailPath: '/combos/test/hasty-copy-connect-extra-combat-loop',
+  url: 'https://example.test/hasty-copy-connect-extra-combat-loop',
+  cards: ['Hasty Copy Source', 'Connect Extra Combat'],
+  cardCount: 2,
+  results: ['Infinite combat phases', 'Infinite creature tokens', 'Infinite ETB'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(hastyCopyConnectExtraCombatLoop.bucket, 'proved');
+assert.ok(hastyCopyConnectExtraCombatLoop.proofOnlyFamilies.includes('hasty-copy→connect-extra-combat-loop'));
+assert.deepEqual(hastyCopyConnectExtraCombatLoop.proofDeltaClasses, ['combat', 'infinite-etb', 'infinite-tokens']);
+assert.equal(hastyCopyConnectExtraCombatLoop.resultCoverage.coveredAny, true);
+
+const combatCopyConnectExtraTurnLoop = evaluateCombo({
+  id: 'combat-copy-connect-extra-turn-loop',
+  detailPath: '/combos/test/combat-copy-connect-extra-turn-loop',
+  url: 'https://example.test/combat-copy-connect-extra-turn-loop',
+  cards: ['Combat Copy Equipment', 'Connect Extra Turn'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 2 },
+}, idx);
+assert.equal(combatCopyConnectExtraTurnLoop.bucket, 'proved');
+assert.ok(combatCopyConnectExtraTurnLoop.proofOnlyFamilies.includes('combat-copy-token→connect-extra-turn-loop'));
+assert.deepEqual(combatCopyConnectExtraTurnLoop.proofDeltaClasses, ['infinite-turns']);
+assert.equal(combatCopyConnectExtraTurnLoop.resultCoverage.coveredAny, true);
+
+const hastyCopyConnectExtraTurnLoop = evaluateCombo({
+  id: 'hasty-copy-connect-extra-turn-loop',
+  detailPath: '/combos/test/hasty-copy-connect-extra-turn-loop',
+  url: 'https://example.test/hasty-copy-connect-extra-turn-loop',
+  cards: ['Hasty Copy Source', 'Connect Extra Turn'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 2 },
+}, idx);
+assert.equal(hastyCopyConnectExtraTurnLoop.bucket, 'proved');
+assert.ok(hastyCopyConnectExtraTurnLoop.proofOnlyFamilies.includes('hasty-copy→connect-extra-turn-loop'));
+assert.deepEqual(hastyCopyConnectExtraTurnLoop.proofDeltaClasses, ['infinite-turns']);
+assert.equal(hastyCopyConnectExtraTurnLoop.resultCoverage.coveredAny, true);
+
+const combatCopyAttackExtraTurnLoop = evaluateCombo({
+  id: 'combat-copy-attack-extra-turn-loop',
+  detailPath: '/combos/test/combat-copy-attack-extra-turn-loop',
+  url: 'https://example.test/combat-copy-attack-extra-turn-loop',
+  cards: ['Generic Precombat Copy Source', 'Attack Extra Turn'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 2 },
+}, idx);
+assert.equal(combatCopyAttackExtraTurnLoop.bucket, 'proved');
+assert.ok(combatCopyAttackExtraTurnLoop.proofOnlyFamilies.includes('combat-copy-token→attack-extra-turn-loop'));
 
 const combatCopyNoExtraCombatNearMiss = evaluateCombo({
   id: 'combat-copy-no-extra-combat-near-miss',
@@ -641,6 +905,314 @@ const combatCopyNoExtraCombatNearMiss = evaluateCombo({
 }, idx);
 assert.notEqual(combatCopyNoExtraCombatNearMiss.bucket, 'proved');
 assert.ok(!combatCopyNoExtraCombatNearMiss.familySignals.includes('combat-copy-token→extra-combat-loop'));
+
+for (const combo of [
+  {
+    id: 'hasty-copy-legendary-attack-near-miss',
+    cards: ['Hasty Copy Source', 'Legendary Attack Extra Combat'],
+    results: ['Infinite combat phases'],
+  },
+  {
+    id: 'broad-hasty-copy-legendary-attack-near-miss',
+    cards: ['Broad Hasty Copy Source', 'Legendary Attack Extra Combat'],
+    results: ['Infinite combat phases'],
+  },
+  {
+    id: 'tapped-artifact-hasty-copy-attack-near-miss',
+    cards: ['Tapped Artifact Hasty Copy Source', 'Exert Extra Combat'],
+    results: ['Infinite combat phases'],
+  },
+  {
+    id: 'tapped-artifact-hasty-copy-connect-near-miss',
+    cards: ['Tapped Artifact Hasty Copy Source', 'Connect Extra Combat'],
+    results: ['Infinite combat phases'],
+  },
+  {
+    id: 'tapped-attacking-copy-connect-near-miss',
+    cards: ['Tapped Attacking Copy Source', 'Connect Extra Combat'],
+    results: ['Infinite combat phases'],
+  },
+  {
+    id: 'restricted-connect-extra-combat-near-miss',
+    cards: ['Combat Copy Equipment', 'Restricted Connect Extra Combat'],
+    results: ['Infinite combat phases'],
+  },
+  {
+    id: 'creature-damage-extra-combat-near-miss',
+    cards: ['Combat Copy Equipment', 'Creature Damage Extra Combat'],
+    results: ['Infinite combat phases'],
+  },
+  {
+    id: 'extra-turn-cannot-attack-near-miss',
+    cards: ['Combat Copy Equipment', 'Extra Turn Cannot Attack'],
+    results: ['Infinite turns'],
+  },
+  {
+    id: 'optional-sacrifice-extra-turn-near-miss',
+    cards: ['Combat Copy Equipment', 'Optional Sacrifice Extra Turn'],
+    results: ['Infinite turns'],
+  },
+]) {
+  const item = evaluateCombo({
+    id: combo.id,
+    detailPath: `/combos/test/${combo.id}`,
+    url: `https://example.test/${combo.id}`,
+    cards: combo.cards,
+    cardCount: 2,
+    results: combo.results,
+    categories: ['test'],
+    metadata: { deckCount: 1 },
+  }, idx);
+  assert.notEqual(item.bucket, 'proved', `${combo.id} should not be strict-proved`);
+  assert.equal(item.proofOnlyFamilies.some(family => /extra-combat-loop|extra-turn-loop/.test(family)), false, `${combo.id} should not surface a strict combat/turn proof family`);
+  assert.equal(item.resultCoverage.coveredAny, false, `${combo.id} should not cover its requested result axis`);
+}
+
+const combatSacrificeAuraLoop = evaluateCombo({
+  id: 'combat-sacrifice-aura-loop',
+  detailPath: '/combos/test/combat-sacrifice-aura-loop',
+  url: 'https://example.test/combat-sacrifice-aura-loop',
+  cards: ['Combat Sacrifice Aura', 'Fresh Combat Carrier Source'],
+  cardCount: 2,
+  results: ['Infinite combat phases', 'Infinite sacrifice triggers', 'Infinite LTB', 'Infinite death triggers', 'Infinite untap'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(combatSacrificeAuraLoop.bucket, 'proved');
+assert.ok(combatSacrificeAuraLoop.proofOnlyFamilies.includes('combat-sacrifice-aura→extra-combat-loop'));
+assert.ok(combatSacrificeAuraLoop.familySignals.includes('combat-sacrifice-aura→extra-combat-loop'));
+assert.deepEqual(combatSacrificeAuraLoop.proofDeltaClasses, ['combat', 'infinite-death', 'infinite-ltb', 'infinite-sacrifice', 'infinite-untap']);
+assert.equal(combatSacrificeAuraLoop.proofOnlyResultCoverage.coveredAny, true);
+assert.equal(combatSacrificeAuraLoop.resultCoverage.coveredAny, true);
+assert.equal(combatSacrificeAuraLoop.modelClasses.includes('infinite-mana'), false);
+assert.equal(combatSacrificeAuraLoop.modelClasses.includes('infinite-damage'), false);
+assert.equal(combatSacrificeAuraLoop.modelClasses.includes('infinite-tokens'), false);
+
+const breathShapedAuraLoop = evaluateCombo({
+  id: 'breath-shaped-aura-loop',
+  detailPath: '/combos/test/breath-shaped-aura-loop',
+  url: 'https://example.test/breath-shaped-aura-loop',
+  cards: ['Breath-Shaped Aura', 'Fresh Combat Carrier Source'],
+  cardCount: 2,
+  results: ['Infinite combat phases', 'Infinite sacrifice triggers', 'Infinite LTB', 'Infinite death triggers', 'Infinite untap'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(breathShapedAuraLoop.bucket, 'proved');
+assert.ok(breathShapedAuraLoop.proofOnlyFamilies.includes('combat-sacrifice-aura→extra-combat-loop'));
+assert.deepEqual(breathShapedAuraLoop.proofDeltaClasses, ['combat', 'infinite-death', 'infinite-ltb', 'infinite-sacrifice', 'infinite-untap']);
+
+const combatSacrificeAuraStaleCarrierNearMiss = evaluateCombo({
+  id: 'combat-sacrifice-aura-stale-carrier-near-miss',
+  detailPath: '/combos/test/combat-sacrifice-aura-stale-carrier-near-miss',
+  url: 'https://example.test/combat-sacrifice-aura-stale-carrier-near-miss',
+  cards: ['Combat Sacrifice Aura', 'Stale Carrier Source'],
+  cardCount: 2,
+  results: ['Infinite combat phases'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(combatSacrificeAuraStaleCarrierNearMiss.bucket, 'proved');
+assert.ok(!combatSacrificeAuraStaleCarrierNearMiss.proofOnlyFamilies.includes('combat-sacrifice-aura→extra-combat-loop'));
+assert.ok(!combatSacrificeAuraStaleCarrierNearMiss.modelClasses.includes('combat'));
+assert.equal(combatSacrificeAuraStaleCarrierNearMiss.resultCoverage.coveredAny, false);
+
+const breathShapedAuraFirstCombatOnlyNearMiss = evaluateCombo({
+  id: 'breath-shaped-aura-first-combat-only-near-miss',
+  detailPath: '/combos/test/breath-shaped-aura-first-combat-only-near-miss',
+  url: 'https://example.test/breath-shaped-aura-first-combat-only-near-miss',
+  cards: ['Breath-Shaped Aura', 'First Combat Only Carrier Source'],
+  cardCount: 2,
+  results: ['Infinite combat phases'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(breathShapedAuraFirstCombatOnlyNearMiss.bucket, 'proved');
+assert.ok(!breathShapedAuraFirstCombatOnlyNearMiss.proofOnlyFamilies.includes('combat-sacrifice-aura→extra-combat-loop'));
+assert.equal(breathShapedAuraFirstCombatOnlyNearMiss.resultCoverage.coveredAny, false);
+
+const combatTreasureExtraCombatLoop = evaluateCombo({
+  id: 'combat-treasure-extra-combat-loop',
+  detailPath: '/combos/test/combat-treasure-extra-combat-loop',
+  url: 'https://example.test/combat-treasure-extra-combat-loop',
+  cards: ['Combat Treasure Equipment', 'Generic Extra Combat Activator'],
+  cardCount: 2,
+  results: ['Infinite combat phases'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(combatTreasureExtraCombatLoop.bucket, 'proved');
+assert.ok(combatTreasureExtraCombatLoop.familySignals.includes('combat-resource→extra-combat-loop'));
+assert.deepEqual(combatTreasureExtraCombatLoop.proofDeltaClasses, ['combat']);
+assert.deepEqual(combatTreasureExtraCombatLoop.modelClasses, ['combat']);
+assert.equal(combatTreasureExtraCombatLoop.resultCoverage.coveredAny, true);
+
+const combatLandUntapExtraCombatLoop = evaluateCombo({
+  id: 'combat-land-untap-extra-combat-loop',
+  detailPath: '/combos/test/combat-land-untap-extra-combat-loop',
+  url: 'https://example.test/combat-land-untap-extra-combat-loop',
+  cards: ['Combat Land Untap Equipment', 'Generic Extra Combat Activator'],
+  cardCount: 2,
+  results: ['Infinite combat phases', 'Infinite untap'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(combatLandUntapExtraCombatLoop.bucket, 'proved');
+assert.ok(combatLandUntapExtraCombatLoop.familySignals.includes('combat-resource→extra-combat-loop'));
+assert.deepEqual(combatLandUntapExtraCombatLoop.proofDeltaClasses, ['combat', 'infinite-untap']);
+assert.deepEqual(combatLandUntapExtraCombatLoop.modelClasses, ['combat', 'infinite-untap']);
+assert.equal(combatLandUntapExtraCombatLoop.resultCoverage.coveredAny, true);
+
+const randomTreasureExtraCombatNearMiss = evaluateCombo({
+  id: 'random-treasure-extra-combat-near-miss',
+  detailPath: '/combos/test/random-treasure-extra-combat-near-miss',
+  url: 'https://example.test/random-treasure-extra-combat-near-miss',
+  cards: ['Random Treasure Dragon', 'Generic Extra Combat Activator'],
+  cardCount: 2,
+  results: ['Infinite combat phases'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(randomTreasureExtraCombatNearMiss.bucket, 'proved');
+assert.ok(!randomTreasureExtraCombatNearMiss.familySignals.includes('combat-resource→extra-combat-loop'));
+assert.ok(!randomTreasureExtraCombatNearMiss.modelClasses.includes('combat'));
+assert.equal(randomTreasureExtraCombatNearMiss.resultCoverage.coveredAny, false);
+
+const noUntapExtraCombatNearMiss = evaluateCombo({
+  id: 'no-untap-extra-combat-near-miss',
+  detailPath: '/combos/test/no-untap-extra-combat-near-miss',
+  url: 'https://example.test/no-untap-extra-combat-near-miss',
+  cards: ['Combat Treasure Equipment', 'Extra Combat Without Untap'],
+  cardCount: 2,
+  results: ['Infinite combat phases'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(noUntapExtraCombatNearMiss.bucket, 'proved');
+assert.ok(!noUntapExtraCombatNearMiss.familySignals.includes('combat-resource→extra-combat-loop'));
+assert.ok(!noUntapExtraCombatNearMiss.modelClasses.includes('combat'));
+assert.equal(noUntapExtraCombatNearMiss.resultCoverage.coveredAny, false);
+
+const noMainPhaseExtraCombatNearMiss = evaluateCombo({
+  id: 'no-main-phase-extra-combat-near-miss',
+  detailPath: '/combos/test/no-main-phase-extra-combat-near-miss',
+  url: 'https://example.test/no-main-phase-extra-combat-near-miss',
+  cards: ['Combat Treasure Equipment', 'Extra Combat Without Main'],
+  cardCount: 2,
+  results: ['Infinite combat phases'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(noMainPhaseExtraCombatNearMiss.bucket, 'proved');
+assert.ok(!noMainPhaseExtraCombatNearMiss.familySignals.includes('combat-resource→extra-combat-loop'));
+assert.ok(!noMainPhaseExtraCombatNearMiss.modelClasses.includes('combat'));
+assert.equal(noMainPhaseExtraCombatNearMiss.resultCoverage.coveredAny, false);
+
+const attackTriggeredExtraCombatNearMiss = evaluateCombo({
+  id: 'attack-triggered-extra-combat-near-miss',
+  detailPath: '/combos/test/attack-triggered-extra-combat-near-miss',
+  url: 'https://example.test/attack-triggered-extra-combat-near-miss',
+  cards: ['Combat Treasure Equipment', 'Attack Triggered Extra Combat'],
+  cardCount: 2,
+  results: ['Infinite combat phases'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(attackTriggeredExtraCombatNearMiss.bucket, 'proved');
+assert.ok(!attackTriggeredExtraCombatNearMiss.familySignals.includes('combat-resource→extra-combat-loop'));
+assert.ok(!attackTriggeredExtraCombatNearMiss.modelClasses.includes('combat'));
+assert.equal(attackTriggeredExtraCombatNearMiss.resultCoverage.coveredAny, false);
+
+const tappedArtifactExtraCombatNearMiss = evaluateCombo({
+  id: 'tapped-artifact-extra-combat-near-miss',
+  detailPath: '/combos/test/tapped-artifact-extra-combat-near-miss',
+  url: 'https://example.test/tapped-artifact-extra-combat-near-miss',
+  cards: ['Combat Treasure Equipment', 'Tapped Artifact Extra Combat'],
+  cardCount: 2,
+  results: ['Infinite combat phases'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(tappedArtifactExtraCombatNearMiss.bucket, 'proved');
+assert.ok(!tappedArtifactExtraCombatNearMiss.familySignals.includes('combat-resource→extra-combat-loop'));
+assert.ok(!tappedArtifactExtraCombatNearMiss.modelClasses.includes('combat'));
+assert.equal(tappedArtifactExtraCombatNearMiss.resultCoverage.coveredAny, false);
+
+const artifactTokenExtraTurnLoop = evaluateCombo({
+  id: 'artifact-token-extra-turn-loop',
+  detailPath: '/combos/test/artifact-token-extra-turn-loop',
+  url: 'https://example.test/artifact-token-extra-turn-loop',
+  cards: ['Upkeep Artifact Token Engine', 'Artifact Sacrifice Extra-Turn Engine'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 4 },
+}, idx);
+assert.equal(artifactTokenExtraTurnLoop.bucket, 'proved');
+assert.ok(artifactTokenExtraTurnLoop.familySignals.includes('artifact-token→extra-turn-loop'));
+assert.deepEqual(artifactTokenExtraTurnLoop.proofDeltaClasses, ['infinite-turns']);
+assert.deepEqual(artifactTokenExtraTurnLoop.modelClasses, ['infinite-turns']);
+assert.equal(artifactTokenExtraTurnLoop.resultCoverage.coveredAny, true);
+
+const replacementAmplifiedArtifactExtraTurnNearMiss = evaluateCombo({
+  id: 'replacement-amplified-artifact-extra-turn-near-miss',
+  detailPath: '/combos/test/replacement-amplified-artifact-extra-turn-near-miss',
+  url: 'https://example.test/replacement-amplified-artifact-extra-turn-near-miss',
+  cards: ['Four Artifact Token Engine', 'Token Doubler', 'Artifact Sacrifice Extra-Turn Engine'],
+  cardCount: 3,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(replacementAmplifiedArtifactExtraTurnNearMiss.bucket, 'proved');
+assert.ok(!replacementAmplifiedArtifactExtraTurnNearMiss.familySignals.includes('artifact-token→extra-turn-loop'));
+assert.ok(!replacementAmplifiedArtifactExtraTurnNearMiss.modelClasses.includes('infinite-turns'));
+assert.equal(replacementAmplifiedArtifactExtraTurnNearMiss.resultCoverage.coveredAny, false);
+
+const oncePerTurnArtifactTokenSourceExtraTurnNearMiss = evaluateCombo({
+  id: 'once-per-turn-artifact-token-source-extra-turn-near-miss',
+  detailPath: '/combos/test/once-per-turn-artifact-token-source-extra-turn-near-miss',
+  url: 'https://example.test/once-per-turn-artifact-token-source-extra-turn-near-miss',
+  cards: ['Once Per Turn Upkeep Artifact Token Engine', 'Artifact Sacrifice Extra-Turn Engine'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(oncePerTurnArtifactTokenSourceExtraTurnNearMiss.bucket, 'proved');
+assert.ok(!oncePerTurnArtifactTokenSourceExtraTurnNearMiss.familySignals.includes('artifact-token→extra-turn-loop'));
+assert.ok(!oncePerTurnArtifactTokenSourceExtraTurnNearMiss.modelClasses.includes('infinite-turns'));
+assert.equal(oncePerTurnArtifactTokenSourceExtraTurnNearMiss.resultCoverage.coveredAny, false);
+
+const oncePerTurnArtifactExtraTurnNearMiss = evaluateCombo({
+  id: 'once-per-turn-artifact-extra-turn-near-miss',
+  detailPath: '/combos/test/once-per-turn-artifact-extra-turn-near-miss',
+  url: 'https://example.test/once-per-turn-artifact-extra-turn-near-miss',
+  cards: ['Upkeep Artifact Token Engine', 'Once Per Turn Artifact Sacrifice Extra-Turn Engine'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(oncePerTurnArtifactExtraTurnNearMiss.bucket, 'proved');
+assert.ok(!oncePerTurnArtifactExtraTurnNearMiss.familySignals.includes('artifact-token→extra-turn-loop'));
+assert.ok(!oncePerTurnArtifactExtraTurnNearMiss.modelClasses.includes('infinite-turns'));
+assert.equal(oncePerTurnArtifactExtraTurnNearMiss.resultCoverage.coveredAny, false);
+
+const endStepArtifactTokenExtraTurnNearMiss = evaluateCombo({
+  id: 'end-step-artifact-token-extra-turn-near-miss',
+  detailPath: '/combos/test/end-step-artifact-token-extra-turn-near-miss',
+  url: 'https://example.test/end-step-artifact-token-extra-turn-near-miss',
+  cards: ['End Step Artifact Token Engine', 'Artifact Sacrifice Extra-Turn Engine'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(endStepArtifactTokenExtraTurnNearMiss.bucket, 'proved');
+assert.ok(!endStepArtifactTokenExtraTurnNearMiss.familySignals.includes('artifact-token→extra-turn-loop'));
+assert.ok(!endStepArtifactTokenExtraTurnNearMiss.modelClasses.includes('infinite-turns'));
+assert.equal(endStepArtifactTokenExtraTurnNearMiss.resultCoverage.coveredAny, false);
 
 const millLifeLossLoop = evaluateCombo({
   id: 'mill-lifeloss-loop',
@@ -873,6 +1445,7 @@ const summary = summarizeEvaluations([
   recursiveSacLoop,
   layeredRecursiveSacLoop,
   hastyCopyLoop,
+  combatSacrificeAuraLoop,
   amplifiedSelfUntapLoop,
   anyTypeAmplifiedSelfUntapLoop,
   millLifeLossLoop,
@@ -883,12 +1456,12 @@ const summary = summarizeEvaluations([
   tokenReplacementSacLoop,
   miss,
 ], { source: 'fixture' });
-assert.equal(summary.totalDetailed, 24);
-assert.equal(summary.byBucket.proved, 23);
+assert.equal(summary.totalDetailed, 25);
+assert.equal(summary.byBucket.proved, 24);
 assert.equal(summary.byBucket['missing-card'], 1);
-assert.equal(summary.proofOnlyExpectedClassCoverage.considered, 24);
-assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAny, 22);
-assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAnyPct, 91.7);
+assert.equal(summary.proofOnlyExpectedClassCoverage.considered, 25);
+assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAny, 23);
+assert.equal(summary.proofOnlyExpectedClassCoverage.coveredAnyPct, 92);
 assert.equal(summary.byExpectedClass.lock, 2);
 assert.equal(summary.byModelClass.lock, 2);
 assert.equal(summary.topFamilySignals['death-untap-deathtouch-pinger-lock'], 2);

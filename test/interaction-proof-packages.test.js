@@ -56,6 +56,26 @@ const fixtures = [
   { id: 'Magecraft Drain Payoff', type_line: 'Creature — Human Druid', oracle_text: 'Magecraft — Whenever you cast or copy an instant or sorcery spell, each opponent loses 1 life and you gain 1 life.', cmc: 2 },
   { id: 'Combat Copy Equipment', type_line: 'Legendary Artifact — Equipment', oracle_text: "At the beginning of combat on your turn, create a token that's a copy of equipped creature, except the token isn't legendary. That token gains haste. Equip {5}", cmc: 4 },
   { id: 'First Attack Extra Combat', type_line: 'Legendary Creature — Angel', oracle_text: 'Haste. Whenever this creature attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.', cmc: 4 },
+  { id: 'Exert Extra Combat', type_line: 'Creature — Human Warrior', oracle_text: "If this creature hasn't been exerted this turn, you may exert it as it attacks. When you do, untap all other creatures you control and after this phase, there is an additional combat phase.", cmc: 3 },
+  { id: 'Connect Extra Combat', type_line: 'Creature — Orc Pirate', oracle_text: "Whenever this creature deals combat damage to a player, untap each creature you control. After this phase, there is an additional combat phase. This creature can't attack a player it has already attacked this turn.", cmc: 5 },
+  { id: 'Attached Self Copy Aura', type_line: 'Enchantment — Aura', oracle_text: 'Enchant creature\nEnchanted creature has "{T}: Create a token that’s a copy of this creature, except it has haste. Exile that token at the beginning of the next end step."', cmc: 4 },
+  { id: 'Legendary Attack Extra Combat', type_line: 'Legendary Creature — Angel', oracle_text: 'Haste. Whenever this creature attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.', cmc: 4 },
+  { id: 'Generic Precombat Copy Source', type_line: 'Enchantment', oracle_text: "At the beginning of combat on your turn, create a token that's a copy of target creature you control. That token gains haste.", cmc: 4 },
+  { id: 'Broad Hasty Copy Source', type_line: 'Artifact Creature — Shapeshifter', oracle_text: "{T}: Create a token that's a copy of target creature you control, except it has haste.", cmc: 5 },
+  { id: 'Tapped Artifact Hasty Copy Source', type_line: 'Artifact', oracle_text: "{T}: Create a token that's a copy of target creature you control, except it has haste.", cmc: 5 },
+  { id: 'Tapped Attacking Copy Source', type_line: 'Artifact — Equipment', oracle_text: "Whenever equipped creature attacks, create a token that's a copy of equipped creature tapped and attacking. Exile it at end of combat. Equip {4}", cmc: 4 },
+  { id: 'Restricted Connect Extra Combat', type_line: 'Creature — Noble', oracle_text: 'Whenever this creature deals combat damage to a player, untap all lands you control. After this phase, there is an additional combat phase. Only land creatures can attack during that combat phase.', cmc: 5 },
+  { id: 'Connect Extra Turn', type_line: 'Creature — Sphinx', oracle_text: 'Flying. Whenever this creature deals combat damage to a player, take an extra turn after this one.', cmc: 6 },
+  { id: 'Attack Extra Turn', type_line: 'Creature — Human Warrior', oracle_text: 'Whenever this creature attacks, take an extra turn after this one.', cmc: 4 },
+  { id: 'Extra Turn Cannot Attack', type_line: 'Legendary Creature — Sphinx', oracle_text: "Flying Whenever Extra Turn Cannot Attack deals combat damage to a player, take an extra turn after this one. Extra Turn Cannot Attack can't attack during extra turns.", cmc: 6 },
+  { id: 'Optional Sacrifice Extra Turn', type_line: 'Creature — Merfolk Wizard', oracle_text: 'Whenever this creature deals combat damage to a player, you may sacrifice a Merfolk. If you do, take an extra turn after this one.', cmc: 4 },
+  { id: 'Combat Sacrifice Aura', type_line: 'Enchantment — Aura', oracle_text: 'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice that creature and attach this Aura to another target creature you control. Untap all creatures you control. After this phase, there is an additional combat phase.', cmc: 3 },
+  { id: 'Breath-Shaped Aura', type_line: 'Enchantment — Aura', oracle_text: 'Enchant creature\nWhenever enchanted creature deals combat damage to a player, sacrifice it and attach Breath-Shaped Aura to a creature you control. If you do, untap all creatures you control and after this phase, there is an additional combat phase.', cmc: 3 },
+  { id: 'Fresh Combat Carrier Source', type_line: 'Creature — Human Warrior', oracle_text: 'At the beginning of combat on your turn, create a 1/1 red Warrior creature token with haste. It attacks this combat if able.', cmc: 3 },
+  { id: 'Stale Carrier Source', type_line: 'Creature — Human Soldier', oracle_text: 'At the beginning of combat on your turn, create a 1/1 white Soldier creature token.', cmc: 2 },
+  { id: 'Wrong Timing Carrier Source', type_line: 'Creature — Human Soldier', oracle_text: 'Whenever this creature attacks, create a 1/1 red Warrior creature token with haste.', cmc: 2 },
+  { id: 'First Combat Only Carrier Source', type_line: 'Creature — Human Warrior', oracle_text: 'At the beginning of combat on your turn, if this is the first combat phase this turn, create a 1/1 red Warrior creature token with haste. It attacks this combat if able.', cmc: 2 },
+  { id: 'Hasty Tapped Attacking Carrier Source', type_line: 'Creature — Human Soldier', oracle_text: 'At the beginning of combat on your turn, create a 1/1 red Warrior creature token tapped and attacking. That token gains haste.', cmc: 2 },
   { id: 'Recursive Exile Creature', type_line: 'Creature — Elemental', oracle_text: 'You may cast this card from exile.', cmc: 3, mana_cost: '{2}{R}' },
   { id: 'Creature-Only Exile Mana Outlet', type_line: 'Enchantment', oracle_text: "Exile a creature you control: Add X mana of any one color, where X is 1 plus the exiled creature's mana value. Spend this mana only to cast creature spells.", cmc: 3 },
   { id: 'Artifact Ability Cost Reducer', type_line: 'Creature — Vedalken Artificer', oracle_text: "Activated abilities of artifacts you control cost {1} less to activate. This effect can't reduce the mana in that cost to less than one mana.", cmc: 3 },
@@ -66,6 +86,22 @@ const fixtures = [
   { id: 'Colorless Mana Amplifier', type_line: 'Artifact', oracle_text: 'Whenever you tap a permanent for {C}, add an additional {C}.', cmc: 5 },
   { id: 'Any-Type Nonland Mana Amplifier', type_line: 'Legendary Creature — Druid', oracle_text: 'Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.', cmc: 2 },
   { id: 'Break-Even Self Untapper With Colorless', type_line: 'Artifact', oracle_text: '{T}: Add {C}{C}{C}. {3}: Untap this artifact.', cmc: 3 },
+  { id: 'Generic Tribe Count Druid', type_line: 'Creature — Elf Druid', oracle_text: '{T}: Add {G} for each Elf you control.', cmc: 2, mana_cost: '{1}{G}' },
+  { id: 'Opponent Count Druid', type_line: 'Creature — Druid', oracle_text: '{T}: Add {G} for each creature target opponent controls.', cmc: 2, mana_cost: '{1}{G}' },
+  { id: 'Generic Modal Untap Engine', type_line: 'Artifact', oracle_text: '{1}: Untap this artifact. {3}, {T}: Untap target creature. {4}, {T}: Draw a card. {2}, {T}: You gain 1 life.', cmc: 3, mana_cost: '{3}' },
+  { id: 'Generic Creature Untap Aura', type_line: 'Enchantment — Aura', oracle_text: 'Enchant creature\n{3}: Untap enchanted creature.', cmc: 1, mana_cost: '{G}' },
+  { id: 'Untap Symbol Equipment', type_line: 'Artifact — Equipment', oracle_text: 'Equipped creature has "{3}, {Q}: This creature gets +2/+2 until end of turn." Equip {0}', cmc: 3, mana_cost: '{3}' },
+  { id: 'Generic Extra Combat Activator', type_line: 'Enchantment', oracle_text: '{3}{R}{R}: Untap all creatures you control. After this phase, there is an additional combat phase followed by an additional main phase. Activate only as a sorcery.', cmc: 3, mana_cost: '{3}' },
+  { id: 'Combat Treasure Equipment', type_line: 'Artifact — Equipment', oracle_text: 'Equipped creature has trample and "Whenever this creature deals combat damage to a player, create that many Treasure tokens." Equip {3}', cmc: 3, mana_cost: '{3}' },
+  { id: 'Combat Land Untap Equipment', type_line: 'Artifact — Equipment', oracle_text: 'Whenever equipped creature deals combat damage to a player, untap all lands you control.', cmc: 3, mana_cost: '{3}' },
+  { id: 'Attack Land Untap Aura', type_line: 'Enchantment — Aura', oracle_text: 'Enchant creature Whenever enchanted creature attacks, untap all lands you control.', cmc: 2, mana_cost: '{2}' },
+  { id: 'Random Treasure Dragon', type_line: 'Creature — Dragon', oracle_text: 'Whenever this creature deals combat damage to a player, roll a d20. Create a number of Treasure tokens equal to the result.', cmc: 6, mana_cost: '{4}{R}{R}' },
+  { id: 'Upkeep Artifact Token Engine', type_line: 'Artifact Creature — Thopter', oracle_text: 'At the beginning of your upkeep, create five 1/1 colorless Thopter artifact creature tokens.', cmc: 6, mana_cost: '{6}' },
+  { id: 'Four Artifact Token Engine', type_line: 'Artifact', oracle_text: 'At the beginning of your upkeep, create four Clue tokens.', cmc: 4, mana_cost: '{4}' },
+  { id: 'Artifact Sacrifice Extra-Turn Engine', type_line: 'Artifact', oracle_text: '{T}, Sacrifice five artifacts: Take an extra turn after this one.', cmc: 2, mana_cost: '{2}' },
+  { id: 'Creature Token Engine', type_line: 'Creature', oracle_text: 'At the beginning of your upkeep, create five 1/1 white Soldier creature tokens.', cmc: 5, mana_cost: '{5}' },
+  { id: 'Once Per Turn Upkeep Artifact Token Engine', type_line: 'Artifact Creature — Thopter', oracle_text: 'At the beginning of your upkeep, create five 1/1 colorless Thopter artifact creature tokens. This ability triggers only once each turn.', cmc: 6, mana_cost: '{6}' },
+  { id: 'Once Per Turn Artifact Sacrifice Extra-Turn Engine', type_line: 'Artifact', oracle_text: '{T}, Sacrifice five artifacts: Take an extra turn after this one. Activate only once each turn.', cmc: 2, mana_cost: '{2}' },
   { id: 'Mill To Life Loss Payoff', type_line: 'Enchantment', oracle_text: "Whenever a card is put into an opponent's graveyard from anywhere, that player loses 1 life and you gain 1 life.", cmc: 1 },
   { id: 'Life Loss To Mill Payoff', type_line: 'Enchantment', oracle_text: 'Whenever an opponent loses life, that player mills that many cards.', cmc: 3 },
   { id: 'Opponent Half-Library Draw', type_line: 'Sorcery', oracle_text: 'Target opponent draws cards equal to half the number of cards in their library, rounded up.', cmc: 7 },
@@ -102,12 +138,59 @@ assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Ability Copier
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Artifact Ability Cost Reducer|Self Untapping Artifact'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Hasty Copy Engine|Permanent Untapper'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Combat Copy Equipment|First Attack Extra Combat'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Exert Extra Combat|Hasty Copy Engine'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Attached Self Copy Aura|Exert Extra Combat'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Exert Extra Combat|Generic Precombat Copy Source'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Combat Copy Equipment|Connect Extra Combat'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Connect Extra Combat|Hasty Copy Engine'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Combat Copy Equipment|Connect Extra Turn'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Connect Extra Turn|Hasty Copy Engine'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Attack Extra Turn|Generic Precombat Copy Source'));
+assert.equal(seeded.some(candidate => candidate.cards.includes('Tapped Attacking Copy Source') && candidate.cards.includes('Connect Extra Combat')), false, 'tapped-and-attacking copy sources must not seed fresh-token connect extra-combat packages');
+assert.equal(seeded.some(candidate => candidate.cards.includes('Hasty Copy Engine') && candidate.cards.includes('Legendary Attack Extra Combat')), true, 'illegal legendary copy targets may seed but must fail strict proof');
+assert.equal(seeded.some(candidate => candidate.cards.includes('Combat Copy Equipment') && candidate.cards.includes('Restricted Connect Extra Combat')), false, 'restricted connect-trigger extra-combat sources must not seed strict fresh-token connect packages');
+assert.equal(seeded.some(candidate => candidate.cards.includes('Combat Copy Equipment') && candidate.cards.includes('Extra Turn Cannot Attack')), false, 'fresh-token extra-turn packages must not seed sources that cannot attack during extra turns');
+assert.equal(seeded.some(candidate => candidate.cards.includes('Combat Copy Equipment') && candidate.cards.includes('Optional Sacrifice Extra Turn')), false, 'fresh-token extra-turn packages must not seed optional-payment extra-turn sources');
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Combat Sacrifice Aura|Fresh Combat Carrier Source'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Breath-Shaped Aura|Fresh Combat Carrier Source'));
+assert.equal(
+  seeded.some(candidate => candidate.cards.includes('Combat Sacrifice Aura') && candidate.cards.includes('Stale Carrier Source')),
+  false,
+  'fresh carrier source must be combat-ready before seeding combat-sacrifice Aura packages',
+);
+assert.equal(
+  seeded.some(candidate => candidate.cards.includes('Combat Sacrifice Aura') && candidate.cards.includes('Wrong Timing Carrier Source')),
+  false,
+  'attack-trigger carrier sources are deferred from G014 and must not seed combat-sacrifice Aura packages',
+);
+assert.equal(
+  seeded.some(candidate => candidate.cards.includes('Breath-Shaped Aura') && candidate.cards.includes('First Combat Only Carrier Source')),
+  false,
+  'first-combat-only carrier sources must not seed combat-sacrifice Aura packages',
+);
+assert.equal(
+  seeded.some(candidate => candidate.cards.includes('Breath-Shaped Aura') && candidate.cards.includes('Hasty Tapped Attacking Carrier Source')),
+  false,
+  'tapped-and-attacking carrier sources are deferred from G014 and must not seed combat-sacrifice Aura packages',
+);
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'ETB Spell Copier|Hasty Creature Copy Spell'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Death-Copy Creature Spell|ETB Spell Copier'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Magecraft Drain Payoff|Self-Copying Targeted Spell'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Creature-Only Exile Mana Outlet|Recursive Exile Creature'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Break-Even Self Untapper With Colorless|Colorless Mana Amplifier'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Any-Type Nonland Mana Amplifier|Break-Even Self Untapper With Colorless'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Generic Modal Untap Engine|Generic Tribe Count Druid'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Generic Creature Untap Aura|Generic Tribe Count Druid'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Generic Tribe Count Druid|Untap Symbol Equipment'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Combat Treasure Equipment|Generic Extra Combat Activator'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Combat Land Untap Equipment|Generic Extra Combat Activator'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Attack Land Untap Aura|Generic Extra Combat Activator'));
+assert.equal(seeded.some(candidate => candidate.cards.join('|') === 'Generic Extra Combat Activator|Random Treasure Dragon'), false, 'random Treasure combat triggers must not seed strict combat-resource proof packages');
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Artifact Sacrifice Extra-Turn Engine|Upkeep Artifact Token Engine'));
+assert.equal(seeded.some(candidate => candidate.cards.join('|') === 'Artifact Sacrifice Extra-Turn Engine|Four Artifact Token Engine'), true, 'below-threshold artifact token sources can seed but must fail strict proof');
+assert.equal(seeded.some(candidate => candidate.cards.includes('Artifact Sacrifice Extra-Turn Engine') && candidate.cards.includes('Creature Token Engine')), false, 'nonartifact token sources must not seed artifact-token extra-turn packages');
+assert.equal(seeded.some(candidate => candidate.cards.includes('Artifact Sacrifice Extra-Turn Engine') && candidate.cards.includes('Once Per Turn Upkeep Artifact Token Engine')), false, 'once-per-turn artifact token sources must not seed strict repeatable packages');
+assert.equal(seeded.some(candidate => candidate.cards.includes('Upkeep Artifact Token Engine') && candidate.cards.includes('Once Per Turn Artifact Sacrifice Extra-Turn Engine')), false, 'once-per-turn extra-turn engines must not seed strict artifact-token extra-turn packages');
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Life Loss To Mill Payoff|Mill To Life Loss Payoff'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Opponent Draw Punisher|Opponent Half-Library Draw'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Half-Library Mill|Mill Multiplier'));
@@ -116,7 +199,7 @@ assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'ETB Creature B
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Creature-Token Replacement Outlet|Death Mana Payoff'));
 assert.ok(seeded.some(candidate => candidate.cards.includes('Artifact Top Caster') && candidate.cards.includes('Artifact Spell Reducer') && candidate.cards.includes('Self Top Draw Artifact')));
 
-const packages = buildInteractionProofPackages(fixtures, { maxProofPackages: 64 });
+const packages = buildInteractionProofPackages(fixtures, { maxProofPackages: 192 });
 const byFamily = new Map(packages.map(pkg => [pkg.family, pkg]));
 
 assert.ok(byFamily.has('self-untap-mana-loop'));
@@ -136,6 +219,13 @@ assert.ok(byFamily.has('imprint-untap-spell-loop'));
 assert.ok(byFamily.has('self-untap-mana→ability-copy-loop'));
 assert.ok(byFamily.has('hasty-copy→etb-untap-loop'));
 assert.ok(byFamily.has('combat-copy-token→extra-combat-loop'));
+assert.ok(byFamily.has('hasty-copy→attack-extra-combat-loop'));
+assert.ok(byFamily.has('combat-copy-token→connect-extra-combat-loop'));
+assert.ok(byFamily.has('hasty-copy→connect-extra-combat-loop'));
+assert.ok(byFamily.has('combat-copy-token→attack-extra-turn-loop'));
+assert.ok(byFamily.has('combat-copy-token→connect-extra-turn-loop'));
+assert.ok(byFamily.has('hasty-copy→connect-extra-turn-loop'));
+assert.ok(byFamily.has('combat-sacrifice-aura→extra-combat-loop'));
 assert.ok(byFamily.has('spell-copy-etb→creature-copy-spell-loop'));
 assert.ok(byFamily.has('death-copy-spell-etb-copy-loop'));
 assert.ok(byFamily.has('self-copy-spell→magecraft-drain-loop'));
@@ -147,6 +237,9 @@ assert.ok(byFamily.has('mill-multiplier-finite-mill'));
 assert.ok(byFamily.has('delayed-mill-equalizer-finite-mill'));
 assert.ok(byFamily.has('mutual-etb-blink-reset-loop'));
 assert.ok(byFamily.has('token-replacement-sacrifice-mana-loop'));
+assert.ok(byFamily.has('variable-board-count-mana-loop'));
+assert.ok(byFamily.has('combat-resource→extra-combat-loop'));
+assert.ok(byFamily.has('artifact-token→extra-turn-loop'));
 assert.equal(packages.some(pkg => pkg.cards.includes('Ephemerate')), false, 'one-shot blink should not surface as a proven package');
 
 const artifactLoop = byFamily.get('artifact-top-cost-reduction-loop');
@@ -235,6 +328,96 @@ const anyTypeAmplifiedSelfUntapLoop = packages.find(pkg => pkg.family === 'self-
 assert.ok(anyTypeAmplifiedSelfUntapLoop);
 assert.ok(anyTypeAmplifiedSelfUntapLoop.cards.includes('Break-Even Self Untapper With Colorless'));
 
+const variableBoardCountPackage = packages.find(pkg => pkg.family === 'variable-board-count-mana-loop'
+  && pkg.cards.includes('Generic Modal Untap Engine'));
+assert.ok(variableBoardCountPackage);
+assert.equal(variableBoardCountPackage.cardCount, 2);
+assert.equal(variableBoardCountPackage.repeatability.status, 'repeatable-threshold');
+assert.ok(variableBoardCountPackage.cards.includes('Generic Tribe Count Druid'));
+assert.ok(/mana/.test(variableBoardCountPackage.result));
+assert.ok(variableBoardCountPackage.resourceDeltas.some(delta => delta.resource === 'mana' && delta.min >= 1));
+assert.ok(variableBoardCountPackage.resourceDeltas.some(delta => delta.resource === 'untaps'));
+assert.ok(variableBoardCountPackage.resourceDeltas.some(delta => delta.resource === 'cards'));
+assert.ok(variableBoardCountPackage.resourceDeltas.some(delta => delta.resource === 'life'));
+assert.ok(variableBoardCountPackage.assumptions.some(text => /at least 5 elf/.test(text)));
+assert.ok(variableBoardCountPackage.contributions.some(contribution => contribution.facts.includes('is-variable-board-count-mana-source')));
+assert.ok(variableBoardCountPackage.contributions.some(contribution => contribution.facts.includes('is-repeatable-creature-untap-ability')));
+assert.ok(variableBoardCountPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'minimum-board-count'));
+
+const attachedPumpVariablePackage = packages.find(pkg => pkg.family === 'variable-board-count-mana-loop'
+  && pkg.cards.includes('Untap Symbol Equipment'));
+assert.ok(attachedPumpVariablePackage);
+assert.ok(attachedPumpVariablePackage.resourceDeltas.some(delta => delta.resource === 'pump'));
+assert.ok(attachedPumpVariablePackage.contributions.some(contribution => contribution.facts.includes('is-attached-creature-untapper')));
+assert.equal(
+  packages.some(pkg => pkg.family === 'variable-board-count-mana-loop' && pkg.cards.includes('Opponent Count Druid')),
+  false,
+  'opponent-count variable mana sources must not seed or prove variable-board-count packages',
+);
+
+const combatResourcePackage = packages.find(pkg => pkg.family === 'combat-resource→extra-combat-loop'
+  && pkg.cards.includes('Combat Treasure Equipment'));
+assert.ok(combatResourcePackage);
+assert.equal(combatResourcePackage.cardCount, 2);
+assert.equal(combatResourcePackage.repeatability.status, 'repeatable-combat-threshold');
+assert.ok(combatResourcePackage.result.includes('combatPhases'));
+assert.equal(/tokens|mana/.test(combatResourcePackage.result), false, 'threshold combat-resource package should not claim accumulating mana or tokens');
+assert.ok(combatResourcePackage.resourceDeltas.some(delta => delta.resource === 'combatPhases'));
+assert.ok(combatResourcePackage.assumptions.some(text => /connects/.test(text)));
+assert.ok(combatResourcePackage.limitingClauses.some(text => /connection/.test(text)));
+assert.ok(combatResourcePackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'minimum-combat-damage'));
+assert.ok(combatResourcePackage.evidence.some(item => item.kind === 'capability' && item.predicate === 'extra-combat-adds-main-phase'));
+
+const combatLandUntapPackage = packages.find(pkg => pkg.family === 'combat-resource→extra-combat-loop'
+  && pkg.cards.includes('Combat Land Untap Equipment'));
+assert.ok(combatLandUntapPackage);
+assert.ok(combatLandUntapPackage.resourceDeltas.some(delta => delta.resource === 'untaps'));
+assert.ok(combatLandUntapPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'minimum-land-count'));
+assert.ok(combatLandUntapPackage.evidence.some(item => item.kind === 'precondition'
+  && item.predicate === 'land-mana-can-pay-extra-combat-cost'
+  && item.colors
+  && item.colors.r === 2));
+const attackLandUntapPackage = packages.find(pkg => pkg.family === 'combat-resource→extra-combat-loop'
+  && pkg.cards.includes('Attack Land Untap Aura'));
+assert.ok(attackLandUntapPackage);
+assert.ok(attackLandUntapPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'attack-trigger-can-be-declared'));
+assert.equal(
+  packages.some(pkg => pkg.family === 'combat-resource→extra-combat-loop' && pkg.cards.includes('Random Treasure Dragon')),
+  false,
+  'random Treasure combat damage must not surface as a proven strict package',
+);
+
+const artifactTokenExtraTurnPackage = byFamily.get('artifact-token→extra-turn-loop');
+assert.equal(artifactTokenExtraTurnPackage.cardCount, 2);
+assert.equal(artifactTokenExtraTurnPackage.repeatability.status, 'repeatable-turn-cycle-threshold');
+assert.ok(artifactTokenExtraTurnPackage.result.includes('turns'));
+assert.equal(/tokens|mana/.test(artifactTokenExtraTurnPackage.result), false, 'threshold artifact-token extra-turn package should not claim accumulating artifact tokens or mana');
+assert.ok(artifactTokenExtraTurnPackage.resourceDeltas.some(delta => delta.resource === 'turns'));
+assert.ok(artifactTokenExtraTurnPackage.assumptions.some(text => /each extra turn/.test(text)));
+assert.ok(artifactTokenExtraTurnPackage.limitingClauses.some(text => /replacement-amplified/.test(text)));
+assert.ok(artifactTokenExtraTurnPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'artifact-tokens-per-turn' && item.value === 5));
+assert.ok(artifactTokenExtraTurnPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'artifact-extra-turn-sac-count' && item.value === 5));
+assert.ok(artifactTokenExtraTurnPackage.contributions.some(contribution => contribution.facts.includes('is-turn-cycle-artifact-token-engine')));
+assert.ok(artifactTokenExtraTurnPackage.contributions.some(contribution => contribution.facts.includes('is-artifact-sacrifice-extra-turn-engine')));
+assert.equal(
+  packages.some(pkg => pkg.family === 'artifact-token→extra-turn-loop' && pkg.cards.includes('Four Artifact Token Engine')),
+  false,
+  'below-threshold artifact token refills must not surface as proven strict extra-turn packages',
+);
+const replacementAmplifiedExtraTurnPackages = buildInteractionProofPackages(
+  [
+    fixtures.find(item => item.id === 'Four Artifact Token Engine'),
+    fixtures.find(item => item.id === 'Token Doubler'),
+    fixtures.find(item => item.id === 'Artifact Sacrifice Extra-Turn Engine'),
+  ],
+  { maxProofPackages: 16 },
+);
+assert.equal(
+  replacementAmplifiedExtraTurnPackages.some(pkg => pkg.family === 'artifact-token→extra-turn-loop'),
+  false,
+  'broad token replacement must not turn a below-threshold artifact-token refill into a strict extra-turn proof package',
+);
+
 const millLifeLossPackage = byFamily.get('mill-lifeloss-feedback-loop');
 assert.equal(millLifeLossPackage.cardCount, 2);
 assert.ok(millLifeLossPackage.result.includes('mill'));
@@ -262,6 +445,91 @@ assert.ok(tokenReplacementPackage.contributions.some(contribution => contributio
 const combatCopyPackage = byFamily.get('combat-copy-token→extra-combat-loop');
 assert.equal(combatCopyPackage.cardCount, 2);
 assert.ok(combatCopyPackage.resourceDeltas.some(delta => delta.resource === 'combatPhases'));
+assert.ok(combatCopyPackage.evidence.some(item => item.predicate === 'fresh-token-can-be-declared-attacker'));
+
+const hastyCopyAttackPackage = byFamily.get('hasty-copy→attack-extra-combat-loop');
+assert.equal(hastyCopyAttackPackage.cardCount, 2);
+assert.equal(/mana|damage|win/i.test(hastyCopyAttackPackage.result), false);
+assert.ok(hastyCopyAttackPackage.evidence.some(item => item.predicate === 'copy-source-reset-by-extra-combat-trigger'));
+assert.ok(hastyCopyAttackPackage.evidence.some(item => item.predicate === 'fresh-token-unused-attack-trigger-at-loop-entry'));
+
+const combatCopyConnectPackage = byFamily.get('combat-copy-token→connect-extra-combat-loop');
+assert.equal(combatCopyConnectPackage.cardCount, 2);
+assert.equal(/mana|damage|win/i.test(combatCopyConnectPackage.result), false);
+assert.ok(combatCopyConnectPackage.evidence.some(item => item.predicate === 'combat-damage-connects'));
+assert.ok(combatCopyConnectPackage.evidence.some(item => item.predicate === 'fresh-token-combat-damage-trigger-unused-at-loop-entry'));
+
+const hastyCopyConnectPackage = byFamily.get('hasty-copy→connect-extra-combat-loop');
+assert.equal(hastyCopyConnectPackage.cardCount, 2);
+assert.equal(/mana|damage|win/i.test(hastyCopyConnectPackage.result), false);
+assert.ok(hastyCopyConnectPackage.evidence.some(item => item.predicate === 'copy-source-reset-by-extra-combat-trigger'));
+assert.ok(hastyCopyConnectPackage.evidence.some(item => item.predicate === 'combat-damage-connects'));
+
+const combatCopyAttackTurnPackage = byFamily.get('combat-copy-token→attack-extra-turn-loop');
+assert.equal(combatCopyAttackTurnPackage.cardCount, 2);
+assert.equal(/combatPhases|tokens|etbTriggers|damage|win/i.test(combatCopyAttackTurnPackage.result), false);
+assert.ok(combatCopyAttackTurnPackage.evidence.some(item => item.predicate === 'extra-turn-repeatable-with-fresh-token'));
+
+const combatCopyConnectTurnPackage = byFamily.get('combat-copy-token→connect-extra-turn-loop');
+assert.equal(combatCopyConnectTurnPackage.cardCount, 2);
+assert.equal(/combatPhases|tokens|etbTriggers|damage|win/i.test(combatCopyConnectTurnPackage.result), false);
+assert.ok(combatCopyConnectTurnPackage.evidence.some(item => item.predicate === 'combat-damage-connects'));
+
+const hastyCopyConnectTurnPackage = byFamily.get('hasty-copy→connect-extra-turn-loop');
+assert.equal(hastyCopyConnectTurnPackage.cardCount, 2);
+assert.equal(/combatPhases|tokens|etbTriggers|damage|win/i.test(hastyCopyConnectTurnPackage.result), false);
+assert.ok(hastyCopyConnectTurnPackage.evidence.some(item => item.predicate === 'copy-source-reset-by-extra-turn-untap-step'));
+
+const combatSacrificeAuraPackage = byFamily.get('combat-sacrifice-aura→extra-combat-loop');
+assert.equal(combatSacrificeAuraPackage.cardCount, 2);
+assert.equal(combatSacrificeAuraPackage.repeatability.status, 'repeatable-combat-carrier');
+assert.ok(combatSacrificeAuraPackage.result.includes('combatPhases'));
+assert.equal(/mana|tokens|damage|win/i.test(combatSacrificeAuraPackage.result), false);
+for (const resource of ['combatPhases', 'sacrifices', 'deathTriggers', 'ltbTriggers', 'untaps']) {
+  assert.ok(combatSacrificeAuraPackage.resourceDeltas.some(delta => delta.resource === resource), `package missing ${resource}`);
+}
+assert.ok(combatSacrificeAuraPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'combat-damage-connects'));
+assert.ok(combatSacrificeAuraPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'fresh-carrier-continuity'));
+assert.ok(combatSacrificeAuraPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'legal-reattach-target-at-trigger-resolution'));
+assert.ok(combatSacrificeAuraPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'current-enchanted-carrier-at-loop-entry'));
+assert.ok(combatSacrificeAuraPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'fresh-carrier-source-distinct-from-sacrificed-carrier'));
+assert.ok(combatSacrificeAuraPackage.contributions.some(contribution => contribution.facts.includes('is-combat-sacrifice-extra-combat-aura')));
+assert.ok(combatSacrificeAuraPackage.contributions.some(contribution => contribution.facts.includes('is-fresh-attack-carrier-source')));
+const breathShapedAuraPackages = buildInteractionProofPackages([
+  fixtures.find(item => item.id === 'Breath-Shaped Aura'),
+  fixtures.find(item => item.id === 'Fresh Combat Carrier Source'),
+], { maxProofPackages: 16 });
+assert.ok(
+  breathShapedAuraPackages.some(pkg => pkg.family === 'combat-sacrifice-aura→extra-combat-loop'),
+  'Breath-shaped Aura wording should surface as a proven combat-sacrifice Aura package',
+);
+const staleCarrierPackages = buildInteractionProofPackages([
+  fixtures.find(item => item.id === 'Combat Sacrifice Aura'),
+  fixtures.find(item => item.id === 'Stale Carrier Source'),
+], { maxProofPackages: 16 });
+assert.equal(
+  staleCarrierPackages.some(pkg => pkg.family === 'combat-sacrifice-aura→extra-combat-loop'),
+  false,
+  'stale carrier source must not surface as a proven combat-sacrifice Aura package',
+);
+const firstCombatOnlyCarrierPackages = buildInteractionProofPackages([
+  fixtures.find(item => item.id === 'Breath-Shaped Aura'),
+  fixtures.find(item => item.id === 'First Combat Only Carrier Source'),
+], { maxProofPackages: 16 });
+assert.equal(
+  firstCombatOnlyCarrierPackages.some(pkg => pkg.family === 'combat-sacrifice-aura→extra-combat-loop'),
+  false,
+  'first-combat-only carrier source must not surface as a proven combat-sacrifice Aura package',
+);
+const hastyTappedAttackingCarrierPackages = buildInteractionProofPackages([
+  fixtures.find(item => item.id === 'Breath-Shaped Aura'),
+  fixtures.find(item => item.id === 'Hasty Tapped Attacking Carrier Source'),
+], { maxProofPackages: 16 });
+assert.equal(
+  hastyTappedAttackingCarrierPackages.some(pkg => pkg.family === 'combat-sacrifice-aura→extra-combat-loop'),
+  false,
+  'tapped-and-attacking carrier source must not surface as a proven combat-sacrifice Aura package',
+);
 
 const deathCopyPackage = byFamily.get('death-copy-spell-etb-copy-loop');
 assert.equal(deathCopyPackage.cardCount, 2);

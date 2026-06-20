@@ -14,6 +14,7 @@ const { provePackage } = require('../../src/interaction-proof-search');
 const { buildInteractionIndexes } = require('../../src/interaction-indexes');
 const { COMBO_FAMILIES } = require('../../src/combo-family-library');
 const MODEL = require('../../src/interaction-model');
+const SEMANTICS = require('../../src/semantic-proof-utils');
 
 const DEFAULT_CACHE = path.join(__dirname, 'edhrec-combo-cache.json');
 const DEFAULT_JSON_OUT = path.join(__dirname, 'edhrec-combo-evaluation.json');
@@ -109,8 +110,6 @@ const EDGE_RESULT_CLASS_MAP = {
   magecraft: ['infinite-cast'],
   'artifact-cost-reduction→top-loop-piece': ['infinite-cast', 'infinite-draw'],
   'cast-from-top→top-loop-piece': ['infinite-cast', 'infinite-draw'],
-  'combat-enabler': ['combat'],
-  'combat→payoff': ['combat'],
   bounce: ['bounce-loop'],
 };
 
@@ -385,11 +384,6 @@ function detectCapabilityFamilies(nodes) {
   if (cards.some(c => hasCap(c, 'is-activated-ability-copier')) && cards.some(c => hasCap(c, 'is-self-untapper'))) families.add('self-untap-mana→ability-copy-loop');
   if (cards.some(copier => hasCap(copier, 'is-repeatable-hasty-creature-copy')
     && cards.some(untapper => untapper !== copier && hasCap(untapper, 'etb-untaps-permanent') && hastyCopyCanTarget(copier, untapper, ['etb-untaps-permanent'])))) families.add('hasty-copy→etb-untap-loop');
-  if (cards.some(copier => hasCap(copier, 'is-combat-copy-token-equipment') && hasCap(copier, 'combat-copy-token-haste') && hasCap(copier, 'combat-copy-token-nonlegendary')
-    && cards.some(attacker => attacker !== copier
-      && hasCap(attacker, 'is-attack-extra-combat-source')
-      && hasCap(attacker, 'extra-combat-repeatable-with-fresh-token')
-      && MODEL.faceCompatibleCaps(attacker, ['is-creature-permanent', 'is-attack-extra-combat-source'])))) families.add('combat-copy-token→extra-combat-loop');
   if (cards.some(spellCopier => hasCap(spellCopier, 'is-etb-spell-copier')
     && cards.some(copySpell => copySpell !== spellCopier && hasCap(copySpell, 'is-hasty-creature-copy-spell') && hastyCopySpellCanTarget(copySpell, spellCopier, ['is-etb-spell-copier'])))) families.add('spell-copy-etb→creature-copy-spell-loop');
   if (cards.some(spellCopier => hasCap(spellCopier, 'is-etb-spell-copier')
@@ -448,38 +442,16 @@ function classesForEdgeFamilies(families) {
   return sortedUnique((families || []).flatMap(family => EDGE_RESULT_CLASS_MAP[family] || []));
 }
 
-const PROOF_DELTA_CLASS_MAP = {
-  mana: 'infinite-mana',
-  life: 'infinite-life',
-  opponentLife: 'infinite-opponent-life-loss',
-  damage: 'infinite-damage',
-  cards: 'infinite-draw',
-  tokens: 'infinite-tokens',
-  mill: 'mill',
-  counters: 'infinite-counters',
-  deathTriggers: 'infinite-death',
-  sacrifices: 'infinite-sacrifice',
-  etbTriggers: 'infinite-etb',
-  ltbTriggers: 'infinite-ltb',
-  casts: 'infinite-cast',
-  untaps: 'infinite-untap',
-  combatPhases: 'combat',
-};
-
 function classesForProofDeltas(proofs) {
   const classes = new Set();
   for (const proof of proofs || []) {
     const familyId = FAMILY_CLASS_ALIASES[proof.family] || proof.family;
     const allowedClasses = FAMILY_PROOF_DELTA_CLASS_MAP[familyId] || [];
     for (const delta of proof.positiveDeltas || []) {
-      const cls = PROOF_DELTA_CLASS_MAP[delta.resource];
+      const cls = SEMANTICS.classForProofDeltaResource(delta.resource);
       if (!cls) continue;
       if (!allowedClasses.includes(cls)) continue;
-      if (delta.resource === 'opponentLife') {
-        if (!(delta.min === -Infinity || delta.max < 0)) continue;
-      } else if (!(delta.min > 0 || delta.max > 0)) {
-        continue;
-      }
+      if (!SEMANTICS.proofDeltaShowsPositiveResult(delta)) continue;
       classes.add(cls);
     }
   }
@@ -581,7 +553,7 @@ function evaluateCombo(combo, idx) {
     graphEdgeCount: (graph.edges || []).length,
     proofPackageCount: (graph.interactionProofs || []).length,
     capabilityCount: capabilities.length,
-    notableCapabilities: capabilities.filter(cap => /library|empty|imprint|self-untap|ability-copy|lifegain|lifeloss|mill|opponent-draw|mass-opponent-draw|draw-to-damage|damage-to-draw|recursive|token|blink|sac|death|top|caster|untap-spell|colorless-mana-amplifier/.test(cap)).slice(0, 24),
+    notableCapabilities: capabilities.filter(cap => /library|empty|imprint|self-untap|ability-copy|lifegain|lifeloss|mill|opponent-draw|mass-opponent-draw|draw-to-damage|damage-to-draw|escape|wheel|discard-hand|recursive|token|blink|sac|death|top|caster|untap-spell|variable-|board-count|creature-untap|attached-creature-untap|combat-|extra-combat|colorless-mana-amplifier/.test(cap)).slice(0, 24),
     proof: compactProof(proof),
   };
 }

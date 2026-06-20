@@ -9,6 +9,23 @@ const { buildInteractionHypergraph } = require('./interaction-hypergraph');
 const { buildInteractionIndexes, normalizeCard } = require('./interaction-indexes');
 const FACE_CLASSIFICATION = require('./face-classification');
 const MODEL = require('./interaction-model.js');
+const {
+  MANA_COLORS,
+  addManaProfiles,
+  canPayManaCost,
+  capSuffixes,
+  capValue,
+  eventConsumesFact,
+  fact,
+  hasCap,
+  manaCostProfileFromCaps,
+  manaProductionProfileFromCaps,
+  maxCapNumber,
+  minimumVariableManaCountToPay,
+  minCapNumber,
+  scaleManaProfile,
+  sortedUnique: sorted,
+} = require('./semantic-proof-utils');
 
 const DEFAULT_LIMITS = {
   maxCards: 3,
@@ -16,22 +33,6 @@ const DEFAULT_LIMITS = {
   maxBranches: 64,
   auditLowConfidence: false,
 };
-
-function sorted(values) {
-  return [...new Set((values || []).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
-}
-
-function hasCap(card, cap) {
-  return (card.caps || []).includes(cap);
-}
-
-function fact(card, predicate) {
-  return { card: card.id || card, kind: 'capability', predicate };
-}
-
-function eventConsumesFact(card, event) {
-  return { card: card.id || card, kind: 'event.consumes', event };
-}
 
 function firstCap(card, caps) {
   return (caps || []).find(cap => hasCap(card, cap));
@@ -44,31 +45,6 @@ function tokenPayoffFact(card) {
 
 function deathPayoffFact(card) {
   return fact(card, firstCap(card, ['is-death-drain-payoff', 'is-death-draw-payoff', 'is-death-token-payoff']) || 'death-payoff');
-}
-
-function capValue(card, prefix) {
-  const raw = (card.caps || []).find(cap => cap.startsWith(prefix + ':'));
-  if (!raw) return null;
-  const n = Number(raw.slice(prefix.length + 1));
-  return Number.isFinite(n) ? n : raw.slice(prefix.length + 1);
-}
-
-function capNumbers(card, prefix) {
-  return (card.caps || [])
-    .filter(cap => cap.startsWith(prefix + ':'))
-    .map(cap => Number(cap.slice(prefix.length + 1)))
-    .filter(Number.isFinite);
-}
-
-const MANA_COLORS = ['w', 'u', 'b', 'r', 'g'];
-
-function maxCapNumber(card, prefix) {
-  return Math.max(0, ...capNumbers(card, prefix));
-}
-
-function minCapNumber(card, prefix) {
-  const values = capNumbers(card, prefix);
-  return values.length ? Math.min(...values) : 0;
 }
 
 function recursiveCostProfile(card) {
@@ -84,14 +60,6 @@ function recursiveExileCostProfile(card) {
     total: minCapNumber(card, 'recursive-exile-body-cost'),
     colorless: maxCapNumber(card, 'recursive-exile-body-colorless-cost'),
     colors: Object.fromEntries(MANA_COLORS.map(color => [color, maxCapNumber(card, 'recursive-exile-body-color-' + color)])),
-  };
-}
-
-function manaCostProfileFromCaps(card, prefix) {
-  return {
-    total: minCapNumber(card, prefix + '-cost'),
-    colorless: maxCapNumber(card, prefix + '-colorless-cost'),
-    colors: Object.fromEntries(MANA_COLORS.map(color => [color, maxCapNumber(card, prefix + '-color-' + color)])),
   };
 }
 
@@ -131,24 +99,64 @@ function deathManaProfile(card) {
   };
 }
 
-function addManaProfiles(a, b) {
+function landfallManaProfile(card) {
+  return manaProductionProfileFromCaps(card, 'landfall-mana');
+}
+
+function landfallTokenManaProfile(card) {
+  return manaProductionProfileFromCaps(card, 'landfall-token-mana');
+}
+
+function variableManaUnitProfile(card) {
+  return manaProductionProfileFromCaps(card, 'variable-mana-unit');
+}
+
+function extraCombatCostProfile(card) {
+  return manaCostProfileFromCaps(card, 'extra-combat');
+}
+
+function anyManaUnitProfile(total = 1) {
   return {
-    total: (a.total || 0) + (b.total || 0),
-    any: (a.any || 0) + (b.any || 0),
-    colorless: (a.colorless || 0) + (b.colorless || 0),
-    colors: Object.fromEntries(MANA_COLORS.map(color => [color, (a.colors?.[color] || 0) + (b.colors?.[color] || 0)])),
+    total,
+    any: total,
+    colorless: 0,
+    colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])),
   };
 }
 
-function canPayRecursiveCost(cost, mana) {
-  if ((mana.colorless || 0) < (cost.colorless || 0)) return false;
-  let anyRemaining = mana.any;
-  for (const color of MANA_COLORS) {
-    const shortage = Math.max(0, (cost.colors[color] || 0) - (mana.colors[color] || 0));
-    anyRemaining -= shortage;
-    if (anyRemaining < 0) return false;
-  }
-  return mana.total >= cost.total;
+const canPayRecursiveCost = canPayManaCost;
+
+function artifactTokensPerTurn(card) {
+  return maxCapNumber(card, 'artifact-tokens-per-turn');
+}
+
+function artifactExtraTurnSacCount(card) {
+  return maxCapNumber(card, 'artifact-extra-turn-sac-count');
+}
+
+function addCostProfiles(...profiles) {
+  return {
+    total: profiles.reduce((sum, profile) => sum + (profile?.total || 0), 0),
+    colorless: profiles.reduce((sum, profile) => sum + (profile?.colorless || 0), 0),
+    colors: Object.fromEntries(MANA_COLORS.map(color => [
+      color,
+      profiles.reduce((sum, profile) => sum + (profile?.colors?.[color] || 0), 0),
+    ])),
+  };
+}
+
+function reduceGenericCost(cost, reduction) {
+  const fixed = (cost.colorless || 0) + MANA_COLORS.reduce((sum, color) => sum + (cost.colors?.[color] || 0), 0);
+  return Object.assign({}, cost, {
+    total: Math.max(fixed, (cost.total || 0) - Math.max(0, reduction || 0)),
+  });
+}
+
+function spellCostReducerApplies(reducer, spell) {
+  const scopes = capSuffixes(reducer, 'spell-cost-reduction-scope:');
+  if (!scopes.length) return true;
+  if (scopes.includes('instant-sorcery') && /\b(instant|sorcery)\b/i.test(spell?.type || spell?.type_line || '')) return true;
+  return MANA_COLORS.some(color => scopes.includes(color) && maxCapNumber(spell, 'buyback-copy-color-' + color) > 0);
 }
 
 function uniqueCards(cards) {
@@ -176,7 +184,7 @@ function canHastyCopyTarget(copier, target, extraTargetCaps = []) {
   if (!MODEL.faceCompatibleCaps(target, targetCaps)) return false;
   if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
   if (!target?.faceFacts?.length && hasCap(copier, 'hasty-copy-target-requires-nonlegendary') && isLegendaryPermanent(target)) return false;
-  return true;
+  return copyTokenLegendSafe(copier, target, 'hasty-copy-token-nonlegendary', targetCaps);
 }
 
 function canHastyCopySpellTarget(copySpell, target, extraTargetCaps = []) {
@@ -188,6 +196,48 @@ function canHastyCopySpellTarget(copySpell, target, extraTargetCaps = []) {
   return true;
 }
 
+function copyTokenLegendSafe(copier, target, tokenNonlegendaryCap, targetCaps = []) {
+  if (hasCap(copier, tokenNonlegendaryCap)) return true;
+  if (MODEL.faceCompatibleCaps(target, [...targetCaps, 'is-nonlegendary-permanent'])) return true;
+  if (!target?.faceFacts?.length && !isLegendaryPermanent(target)) return true;
+  return false;
+}
+
+function canPrecombatCopyTarget(copier, target, extraTargetCaps = []) {
+  if (!hasCap(copier, 'is-precombat-hasty-creature-copy-source')) return false;
+  const targetCaps = ['is-creature-permanent', ...extraTargetCaps];
+  if (!MODEL.faceCompatibleCaps(target, targetCaps)) return false;
+  if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
+  return copyTokenLegendSafe(copier, target, 'precombat-copy-token-nonlegendary', targetCaps);
+}
+
+function canAttachedSelfCopyTarget(copySource, target, extraTargetCaps = []) {
+  if (!hasCap(copySource, 'is-attached-self-hasty-creature-copy')) return false;
+  if (!MODEL.faceCompatibleCaps(target, ['is-creature-permanent', 'is-nonlegendary-permanent', ...extraTargetCaps])) return false;
+  if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
+  if (!target?.faceFacts?.length && isLegendaryPermanent(target)) return false;
+  return true;
+}
+
+function extraCombatTriggerUntapsCopySource(attacker, resetSubject, connect = false, resetSubjectCaps = []) {
+  if (!MODEL.faceCompatibleCaps(resetSubject, ['is-creature-permanent', ...resetSubjectCaps])) return false;
+  if (!resetSubject?.faceFacts?.length && !isCreaturePermanent(resetSubject)) return false;
+  if (hasCap(attacker, 'attack-extra-combat-untaps-creatures')) return true;
+  if (hasCap(attacker, 'attack-extra-combat-untaps-other-creatures')) return true;
+  if (connect && hasCap(attacker, 'combat-damage-extra-combat-untaps-creatures')) return true;
+  return false;
+}
+
+function activeCopyWindowSafe(copier) {
+  if (hasCap(copier, 'hasty-copy-activation-window:sorcery')) return false;
+  return hasCap(copier, 'hasty-copy-activation-window:instant') || !hasCap(copier, 'hasty-copy-activation-window:sorcery');
+}
+
+function attachedCopyWindowSafe(copySource) {
+  if (hasCap(copySource, 'attached-copy-activation-window:sorcery')) return false;
+  return hasCap(copySource, 'attached-copy-activation-window:instant') || !hasCap(copySource, 'attached-copy-activation-window:sorcery');
+}
+
 function canDeathCopySpellTarget(copySpell, target, extraTargetCaps = []) {
   if (!hasCap(copySpell, 'death-copy-spell-target-creature')) return false;
   const targetCaps = ['is-creature-permanent', 'is-nonlegendary-permanent', ...extraTargetCaps];
@@ -195,12 +245,6 @@ function canDeathCopySpellTarget(copySpell, target, extraTargetCaps = []) {
   if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
   if (!target?.faceFacts?.length && isLegendaryPermanent(target)) return false;
   return true;
-}
-
-function capSuffixes(card, prefix) {
-  return (card.caps || [])
-    .filter(cap => cap.startsWith(prefix))
-    .map(cap => cap.slice(prefix.length));
 }
 
 function counterTokenColors(card) {
@@ -462,6 +506,497 @@ function proveDirectSelfLoop(cards) {
   }, [{ resource: 'mana', min: totalProduced - effectiveCost, max: totalProduced - effectiveCost }]);
 }
 
+function proveVariableBoardCountManaLoop(cards) {
+  const source = find(cards, c => hasCap(c, 'is-variable-board-count-mana-source') && hasCap(c, 'taps-for-mana'));
+  if (!source) return null;
+  const engine = find(cards, c => c !== source
+    && (hasCap(c, 'is-repeatable-creature-untap-ability') || hasCap(c, 'is-attached-creature-untapper')));
+  if (!engine) {
+    return failure(
+      'proof:variable-board-count-mana-missing-engine:' + sorted(cards.map(c => c.id)).join('|'),
+      [source],
+      'variable-count mana source needs a repeatable creature-untap engine in the package',
+      { source: source.id },
+    );
+  }
+  if (!MODEL.faceCompatibleCaps(source, ['is-creature-permanent', 'taps-for-mana', 'is-variable-board-count-mana-source'])) {
+    return failure(
+      'proof:variable-board-count-mana-target-illegal:' + sorted([source.id, engine.id]).join('|'),
+      [source, engine],
+      'repeatable creature untap engine cannot legally target the variable-count mana source',
+      { sourceIsCreature: isCreaturePermanent(source) },
+    );
+  }
+
+  const unitMana = variableManaUnitProfile(source);
+  const isAttachedUntapper = hasCap(engine, 'is-attached-creature-untapper');
+  const untapCost = isAttachedUntapper
+    ? manaCostProfileFromCaps(engine, 'attached-creature-untap')
+    : manaCostProfileFromCaps(engine, 'creature-untap-ability');
+  let resetCost = { total: 0, colorless: 0, colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])) };
+  const untapAbilityTapsEngine = hasCap(engine, 'creature-untap-ability-taps-source');
+  if (untapAbilityTapsEngine) {
+    if (!hasCap(engine, 'is-self-untapper')) {
+      return failure(
+        'proof:variable-board-count-mana-engine-tapped:' + sorted([source.id, engine.id]).join('|'),
+        [source, engine],
+        'repeatable untap ability taps its own source but the package cannot reset that source',
+        { engine: engine.id },
+      );
+    }
+    resetCost = manaCostProfileFromCaps(engine, 'self-untap');
+  }
+  const loopCost = addCostProfiles(untapCost, resetCost);
+  const threshold = minimumVariableManaCountToPay(loopCost, unitMana, { requirePositive: true, maxCount: 50 });
+  if (!Number.isFinite(threshold)) {
+    return failure(
+      'proof:variable-board-count-mana-cost:' + sorted([source.id, engine.id]).join('|'),
+      [source, engine],
+      'variable-count mana unit cannot pay the repeatable untap loop cost with a positive mana delta',
+      { unitMana, loopCost },
+    );
+  }
+  const producedAtThreshold = scaleManaProfile(unitMana, threshold);
+  const netMana = producedAtThreshold.total - loopCost.total;
+  if (netMana <= 0) {
+    return failure(
+      'proof:variable-board-count-mana-no-positive-delta:' + sorted([source.id, engine.id]).join('|'),
+      [source, engine],
+      'variable-count mana loop does not prove positive mana at its minimum threshold',
+      { unitMana, loopCost, threshold, producedAtThreshold },
+    );
+  }
+  const countSubjects = capSuffixes(source, 'variable-mana-counts:');
+  const subject = countSubjects[0] || 'board-resource';
+  const deltas = [
+    { resource: 'mana', min: netMana, max: Infinity },
+    { resource: 'untaps', min: 1, max: Infinity },
+  ];
+  if (hasCap(engine, 'is-repeatable-tap-draw-ability')) deltas.push({ resource: 'cards', min: 1, max: Infinity });
+  if (hasCap(engine, 'is-repeatable-tap-lifegain-ability')) deltas.push({ resource: 'life', min: 1, max: Infinity });
+  if (hasCap(engine, 'attached-untap-adds-pump')) deltas.push({ resource: 'pump', min: 1, max: Infinity });
+  return success('proof:variable-board-count-mana:' + sorted([source.id, engine.id]).join('|'), 'variable-board-count-mana-loop', [source, engine], {
+    requiredFacts: [
+      fact(source, 'is-variable-board-count-mana-source'),
+      fact(source, 'taps-for-mana'),
+      fact(source, 'is-creature-permanent'),
+      fact(source, 'variable-mana-unit-produced'),
+      { card: source.id, kind: 'precondition', predicate: 'minimum-board-count', subject, value: threshold },
+      fact(engine, isAttachedUntapper ? 'is-attached-creature-untapper' : 'is-repeatable-creature-untap-ability'),
+      ...(untapAbilityTapsEngine ? [fact(engine, 'is-self-untapper')] : []),
+      ...(hasCap(engine, 'is-repeatable-tap-draw-ability') ? [fact(engine, 'is-repeatable-tap-draw-ability')] : []),
+      ...(hasCap(engine, 'is-repeatable-tap-lifegain-ability') ? [fact(engine, 'is-repeatable-tap-lifegain-ability')] : []),
+    ],
+    steps: [
+      { card: source.id, action: `tap for variable mana using a minimum ${subject} count of ${threshold}`, delta: { mana: producedAtThreshold.total } },
+      { card: engine.id, action: 'pay the repeatable creature-untap cost targeting the variable mana source', cost: { mana: untapCost.total, colors: untapCost.colors, colorless: untapCost.colorless } },
+      ...(untapAbilityTapsEngine ? [{ card: engine.id, action: 'pay the engine self-untap cost to restore the repeatable untap source', cost: { mana: resetCost.total, colors: resetCost.colors, colorless: resetCost.colorless } }] : []),
+      { action: 'the variable mana source and untap engine return to the same abstract state', delta: { mana: netMana, untaps: 1 } },
+      ...(hasCap(engine, 'is-repeatable-tap-draw-ability') ? [{ card: engine.id, action: 'positive mana can repeatedly pay the tap draw mode after the loop is established', delta: { cards: 1 } }] : []),
+      ...(hasCap(engine, 'is-repeatable-tap-lifegain-ability') ? [{ card: engine.id, action: 'positive mana can repeatedly pay the tap lifegain mode after the loop is established', delta: { life: 1 } }] : []),
+      ...(hasCap(engine, 'attached-untap-adds-pump') ? [{ card: engine.id, action: 'the attached untap activation increases the creature power each iteration', delta: { pump: 1 } }] : []),
+    ],
+    assumptions: [
+      `the board state has at least ${threshold} ${subject === 'board-resource' ? 'counted permanents/resources' : subject + ' resources'} for the variable mana ability`,
+      'the repeatable untap ability can legally target the variable mana source each iteration',
+    ],
+    limitingClauses: ['conditional board-count threshold is explicit; this proof does not infer that an arbitrary deck currently controls the required count'],
+    repeatability: { status: 'repeatable-threshold', reason: 'at the stated board-count threshold, variable mana pays the untap/reset costs and returns the package to the same abstract state with positive mana' },
+  }, deltas);
+}
+
+function isDeterministicCombatResourceEngine(card) {
+  return hasCap(card, 'is-combat-damage-land-untap-engine')
+    || hasCap(card, 'is-attack-land-untap-engine')
+    || hasCap(card, 'is-combat-damage-treasure-engine');
+}
+
+function isRejectedCombatResourceEngine(card) {
+  return hasCap(card, 'is-random-combat-damage-treasure-source')
+    || hasCap(card, 'is-fixed-combat-damage-treasure-source');
+}
+
+function extraCombatActivationTimingSafe(card) {
+  if (!hasCap(card, 'is-repeatable-extra-combat-activator')) return false;
+  if (hasCap(card, 'extra-combat-adds-main-phase')) return true;
+  return !hasCap(card, 'extra-combat-activation-window:sorcery');
+}
+
+function extraCombatActivationSourceResetSafe(card) {
+  const tapsSource = hasCap(card, 'extra-combat-activation-taps-source');
+  const usesUntapSymbol = hasCap(card, 'extra-combat-activation-uses-untap-symbol');
+  if (!tapsSource && !usesUntapSymbol) return true;
+  if (!MODEL.faceCompatibleCaps(card, ['is-creature-permanent'])) return false;
+  if (tapsSource && !hasCap(card, 'extra-combat-untaps-activating-creature')) return false;
+  return true;
+}
+
+function proveCombatResourceExtraCombatPair(resourceEngine, extraCombat) {
+  if (!hasCap(extraCombat, 'extra-combat-untaps-creatures')) {
+    return failure(
+      'proof:combat-resource-extra-combat-no-untap:' + sorted([resourceEngine.id, extraCombat.id]).join('|'),
+      [resourceEngine, extraCombat],
+      'extra-combat engine does not untap attackers/creatures, so the same combat resource source is not locally reset',
+      { extraCombat: extraCombat.id },
+    );
+  }
+  if (!extraCombatActivationSourceResetSafe(extraCombat)) {
+    return failure(
+      'proof:combat-resource-extra-combat-source-not-reset:' + sorted([resourceEngine.id, extraCombat.id]).join('|'),
+      [resourceEngine, extraCombat],
+      'extra-combat activation changes the source tap state, but the package does not prove that activating source is reset for the next activation',
+      {
+        extraCombat: extraCombat.id,
+        tapsSource: hasCap(extraCombat, 'extra-combat-activation-taps-source'),
+        usesUntapSymbol: hasCap(extraCombat, 'extra-combat-activation-uses-untap-symbol'),
+        sourceIsCreature: MODEL.faceCompatibleCaps(extraCombat, ['is-creature-permanent']),
+        untapsActivatingCreature: hasCap(extraCombat, 'extra-combat-untaps-activating-creature'),
+      },
+    );
+  }
+  if (!extraCombatActivationTimingSafe(extraCombat)) {
+    return failure(
+      'proof:combat-resource-extra-combat-timing:' + sorted([resourceEngine.id, extraCombat.id]).join('|'),
+      [resourceEngine, extraCombat],
+      hasCap(extraCombat, 'is-repeatable-extra-combat-attack-trigger')
+        ? 'combat resource triggers cannot safely pay an attack-trigger extra-combat cost in the same combat without a separate initial-payment proof'
+        : 'sorcery-speed extra-combat activation needs an additional main phase after combat to prove repeatable payment timing',
+      {
+        extraCombat: extraCombat.id,
+        activationWindow: capSuffixes(extraCombat, 'extra-combat-activation-window:')[0] || 'unknown',
+        addsMainPhase: hasCap(extraCombat, 'extra-combat-adds-main-phase'),
+      },
+    );
+  }
+
+  const cost = extraCombatCostProfile(extraCombat);
+  if (!(cost.total > 0)) {
+    return failure(
+      'proof:combat-resource-extra-combat-missing-cost:' + sorted([resourceEngine.id, extraCombat.id]).join('|'),
+      [resourceEngine, extraCombat],
+      'extra-combat cost was not parsed, so resource accounting cannot prove repeatability',
+      { cost },
+    );
+  }
+  const usesTreasure = hasCap(resourceEngine, 'is-combat-damage-treasure-engine') && hasCap(resourceEngine, 'combat-damage-treasure-per-damage:1');
+  const usesLandUntap = hasCap(resourceEngine, 'is-combat-damage-land-untap-engine') || hasCap(resourceEngine, 'is-attack-land-untap-engine');
+  if (!usesTreasure && !usesLandUntap) {
+    return failure(
+      'proof:combat-resource-extra-combat-nondeterministic:' + sorted([resourceEngine.id, extraCombat.id]).join('|'),
+      [resourceEngine, extraCombat],
+      'combat resource trigger is not a deterministic per-damage Treasure or land-untap engine',
+      {
+        randomTreasure: hasCap(resourceEngine, 'is-random-combat-damage-treasure-source'),
+        fixedTreasure: hasCap(resourceEngine, 'is-fixed-combat-damage-treasure-source'),
+      },
+    );
+  }
+  const resourceUnit = anyManaUnitProfile(1);
+  const threshold = minimumVariableManaCountToPay(cost, resourceUnit, { requirePositive: false, maxCount: 50 });
+  if (!Number.isFinite(threshold)) {
+    return failure(
+      'proof:combat-resource-extra-combat-cost:' + sorted([resourceEngine.id, extraCombat.id]).join('|'),
+      [resourceEngine, extraCombat],
+      'combat resource trigger cannot pay the extra-combat cost',
+      { cost },
+    );
+  }
+
+  const thresholdFact = usesTreasure
+    ? { card: resourceEngine.id, kind: 'precondition', predicate: 'minimum-combat-damage', value: threshold }
+    : { card: resourceEngine.id, kind: 'precondition', predicate: 'minimum-land-count', value: threshold };
+  const needsConnect = hasCap(resourceEngine, 'combat-resource-requires-connect');
+  const triggerKind = hasCap(resourceEngine, 'is-attack-land-untap-engine') ? 'attack' : 'combat-damage';
+  const deltas = [
+    { resource: 'combatPhases', min: 1, max: Infinity },
+  ];
+  if (usesLandUntap) deltas.push({ resource: 'untaps', min: 1, max: Infinity });
+  return success('proof:combat-resource-extra-combat:' + sorted([resourceEngine.id, extraCombat.id]).join('|'), 'combat-resource→extra-combat-loop', [resourceEngine, extraCombat], {
+    requiredFacts: [
+      fact(extraCombat, 'is-repeatable-extra-combat-engine'),
+      fact(extraCombat, 'is-repeatable-extra-combat-activator'),
+      fact(extraCombat, 'extra-combat-untaps-creatures'),
+      ...(hasCap(extraCombat, 'extra-combat-activation-taps-source') ? [fact(extraCombat, 'extra-combat-activation-taps-source'), fact(extraCombat, 'extra-combat-untaps-activating-creature'), fact(extraCombat, 'is-creature-permanent')] : []),
+      ...(hasCap(extraCombat, 'extra-combat-activation-uses-untap-symbol') ? [fact(extraCombat, 'extra-combat-activation-uses-untap-symbol'), fact(extraCombat, 'is-creature-permanent')] : []),
+      ...(hasCap(extraCombat, 'extra-combat-adds-main-phase') ? [fact(extraCombat, 'extra-combat-adds-main-phase')] : []),
+      usesTreasure ? fact(resourceEngine, 'is-combat-damage-treasure-engine') : fact(resourceEngine, hasCap(resourceEngine, 'is-attack-land-untap-engine') ? 'is-attack-land-untap-engine' : 'is-combat-damage-land-untap-engine'),
+      thresholdFact,
+      ...(usesLandUntap ? [{ card: resourceEngine.id, kind: 'precondition', predicate: 'land-mana-can-pay-extra-combat-cost', value: cost.total, colors: cost.colors }] : []),
+      ...(needsConnect ? [{ card: resourceEngine.id, kind: 'precondition', predicate: 'combat-damage-connects' }] : []),
+      ...(hasCap(resourceEngine, 'combat-resource-requires-attack') ? [{ card: resourceEngine.id, kind: 'precondition', predicate: 'attack-trigger-can-be-declared' }] : []),
+    ],
+    steps: [
+      {
+        card: resourceEngine.id,
+        action: usesTreasure
+          ? `deal at least ${threshold} combat damage to create enough Treasure mana`
+          : `trigger land untap with at least ${threshold} lands able to pay the extra-combat cost`,
+        delta: usesTreasure ? { treasureMana: threshold } : { untappedLands: threshold },
+      },
+      { card: extraCombat.id, action: 'pay the repeatable extra-combat cost', cost: { mana: cost.total, colors: cost.colors, colorless: cost.colorless } },
+      { card: extraCombat.id, action: 'untap attackers/creatures and create the next combat phase plus a payment window', delta: { combatPhases: 1 } },
+      { action: 'the next combat repeats the same attack/connect resource trigger and restores the loop' },
+    ],
+    assumptions: [
+      usesTreasure
+        ? `a combat creature carrying or supported by the resource trigger deals at least ${threshold} combat damage each combat`
+        : `the board has at least ${threshold} lands that can produce the mana required for the extra-combat activation`,
+      needsConnect
+        ? 'the combat-damage trigger connects with a player/opponent each combat'
+        : 'the attack trigger can be declared each combat after the extra-combat engine untaps attackers',
+      usesLandUntap ? 'the untapped lands can produce the colored mana required by the extra-combat cost' : 'Treasure mana can pay the colored extra-combat cost',
+      'extra-combat timing provides a legal repeatable activation/payment window before the next combat begins',
+    ],
+    limitingClauses: [
+      `conditional ${usesTreasure ? 'combat-damage' : 'land-count'} threshold is explicit; this proof does not infer that an arbitrary board state already satisfies it`,
+      triggerKind === 'combat-damage' ? 'evasion/blocker state is not inferred; connection is an explicit precondition' : 'attack legality is an explicit precondition',
+    ],
+    repeatability: { status: 'repeatable-combat-threshold', reason: 'combat resource trigger pays the repeatable extra-combat cost, the extra-combat effect untaps attackers, and timing provides a fresh payment window' },
+  }, deltas);
+}
+
+function proveCombatResourceExtraCombatLoop(cards) {
+  const extraCombats = cards.filter(c => hasCap(c, 'is-repeatable-extra-combat-engine'));
+  if (!extraCombats.length) return null;
+  const deterministicResources = cards.filter(c => !extraCombats.includes(c) && isDeterministicCombatResourceEngine(c));
+  const rejectedResources = cards.filter(c => !extraCombats.includes(c) && !isDeterministicCombatResourceEngine(c) && isRejectedCombatResourceEngine(c));
+  const resourceEngines = [...deterministicResources, ...rejectedResources];
+  if (!resourceEngines.length) {
+    return failure(
+      'proof:combat-resource-extra-combat-missing-resource-engine:' + sorted(cards.map(c => c.id)).join('|'),
+      extraCombats,
+      'repeatable extra-combat engine needs a package-local attack/connect resource trigger',
+      { extraCombats: extraCombats.map(card => card.id) },
+    );
+  }
+
+  const failures = [];
+  for (const extraCombat of extraCombats) {
+    for (const resourceEngine of resourceEngines) {
+      const result = proveCombatResourceExtraCombatPair(resourceEngine, extraCombat);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+  }
+  if (failures.length === 1) return failures[0];
+  return failure(
+    'proof:combat-resource-extra-combat-all-rejected:' + sorted(cards.map(c => c.id)).join('|'),
+    cards,
+    'no combat resource and extra-combat pairing satisfied strict repeatability gates',
+    {
+      rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12),
+    },
+  );
+}
+
+const COMBAT_SACRIFICE_AURA_CAPS = [
+  'is-combat-sacrifice-extra-combat-aura',
+  'combat-sacrifice-aura-requires-connect',
+  'combat-sacrifice-aura-sacrifices-carrier',
+  'combat-sacrifice-aura-reattaches',
+  'combat-sacrifice-aura-untaps-creatures',
+  'combat-sacrifice-aura-adds-combat',
+];
+
+const FRESH_CARRIER_CAPS = [
+  'is-fresh-attack-carrier-source',
+  'fresh-carrier-token-attacks',
+  'fresh-carrier-token-has-haste',
+  'fresh-carrier-continuity',
+  'fresh-carrier-repeatable-each-combat',
+  'fresh-carrier-legal-next-reattach-target',
+  'fresh-carrier-timing:beginning-of-combat',
+];
+
+function isCombatSacrificeAuraCandidate(card) {
+  return COMBAT_SACRIFICE_AURA_CAPS.some(cap => hasCap(card, cap));
+}
+
+function isFreshCarrierCandidate(card) {
+  return FRESH_CARRIER_CAPS.some(cap => hasCap(card, cap));
+}
+
+function proveCombatSacrificeAuraExtraCombatPair(aura, carrierSource) {
+  const missingAuraCaps = COMBAT_SACRIFICE_AURA_CAPS.filter(cap => !hasCap(aura, cap));
+  if (missingAuraCaps.length) {
+    return failure(
+      'proof:combat-sacrifice-aura-extra-combat-aura-incomplete:' + sorted([aura.id, carrierSource.id]).join('|'),
+      [aura, carrierSource],
+      'combat-sacrifice Aura is missing required combat-damage, sacrifice, reattach, untap, or extra-combat text',
+      { aura: aura.id, missing: missingAuraCaps },
+    );
+  }
+  const missingCarrierCaps = FRESH_CARRIER_CAPS.filter(cap => !hasCap(carrierSource, cap));
+  if (missingCarrierCaps.length) {
+    return failure(
+      'proof:combat-sacrifice-aura-extra-combat-no-fresh-carrier:' + sorted([aura.id, carrierSource.id]).join('|'),
+      [aura, carrierSource],
+      'combat-sacrifice Aura needs a package-local beginning-of-combat fresh carrier source that creates a combat-ready legal reattach target',
+      { carrierSource: carrierSource.id, missing: missingCarrierCaps },
+    );
+  }
+  if (!MODEL.faceCompatibleCaps(aura, COMBAT_SACRIFICE_AURA_CAPS)) {
+    return failure(
+      'proof:combat-sacrifice-aura-extra-combat-aura-face-incompatible:' + sorted([aura.id, carrierSource.id]).join('|'),
+      [aura, carrierSource],
+      'combat-sacrifice Aura loop facts do not coexist on a single legal face',
+      { aura: aura.id },
+    );
+  }
+  if (!MODEL.faceCompatibleCaps(carrierSource, FRESH_CARRIER_CAPS)) {
+    return failure(
+      'proof:combat-sacrifice-aura-extra-combat-carrier-face-incompatible:' + sorted([aura.id, carrierSource.id]).join('|'),
+      [aura, carrierSource],
+      'fresh carrier source facts do not coexist on a single legal face',
+      { carrierSource: carrierSource.id },
+    );
+  }
+  const freshCarrierCount = maxCapNumber(carrierSource, 'fresh-carrier-tokens-created');
+  if (freshCarrierCount <= 0) {
+    return failure(
+      'proof:combat-sacrifice-aura-extra-combat-carrier-count-missing:' + sorted([aura.id, carrierSource.id]).join('|'),
+      [aura, carrierSource],
+      'fresh carrier source must expose a deterministic creature-token count',
+      { carrierSource: carrierSource.id },
+    );
+  }
+  return success('proof:combat-sacrifice-aura-extra-combat:' + sorted([aura.id, carrierSource.id]).join('|'), 'combat-sacrifice-aura→extra-combat-loop', [aura, carrierSource], {
+    requiredFacts: [
+      ...COMBAT_SACRIFICE_AURA_CAPS.map(cap => fact(aura, cap)),
+      ...FRESH_CARRIER_CAPS.map(cap => fact(carrierSource, cap)),
+      { card: aura.id, kind: 'precondition', predicate: 'current-enchanted-carrier-at-loop-entry' },
+      { card: carrierSource.id, kind: 'precondition', predicate: 'fresh-carrier-source-distinct-from-sacrificed-carrier' },
+      { card: aura.id, kind: 'precondition', predicate: 'combat-damage-connects' },
+      { card: carrierSource.id, kind: 'precondition', predicate: 'fresh-carrier-continuity', value: freshCarrierCount },
+      { card: carrierSource.id, kind: 'precondition', predicate: 'legal-reattach-target-at-trigger-resolution' },
+    ],
+    steps: [
+      { action: 'loop starts with the Aura already attached to a legal current carrier while the carrier source remains separate' },
+      { card: carrierSource.id, action: `create ${freshCarrierCount} hasty beginning-of-combat creature token carrier(s) before combat damage`, delta: { legalCarriers: freshCarrierCount } },
+      { card: aura.id, action: 'current enchanted carrier deals combat damage to a player/opponent', delta: { combatDamageConnection: 1 } },
+      { card: aura.id, action: 'sacrifice the current enchanted carrier and reattach the Aura to the fresh creature you control', delta: { sacrifices: 1, deathTriggers: 1, ltbTriggers: 1 } },
+      { card: aura.id, action: 'untap all creatures you control and create the next combat phase', delta: { combatPhases: 1, untaps: 1 } },
+      { action: 'the next combat repeats after the carrier source creates another legal reattach target' },
+    ],
+    assumptions: [
+      'the loop is already established with the Aura attached to a legal current carrier',
+      'the fresh carrier source is not the sacrificed enchanted carrier and remains available for later combats',
+      'the enchanted carrier connects with a player/opponent each combat',
+      'the hasty beginning-of-combat carrier token is a creature you control and remains a legal reattach target when the combat-damage trigger resolves',
+      'reattaching to the fresh carrier establishes the next enchanted carrier before the additional combat begins',
+    ],
+    limitingClauses: [
+      'no arbitrary external creature is inferred; the next carrier must be created by the package-local beginning-of-combat source from an established loop state',
+      'attack-trigger, conditional, random, replacement-amplified, and wrong-timing token sources are outside this strict proof',
+      'the proof does not claim surplus tokens, mana, damage, or win-game results',
+    ],
+    repeatability: { status: 'repeatable-combat-carrier', reason: 'from an established loop state, each combat creates a hasty fresh legal carrier, the Aura sacrifices the current carrier, reattaches to the fresh carrier, untaps creatures, and adds the next combat' },
+  }, [
+    { resource: 'combatPhases', min: 1, max: Infinity },
+    { resource: 'sacrifices', min: 1, max: Infinity },
+    { resource: 'deathTriggers', min: 1, max: Infinity },
+    { resource: 'ltbTriggers', min: 1, max: Infinity },
+    { resource: 'untaps', min: 1, max: Infinity },
+  ]);
+}
+
+function proveCombatSacrificeAuraExtraCombatLoop(cards) {
+  const auras = (cards || []).filter(isCombatSacrificeAuraCandidate);
+  if (!auras.length) return null;
+  const carrierSources = (cards || []).filter(c => !auras.includes(c) && isFreshCarrierCandidate(c));
+  if (!carrierSources.length) {
+    return failure(
+      'proof:combat-sacrifice-aura-extra-combat-missing-fresh-carrier:' + sorted(cards.map(c => c.id)).join('|'),
+      auras,
+      'combat-sacrifice Aura needs a package-local beginning-of-combat fresh carrier source',
+      { auras: auras.map(card => card.id) },
+    );
+  }
+
+  const failures = [];
+  for (const aura of auras) {
+    for (const carrierSource of carrierSources) {
+      const result = proveCombatSacrificeAuraExtraCombatPair(aura, carrierSource);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+  }
+  if (failures.length === 1) return failures[0];
+  return failure(
+    'proof:combat-sacrifice-aura-extra-combat-all-rejected:' + sorted(cards.map(c => c.id)).join('|'),
+    cards,
+    'no combat-sacrifice Aura and fresh carrier pairing satisfied strict repeatability gates',
+    { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
+  );
+}
+
+function proveArtifactTokenExtraTurnPair(source, extraTurn) {
+  const sacrificeCount = artifactExtraTurnSacCount(extraTurn);
+  const baseTokens = artifactTokensPerTurn(source);
+  if (!(sacrificeCount > 0 && baseTokens >= sacrificeCount)) {
+    return failure(
+      'proof:artifact-token-extra-turn-threshold:' + sorted([source.id, extraTurn.id]).join('|'),
+      [source, extraTurn],
+      'turn-cycle artifact token refill does not meet the extra-turn artifact sacrifice threshold',
+      { sacrificeCount, artifactTokensPerTurn: baseTokens },
+    );
+  }
+  return success('proof:artifact-token-extra-turn:' + sorted([source.id, extraTurn.id]).join('|'), 'artifact-token→extra-turn-loop', [source, extraTurn], {
+    requiredFacts: [
+      fact(source, 'is-turn-cycle-artifact-token-engine'),
+      { card: source.id, kind: 'precondition', predicate: 'artifact-tokens-per-turn', value: baseTokens },
+      fact(extraTurn, 'is-artifact-sacrifice-extra-turn-engine'),
+      { card: extraTurn.id, kind: 'precondition', predicate: 'artifact-extra-turn-sac-count', value: sacrificeCount },
+    ],
+    steps: [
+      { card: source.id, action: `create ${baseTokens} artifact token(s) on a turn-cycle trigger`, delta: { artifactTokens: baseTokens } },
+      { card: extraTurn.id, action: `sacrifice ${sacrificeCount} artifact tokens to take an extra turn`, delta: { turns: 1 } },
+      { action: 'the extra turn repeats the same turn-cycle artifact-token trigger before the next activation' },
+    ],
+    assumptions: [
+      'the turn-cycle artifact-token trigger occurs during each extra turn before the extra-turn activation is needed again',
+      'the produced artifact tokens remain available to pay the artifact sacrifice cost',
+    ],
+    limitingClauses: [
+      'the proof does not claim surplus artifact tokens, mana, or other payoff unless a separate proof establishes positive surplus',
+      'variable, random, replacement-amplified, or combat-damage-dependent artifact token counts are excluded from this strict turn-cycle proof',
+    ],
+    repeatability: { status: 'repeatable-turn-cycle-threshold', reason: 'each extra turn refreshes enough artifact tokens to pay the artifact-sacrifice extra-turn activation again' },
+  }, [{ resource: 'turns', min: 1, max: Infinity }]);
+}
+
+function proveArtifactTokenExtraTurnLoop(cards) {
+  const extraTurns = (cards || []).filter(c => hasCap(c, 'is-artifact-sacrifice-extra-turn-engine'));
+  if (!extraTurns.length) return null;
+  const sources = (cards || []).filter(c => hasCap(c, 'is-turn-cycle-artifact-token-engine'));
+  if (!sources.length) {
+    return failure(
+      'proof:artifact-token-extra-turn-missing-source:' + sorted(cards.map(c => c.id)).join('|'),
+      extraTurns,
+      'artifact-sacrifice extra-turn engine needs a package-local turn-cycle artifact token refill',
+      { extraTurns: extraTurns.map(card => card.id) },
+    );
+  }
+
+  const failures = [];
+  for (const extraTurn of extraTurns) {
+    for (const source of sources) {
+      const result = proveArtifactTokenExtraTurnPair(source, extraTurn);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+  }
+  if (failures.length === 1) return failures[0];
+  return failure(
+    'proof:artifact-token-extra-turn-all-rejected:' + sorted(cards.map(c => c.id)).join('|'),
+    cards,
+    'no artifact-token refill and artifact-sacrifice extra-turn pairing satisfied strict repeatability gates',
+    {
+      rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12),
+    },
+  );
+}
+
 function proveBlinkUntap(cards) {
   const blink = find(cards, c => hasCap(c, 'is-repeatable-blink'));
   const untapper = find(cards, c => c !== blink && (c.caps || []).some(cap => cap.startsWith('etb-untaps-land:')));
@@ -595,6 +1130,68 @@ function proveSelfCopySpellMagecraftDrain(cards) {
     { resource: 'life', min: drainAmount, max: Infinity },
     { resource: 'opponentLife', min: -Infinity, max: -drainAmount },
     { resource: 'magecraftTriggers', min: 1, max: Infinity },
+  ]);
+}
+
+function proveBuybackCopyRitualLoop(cards) {
+  const copySpell = find(cards, c => hasCap(c, 'is-buyback-spell-copy'));
+  const ritual = find(cards, c => c !== copySpell && hasCap(c, 'is-ritual-mana-spell'));
+  if (!copySpell || !ritual) {
+    if (copySpell || ritual) {
+      return failure(
+        'proof:buyback-copy-ritual-missing-role:' + sorted(cards.map(c => c.id)).join('|'),
+        cards,
+        'buyback copy loop needs both a buyback spell-copy card and a mana-producing instant/sorcery spell',
+        { hasBuybackCopy: Boolean(copySpell), hasRitual: Boolean(ritual) },
+      );
+    }
+    return null;
+  }
+  const ritualMana = manaProductionProfileFromCaps(ritual, 'ritual-spell-mana');
+  const reducer = find(cards, c => c !== copySpell && c !== ritual
+    && hasCap(c, 'is-spell-cost-reducer')
+    && spellCostReducerApplies(c, copySpell)
+    && maxCapNumber(c, 'spell-cost-reduction') > 0);
+  const spellcastManaPayoff = find(cards, c => c !== copySpell && c !== ritual
+    && hasCap(c, 'is-spellcast-mana-payoff'));
+  const supportMana = spellcastManaPayoff ? manaProductionProfileFromCaps(spellcastManaPayoff, 'spellcast-mana') : null;
+  const availableMana = supportMana ? addManaProfiles(ritualMana, supportMana) : ritualMana;
+  const unreducedCost = manaCostProfileFromCaps(copySpell, 'buyback-copy');
+  const reduction = reducer ? maxCapNumber(reducer, 'spell-cost-reduction') : 0;
+  const copyCost = reduceGenericCost(unreducedCost, reduction);
+  if (!canPayRecursiveCost(copyCost, availableMana)) {
+    return failure(
+      'proof:buyback-copy-ritual-cost:' + sorted([copySpell.id, ritual.id, reducer?.id, spellcastManaPayoff?.id]).join('|'),
+      uniqueCards([copySpell, ritual, reducer, spellcastManaPayoff]),
+      'copied ritual mana plus local support cannot pay the buyback spell-copy cost',
+      { ritualMana, supportMana, unreducedCost, reduction, copyCost, availableMana },
+    );
+  }
+  const netMana = availableMana.total - copyCost.total;
+  const proofCards = uniqueCards([copySpell, ritual, reducer, spellcastManaPayoff]);
+  return success('proof:buyback-copy-ritual:' + sorted(proofCards.map(card => card.id)).join('|'), 'buyback-copy-ritual-loop', proofCards, {
+    requiredFacts: [
+      fact(copySpell, 'is-buyback-spell-copy'),
+      fact(copySpell, 'buyback-copy-cost'),
+      fact(ritual, 'is-ritual-mana-spell'),
+      fact(ritual, 'ritual-spell-mana-produced'),
+      ...(reducer ? [fact(reducer, 'is-spell-cost-reducer'), fact(reducer, 'spell-cost-reduction')] : []),
+      ...(spellcastManaPayoff ? [fact(spellcastManaPayoff, 'is-spellcast-mana-payoff'), fact(spellcastManaPayoff, 'spellcast-mana-produced')] : []),
+    ],
+    steps: [
+      { card: ritual.id, action: 'keep a mana-producing instant/sorcery spell on the stack as the legal copy target' },
+      { card: copySpell.id, action: 'cast the spell-copy card with buyback targeting that ritual', cost: { mana: copyCost.total, colors: copyCost.colors, colorless: copyCost.colorless } },
+      ...(reducer ? [{ card: reducer.id, action: 'reduce the generic portion of the buyback spell-copy cost', delta: { manaCostReduction: reduction } }] : []),
+      ...(spellcastManaPayoff ? [{ card: spellcastManaPayoff.id, action: 'spell-cast trigger produces mana for the next iteration', delta: { mana: supportMana.total } }] : []),
+      { card: ritual.id, action: 'the copied ritual resolves and produces mana for the next buyback copy', delta: { mana: ritualMana.total } },
+      { card: copySpell.id, action: 'buyback returns the spell-copy card to hand, restoring the loop state' },
+    ],
+    assumptions: ['an original ritual spell is on the stack and remains a legal target while the copied rituals resolve', 'the spell-copy card is cast with buyback each iteration'],
+    repeatability: { status: netMana > 0 ? 'repeatable-positive-mana' : 'repeatable-break-even', reason: 'copied ritual mana plus local support covers the buyback spell-copy cost and returns the copy spell to hand' },
+  }, [
+    { resource: 'casts', min: 1, max: Infinity },
+    { resource: 'storm', min: 1, max: Infinity },
+    ...(netMana > 0 ? [{ resource: 'mana', min: netMana, max: netMana }] : []),
   ]);
 }
 
@@ -936,6 +1533,86 @@ function proveLifePaidTreasureRecursiveDrain(cards) {
   return failures[0] || null;
 }
 
+function proveEscapeWheelManaLoop(cards) {
+  const escapeEnabler = find(cards, c => hasCap(c, 'is-graveyard-escape-enabler'));
+  const manaSource = find(cards, c => c !== escapeEnabler && hasCap(c, 'is-discard-hand-sac-mana-source'));
+  const wheel = find(cards, c => c !== escapeEnabler && c !== manaSource && hasCap(c, 'is-wheel-draw-discard-spell'));
+  if (!escapeEnabler || !manaSource || !wheel) {
+    if (escapeEnabler || manaSource || wheel) {
+      return failure(
+        'proof:escape-wheel-mana-missing-role:' + sorted(cards.map(c => c.id)).join('|'),
+        cards,
+        'escape wheel loop needs a graveyard escape enabler, a discard-hand sacrifice mana source, and an instant/sorcery wheel',
+        {
+          hasEscapeEnabler: Boolean(escapeEnabler),
+          hasDiscardHandSacMana: Boolean(manaSource),
+          hasWheel: Boolean(wheel),
+        },
+      );
+    }
+    return null;
+  }
+
+  const mana = manaProductionProfileFromCaps(manaSource, 'discard-hand-sac-mana');
+  const manaSourceCost = manaCostProfileFromCaps(manaSource, 'discard-hand-sac-source');
+  const wheelCost = manaCostProfileFromCaps(wheel, 'wheel-spell');
+  const escapeFuel = Math.max(1, maxCapNumber(escapeEnabler, 'graveyard-escape-extra-card-cost'));
+  const drawCount = maxCapNumber(wheel, 'wheel-draw-count');
+  const totalCastCost = addCostProfiles(manaSourceCost, wheelCost);
+  if (!canPayRecursiveCost(totalCastCost, mana)) {
+    return failure(
+      'proof:escape-wheel-mana-cost:' + sorted([escapeEnabler.id, manaSource.id, wheel.id]).join('|'),
+      [escapeEnabler, manaSource, wheel],
+      'discard-hand sacrifice mana cannot pay the escaped mana source plus wheel costs',
+      { produced: mana, manaSourceCost, wheelCost, totalCastCost },
+    );
+  }
+  const requiredFuel = escapeFuel * 2;
+  if (drawCount <= requiredFuel) {
+    return failure(
+      'proof:escape-wheel-mana-fuel:' + sorted([escapeEnabler.id, manaSource.id, wheel.id]).join('|'),
+      [escapeEnabler, manaSource, wheel],
+      'wheel draw count does not replenish enough graveyard fuel to escape both recurring cards',
+      { drawCount, escapeFuel, requiredFuel },
+    );
+  }
+
+  const proofCards = [escapeEnabler, manaSource, wheel];
+  const netMana = mana.total - totalCastCost.total;
+  return success('proof:escape-wheel-mana:' + sorted(proofCards.map(card => card.id)).join('|'), 'escape-wheel-mana-loop', proofCards, {
+    requiredFacts: [
+      fact(escapeEnabler, 'is-graveyard-escape-enabler'),
+      fact(escapeEnabler, 'graveyard-escape-extra-card-cost'),
+      fact(manaSource, 'is-discard-hand-sac-mana-source'),
+      fact(manaSource, 'discard-hand-sac-mana-produced'),
+      fact(manaSource, 'discard-hand-sac-source-cost'),
+      fact(wheel, 'is-wheel-draw-discard-spell'),
+      fact(wheel, 'wheel-draw-count'),
+      fact(wheel, 'wheel-spell-cost'),
+    ],
+    steps: [
+      { card: manaSource.id, action: 'escape and sacrifice the hand-discard mana source', delta: { mana: mana.total, selfDiscard: 1 } },
+      { card: wheel.id, action: 'spend that mana to escape the instant/sorcery wheel', cost: { mana: wheelCost.total, colors: wheelCost.colors, colorless: wheelCost.colorless } },
+      { card: wheel.id, action: 'the wheel discards and draws enough cards to refill graveyard escape fuel', delta: { cards: drawCount, selfDiscard: 1 } },
+      { card: escapeEnabler.id, action: 'escape permission remains available for the same nonland cards in the graveyard' },
+      { action: 'the mana source and wheel return to the graveyard after use, and the abstract state repeats with fresh fuel' },
+    ],
+    assumptions: [
+      'the loop has enough initial nonland graveyard cards to pay the first escape costs',
+      'cards drawn by the wheel are legal nonland escape fuel when discarded by the next mana-source activation',
+      'the discard-hand sacrifice mana ability can be activated at a timing point that supplies mana for the wheel cast',
+    ],
+    repeatability: { status: netMana > 0 ? 'repeatable-positive-mana' : 'repeatable-break-even', reason: 'wheel draw count replenishes escape fuel and the local mana source pays the repeated escape costs' },
+  }, [
+    { resource: 'casts', min: 2, max: Infinity },
+    { resource: 'storm', min: 2, max: Infinity },
+    { resource: 'cards', min: drawCount, max: Infinity },
+    { resource: 'loots', min: drawCount, max: Infinity },
+    { resource: 'selfDiscards', min: 1, max: Infinity },
+    ...(netMana > 0 ? [{ resource: 'mana', min: netMana, max: netMana }] : []),
+  ]);
+}
+
 function proveExileRecastCreatureMana(cards) {
   const outlet = find(cards, c => hasCap(c, 'is-creature-exile-cast-mana-outlet'));
   const body = find(cards, c => c !== outlet && hasCap(c, 'is-recursive-exile-cast-body') && MODEL.faceCompatibleCaps(c, ['is-creature-permanent', 'is-recursive-exile-cast-body']));
@@ -1092,6 +1769,60 @@ function proveTokenReplacementSacrificeMana(cards) {
   return failures[0] || null;
 }
 
+function proveKodamaBounceLandLandfallLoop(cards) {
+  const dropper = find(cards, c => hasCap(c, 'is-permanent-etb-hand-dropper'));
+  const bounceLand = find(cards, c => c !== dropper && hasCap(c, 'is-self-bounce-land'));
+  const payoff = find(cards, c => c !== dropper && c !== bounceLand && hasCap(c, 'is-landfall-payoff'));
+  if (!dropper || !bounceLand || !payoff) {
+    if (dropper || bounceLand || payoff) {
+      return failure(
+        'proof:kodama-bounce-land-landfall-missing-role:' + sorted(cards.map(c => c.id)).join('|'),
+        cards,
+        'landfall bounce loop needs a permanent-ETB hand-dropper, a self-bounce land, and a landfall payoff',
+        { hasDropper: Boolean(dropper), hasBounceLand: Boolean(bounceLand), hasPayoff: Boolean(payoff) },
+      );
+    }
+    return null;
+  }
+  if (!/\bland\b/i.test(bounceLand.type || bounceLand.type_line || '')) {
+    return failure(
+      'proof:kodama-bounce-land-landfall-not-land:' + sorted([dropper.id, bounceLand.id, payoff.id]).join('|'),
+      [dropper, bounceLand, payoff],
+      'self-bounce loop piece must be a land permanent',
+      { type: bounceLand.type || bounceLand.type_line },
+    );
+  }
+  const landfallMana = landfallManaProfile(payoff);
+  const tokenMana = landfallTokenManaProfile(payoff);
+  const totalMana = addManaProfiles(landfallMana, tokenMana);
+  const deltas = [
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'ltbTriggers', min: 1, max: Infinity },
+    { resource: 'landfallTriggers', min: 1, max: Infinity },
+  ];
+  if (hasCap(payoff, 'is-landfall-token-payoff')) deltas.push({ resource: 'tokens', min: 1, max: Infinity });
+  if (totalMana.total > 0) deltas.push({ resource: 'mana', min: totalMana.total, max: Infinity });
+  return success('proof:kodama-bounce-land-landfall:' + sorted([dropper.id, bounceLand.id, payoff.id]).join('|'), 'kodama-bounce-land-landfall-loop', [dropper, bounceLand, payoff], {
+    requiredFacts: [
+      fact(dropper, 'is-permanent-etb-hand-dropper'),
+      fact(bounceLand, 'is-self-bounce-land'),
+      fact(payoff, 'is-landfall-payoff'),
+      ...(hasCap(payoff, 'is-landfall-token-payoff') ? [fact(payoff, 'is-landfall-token-payoff')] : []),
+      ...(hasCap(payoff, 'is-landfall-mana-payoff') ? [fact(payoff, 'is-landfall-mana-payoff'), fact(payoff, 'landfall-mana-produced')] : []),
+      ...(hasCap(payoff, 'is-landfall-treasure-payoff') ? [fact(payoff, 'is-landfall-treasure-payoff'), fact(payoff, 'landfall-token-mana-produced')] : []),
+    ],
+    steps: [
+      { card: bounceLand.id, action: 'the land enters, creating landfall and permanent-ETB triggers' },
+      { card: bounceLand.id, action: 'its ETB trigger returns a land you control, choosing itself', delta: { ltb: 1 } },
+      { card: dropper.id, action: 'the permanent-ETB trigger puts the same zero-mana land card from hand back onto the battlefield' },
+      { card: payoff.id, action: 'the repeated land entry fires the landfall payoff', delta: { landfall: 1, tokens: hasCap(payoff, 'is-landfall-token-payoff') ? 1 : 0, mana: totalMana.total } },
+      { action: 'the same bounce land is back on the battlefield and can return itself again, restoring the loop state' },
+    ],
+    assumptions: ['the self-bounce land can choose itself for its return trigger', 'the hand-dropper permission can put the zero-mana land card returned to hand onto the battlefield'],
+    repeatability: { status: 'repeatable-candidate', reason: 'each bounce-land ETB returns itself and the hand-dropper puts it back, recreating landfall' },
+  }, deltas);
+}
+
 function proveAristocrats(cards) {
   const outlet = find(cards, c => hasCap(c, 'is-sac-outlet'));
   const payoff = find(cards, c => ['is-death-drain-payoff', 'is-death-draw-payoff', 'is-death-token-payoff'].some(cap => hasCap(c, cap)));
@@ -1237,35 +1968,58 @@ function proveCombatCopyTokenExtraCombatLoop(cards) {
   const copier = find(cards, c => hasCap(c, 'is-combat-copy-token-equipment'));
   const attacker = find(cards, c => c !== copier && hasCap(c, 'is-attack-extra-combat-source'));
   if (!copier || !attacker) return null;
-  if (!MODEL.faceCompatibleCaps(attacker, ['is-creature-permanent', 'is-attack-extra-combat-source'])) {
+  if (!canPrecombatCopyTarget(copier, attacker, ['is-attack-extra-combat-source'])) {
     return failure(
       'proof:combat-copy-extra-combat-target-illegal:' + sorted([copier.id, attacker.id]).join('|'),
       [copier, attacker],
-      'combat-copy equipment cannot copy a noncreature extra-combat source',
-      { targetIsCreature: /\bcreature\b/i.test(attacker.type || attacker.type_line || '') },
+      'combat-copy equipment cannot legally create a surviving fresh token copy of the extra-combat source',
+      {
+        targetIsCreature: isCreaturePermanent(attacker),
+        targetIsLegendary: isLegendaryPermanent(attacker),
+        tokenNonlegendary: hasCap(copier, 'precombat-copy-token-nonlegendary') || hasCap(copier, 'combat-copy-token-nonlegendary'),
+      },
     );
   }
   if (!hasCap(copier, 'combat-copy-token-haste')
       || !hasCap(copier, 'combat-copy-token-nonlegendary')
-      || !hasCap(attacker, 'extra-combat-repeatable-with-fresh-token')) {
+      || !hasCap(copier, 'precombat-copy-created-before-attack')
+      || !hasCap(copier, 'precombat-copy-repeatable-each-combat')
+      || !hasCap(attacker, 'extra-combat-repeatable-with-fresh-token')
+      || !hasCap(attacker, 'fresh-token-unused-attack-trigger')
+      || !hasCap(attacker, 'attack-trigger-can-be-declared')) {
     return failure(
       'proof:combat-copy-extra-combat-not-repeatable:' + sorted([copier.id, attacker.id]).join('|'),
       [copier, attacker],
-      'combat-copy token lacks haste/nonlegendary freshness needed to repeat the extra-combat trigger',
+      'combat-copy token lacks strict timing/haste/nonlegendary/unused-trigger freshness needed to repeat the extra-combat trigger',
       {
         hastyToken: hasCap(copier, 'combat-copy-token-haste'),
         nonlegendaryToken: hasCap(copier, 'combat-copy-token-nonlegendary'),
+        createdBeforeAttack: hasCap(copier, 'precombat-copy-created-before-attack'),
+        repeatsEachCombat: hasCap(copier, 'precombat-copy-repeatable-each-combat'),
         freshTokenRepeats: hasCap(attacker, 'extra-combat-repeatable-with-fresh-token'),
+        unusedAttackTrigger: hasCap(attacker, 'fresh-token-unused-attack-trigger'),
+        attackCanBeDeclared: hasCap(attacker, 'attack-trigger-can-be-declared'),
       },
     );
   }
   return success('proof:combat-copy-extra-combat:' + sorted([copier.id, attacker.id]).join('|'), 'combat-copy-token→extra-combat-loop', [copier, attacker], {
     requiredFacts: [
       fact(copier, 'is-combat-copy-token-equipment'),
+      fact(copier, 'is-precombat-hasty-creature-copy-source'),
+      fact(copier, 'precombat-copy-created-before-attack'),
+      fact(copier, 'precombat-copy-repeatable-each-combat'),
       fact(copier, 'combat-copy-token-haste'),
       fact(copier, 'combat-copy-token-nonlegendary'),
+      fact(copier, 'precombat-copy-token-has-haste'),
+      fact(copier, 'precombat-copy-token-nonlegendary'),
       fact(attacker, 'is-attack-extra-combat-source'),
       fact(attacker, 'is-creature-permanent'),
+      fact(attacker, 'extra-combat-repeatable-with-fresh-token'),
+      fact(attacker, 'fresh-token-unused-attack-trigger'),
+      fact(attacker, 'attack-trigger-can-be-declared'),
+      fact(attacker, 'attack-extra-combat-adds-combat'),
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-can-be-declared-attacker' },
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-unused-attack-trigger-at-loop-entry' },
     ],
     steps: [
       { card: copier.id, action: 'at the beginning of combat, create a hasty nonlegendary token copy of the extra-combat attacker' },
@@ -1273,12 +2027,674 @@ function proveCombatCopyTokenExtraCombatLoop(cards) {
       { action: 'the next combat phase begins and the equipment creates another fresh attacking token copy' },
     ],
     assumptions: ['the Equipment is attached to the extra-combat creature before the loop starts'],
-    repeatability: { status: 'repeatable-candidate', reason: 'each additional combat creates a fresh hasty token with an unused extra-combat attack trigger' },
+    limitingClauses: ['tokens put onto the battlefield tapped and attacking are not accepted as attack-trigger proof for this family'],
+    repeatability: { status: 'repeatable-combat-fresh-token', reason: 'each additional combat creates a fresh hasty token before attackers with an unused extra-combat attack trigger' },
   }, [
     { resource: 'tokens', min: 1, max: Infinity },
     { resource: 'etbTriggers', min: 1, max: Infinity },
     { resource: 'combatPhases', min: 1, max: Infinity },
   ]);
+}
+
+function provePrecombatCopyAttackExtraCombatPair(copier, attacker) {
+  if (!canPrecombatCopyTarget(copier, attacker, ['is-attack-extra-combat-source'])) {
+    return failure(
+      'proof:precombat-copy-attack-extra-combat-target-illegal:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'precombat copy source cannot legally create a surviving fresh token copy of the attack-trigger extra-combat source',
+      {
+        targetIsCreature: isCreaturePermanent(attacker),
+        targetIsLegendary: isLegendaryPermanent(attacker),
+        tokenNonlegendary: hasCap(copier, 'precombat-copy-token-nonlegendary'),
+      },
+    );
+  }
+  const ok = hasCap(copier, 'precombat-copy-token-has-haste')
+    && hasCap(copier, 'precombat-copy-created-before-attack')
+    && hasCap(copier, 'precombat-copy-repeatable-each-combat')
+    && hasCap(attacker, 'extra-combat-repeatable-with-fresh-token')
+    && hasCap(attacker, 'fresh-token-unused-attack-trigger')
+    && hasCap(attacker, 'attack-trigger-can-be-declared')
+    && hasCap(attacker, 'attack-extra-combat-adds-combat');
+  if (!ok) {
+    return failure(
+      'proof:precombat-copy-attack-extra-combat-not-repeatable:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'attack-trigger extra-combat proof requires pre-attack hasty token timing, repeatable combat copy, and an unused fresh-token attack trigger',
+      {
+        hastyToken: hasCap(copier, 'precombat-copy-token-has-haste'),
+        createdBeforeAttack: hasCap(copier, 'precombat-copy-created-before-attack'),
+        repeatsEachCombat: hasCap(copier, 'precombat-copy-repeatable-each-combat'),
+        freshTokenRepeats: hasCap(attacker, 'extra-combat-repeatable-with-fresh-token'),
+        unusedAttackTrigger: hasCap(attacker, 'fresh-token-unused-attack-trigger'),
+        attackCanBeDeclared: hasCap(attacker, 'attack-trigger-can-be-declared'),
+        addsCombat: hasCap(attacker, 'attack-extra-combat-adds-combat'),
+      },
+    );
+  }
+  return success('proof:precombat-copy-attack-extra-combat:' + sorted([copier.id, attacker.id]).join('|'), 'combat-copy-token→extra-combat-loop', [copier, attacker], {
+    requiredFacts: [
+      fact(copier, 'is-precombat-hasty-creature-copy-source'),
+      fact(copier, 'precombat-copy-target-creature'),
+      fact(copier, 'precombat-copy-token-has-haste'),
+      fact(copier, 'precombat-copy-created-before-attack'),
+      fact(copier, 'precombat-copy-repeatable-each-combat'),
+      { card: copier.id, kind: 'precondition', predicate: 'copy-token-legend-safe' },
+      fact(attacker, 'is-attack-extra-combat-source'),
+      fact(attacker, 'is-creature-permanent'),
+      fact(attacker, 'extra-combat-repeatable-with-fresh-token'),
+      fact(attacker, 'fresh-token-unused-attack-trigger'),
+      fact(attacker, 'attack-trigger-can-be-declared'),
+      fact(attacker, 'attack-extra-combat-adds-combat'),
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-can-be-declared-attacker' },
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-unused-attack-trigger-at-loop-entry' },
+    ],
+    steps: [
+      { card: copier.id, action: 'at the beginning of combat, create a hasty token copy of the attack-trigger extra-combat attacker before attackers are declared' },
+      { card: attacker.id, action: 'the fresh token attacks with an unused attack trigger and creates an additional combat phase' },
+      { action: 'the next combat reaches another beginning-of-combat trigger and creates a new fresh hasty token copy' },
+    ],
+    assumptions: ['the precombat copy source is attached to or can legally target the attack-trigger creature before the loop starts'],
+    limitingClauses: ['tapped-and-attacking, random, optional-payment, first-combat-only, and legend-unsafe sources are not accepted'],
+    repeatability: { status: 'repeatable-combat-fresh-token', reason: 'each combat creates a fresh hasty token before attackers with an unused extra-combat attack trigger' },
+  }, [
+    { resource: 'tokens', min: 1, max: Infinity },
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'combatPhases', min: 1, max: Infinity },
+  ]);
+}
+
+function provePrecombatCopyConnectExtraCombatPair(copier, attacker) {
+  if (!canPrecombatCopyTarget(copier, attacker, ['is-combat-damage-extra-combat-source'])) {
+    return failure(
+      'proof:combat-copy-connect-extra-combat-target-illegal:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'precombat copy source cannot legally create a surviving fresh token copy of the connect-trigger extra-combat source',
+      {
+        targetIsCreature: isCreaturePermanent(attacker),
+        targetIsLegendary: isLegendaryPermanent(attacker),
+        tokenNonlegendary: hasCap(copier, 'precombat-copy-token-nonlegendary'),
+      },
+    );
+  }
+  const ok = hasCap(copier, 'precombat-copy-token-has-haste')
+    && hasCap(copier, 'precombat-copy-created-before-attack')
+    && hasCap(copier, 'precombat-copy-repeatable-each-combat')
+    && hasCap(attacker, 'combat-damage-extra-combat-requires-connect')
+    && hasCap(attacker, 'fresh-token-unused-combat-damage-trigger')
+    && hasCap(attacker, 'combat-damage-extra-combat-adds-combat')
+    && !hasCap(attacker, 'combat-damage-extra-combat-restricts-next-combat-attackers');
+  if (!ok) {
+    return failure(
+      'proof:combat-copy-connect-extra-combat-not-repeatable:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'connect-trigger extra-combat proof requires pre-attack hasty token timing, repeatable combat copy, player connection, and no next-combat attacker restriction',
+      {
+        hastyToken: hasCap(copier, 'precombat-copy-token-has-haste'),
+        createdBeforeAttack: hasCap(copier, 'precombat-copy-created-before-attack'),
+        repeatsEachCombat: hasCap(copier, 'precombat-copy-repeatable-each-combat'),
+        requiresConnect: hasCap(attacker, 'combat-damage-extra-combat-requires-connect'),
+        unusedConnectTrigger: hasCap(attacker, 'fresh-token-unused-combat-damage-trigger'),
+        addsCombat: hasCap(attacker, 'combat-damage-extra-combat-adds-combat'),
+        restrictsNextCombat: hasCap(attacker, 'combat-damage-extra-combat-restricts-next-combat-attackers'),
+      },
+    );
+  }
+  return success('proof:combat-copy-connect-extra-combat:' + sorted([copier.id, attacker.id]).join('|'), 'combat-copy-token→connect-extra-combat-loop', [copier, attacker], {
+    requiredFacts: [
+      fact(copier, 'is-precombat-hasty-creature-copy-source'),
+      fact(copier, 'precombat-copy-target-creature'),
+      fact(copier, 'precombat-copy-token-has-haste'),
+      fact(copier, 'precombat-copy-created-before-attack'),
+      fact(copier, 'precombat-copy-repeatable-each-combat'),
+      ...(hasCap(copier, 'precombat-copy-token-nonlegendary') ? [fact(copier, 'precombat-copy-token-nonlegendary')] : [fact(attacker, 'is-nonlegendary-permanent')]),
+      fact(attacker, 'is-combat-damage-extra-combat-source'),
+      fact(attacker, 'is-creature-permanent'),
+      fact(attacker, 'combat-damage-extra-combat-requires-connect'),
+      fact(attacker, 'fresh-token-unused-combat-damage-trigger'),
+      fact(attacker, 'combat-damage-extra-combat-adds-combat'),
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-can-be-declared-attacker' },
+      { card: attacker.id, kind: 'precondition', predicate: 'combat-damage-connects' },
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-combat-damage-trigger-unused-at-loop-entry' },
+    ],
+    steps: [
+      { card: copier.id, action: 'at the beginning of combat, create a hasty token copy of the connect-trigger extra-combat attacker before attackers are declared' },
+      { card: attacker.id, action: 'the fresh token attacks and deals combat damage to a player', delta: { combatDamageConnection: 1 } },
+      { card: attacker.id, action: 'the connect trigger creates an additional combat phase', delta: { combatPhases: 1 } },
+      { action: 'the next combat reaches another beginning-of-combat trigger and creates a new fresh hasty token copy' },
+    ],
+    assumptions: ['the copy source is attached to or can legally target the connect-trigger creature before the loop starts', 'the fresh token connects with a player each combat'],
+    limitingClauses: ['evasion/blocker state is not inferred; connection is an explicit precondition', 'tapped-and-attacking, random, optional-payment, and next-combat-restricted sources are not accepted'],
+    repeatability: { status: 'repeatable-combat-connect-fresh-token', reason: 'each combat creates a fresh hasty token before attackers, that token connects to add the next combat, and the copy source repeats at the next beginning of combat' },
+  }, [
+    { resource: 'tokens', min: 1, max: Infinity },
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'combatPhases', min: 1, max: Infinity },
+  ]);
+}
+
+function proveHastyCopyExtraCombatPair(copier, attacker, connect = false) {
+  const family = connect ? 'hasty-copy→connect-extra-combat-loop' : 'hasty-copy→attack-extra-combat-loop';
+  const extraCap = connect ? 'is-combat-damage-extra-combat-source' : 'is-attack-extra-combat-source';
+  if (!canHastyCopyTarget(copier, attacker, [extraCap])) {
+    return failure(
+      'proof:hasty-copy-extra-combat-target-illegal:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'repeatable hasty creature-copy target restrictions or legend-rule survival cannot copy the extra-combat attacker',
+      {
+        targetIsCreature: isCreaturePermanent(attacker),
+        targetIsLegendary: isLegendaryPermanent(attacker),
+        requiresNonlegendary: hasCap(copier, 'hasty-copy-target-requires-nonlegendary'),
+        connect,
+      },
+    );
+  }
+  const ok = activeCopyWindowSafe(copier)
+    && hasCap(copier, 'hasty-copy-token-has-haste')
+    && (!hasCap(copier, 'hasty-copy-activation-taps-source') || extraCombatTriggerUntapsCopySource(attacker, copier, connect, ['is-repeatable-hasty-creature-copy']))
+    && (connect
+      ? hasCap(attacker, 'combat-damage-extra-combat-requires-connect') && hasCap(attacker, 'fresh-token-unused-combat-damage-trigger') && hasCap(attacker, 'combat-damage-extra-combat-adds-combat') && !hasCap(attacker, 'combat-damage-extra-combat-restricts-next-combat-attackers')
+      : hasCap(attacker, 'extra-combat-repeatable-with-fresh-token') && hasCap(attacker, 'fresh-token-unused-attack-trigger') && hasCap(attacker, 'attack-trigger-can-be-declared'));
+  if (!ok) {
+    return failure(
+      'proof:hasty-copy-extra-combat-not-repeatable:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'activated hasty copy source is not reset/timed safely for a fresh-token extra-combat loop',
+      {
+        activeCopyWindowSafe: activeCopyWindowSafe(copier),
+        hastyToken: hasCap(copier, 'hasty-copy-token-has-haste'),
+        tapsSource: hasCap(copier, 'hasty-copy-activation-taps-source'),
+        sourceUntappedByTrigger: extraCombatTriggerUntapsCopySource(attacker, copier, connect, ['is-repeatable-hasty-creature-copy']),
+        connect,
+      },
+    );
+  }
+  return success('proof:hasty-copy-extra-combat:' + sorted([copier.id, attacker.id]).join('|'), family, [copier, attacker], {
+    requiredFacts: [
+      fact(copier, 'is-repeatable-hasty-creature-copy'),
+      fact(copier, 'hasty-copy-target-creature'),
+      fact(copier, 'hasty-copy-token-has-haste'),
+      ...(hasCap(copier, 'hasty-copy-target-requires-nonlegendary') ? [fact(copier, 'hasty-copy-target-requires-nonlegendary'), fact(attacker, 'is-nonlegendary-permanent')] : []),
+      ...(hasCap(copier, 'hasty-copy-activation-taps-source') ? [fact(copier, 'hasty-copy-activation-taps-source')] : []),
+      { card: copier.id, kind: 'precondition', predicate: 'copy-activation-window-before-declare-attackers' },
+      { card: attacker.id, kind: 'precondition', predicate: 'copy-source-reset-by-extra-combat-trigger' },
+      fact(attacker, extraCap),
+      fact(attacker, 'is-creature-permanent'),
+      ...(connect ? [
+        fact(attacker, 'combat-damage-extra-combat-requires-connect'),
+        fact(attacker, 'fresh-token-unused-combat-damage-trigger'),
+        fact(attacker, 'combat-damage-extra-combat-adds-combat'),
+        { card: attacker.id, kind: 'precondition', predicate: 'combat-damage-connects' },
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-combat-damage-trigger-unused-at-loop-entry' },
+      ] : [
+        fact(attacker, 'extra-combat-repeatable-with-fresh-token'),
+        fact(attacker, 'fresh-token-unused-attack-trigger'),
+        fact(attacker, 'attack-trigger-can-be-declared'),
+        fact(attacker, 'attack-extra-combat-adds-combat'),
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-unused-attack-trigger-at-loop-entry' },
+      ]),
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-can-be-declared-attacker' },
+    ],
+    steps: [
+      { card: copier.id, action: 'activate the repeatable copy source before declare attackers to create a hasty fresh token of the extra-combat attacker' },
+      connect
+        ? { card: attacker.id, action: 'the fresh token attacks, connects with a player, and creates an additional combat phase' }
+        : { card: attacker.id, action: 'the fresh token attacks with an unused attack trigger and creates an additional combat phase' },
+      { card: attacker.id, action: 'the extra-combat trigger untaps/resets the copy source for the next combat' },
+      { action: 'the next combat repeats from the same copy-source state with a new fresh token' },
+    ],
+    assumptions: [
+      'the repeatable copy source starts untapped and can legally target the extra-combat creature',
+      connect ? 'the fresh token connects with a player each combat' : 'the fresh token is declared as an attacker each combat',
+    ],
+    limitingClauses: [
+      'sorcery-speed copy sources, random copies, and tapped-and-attacking token copies are not accepted',
+      connect ? 'evasion/blocker state is not inferred; connection is an explicit precondition' : 'the attack trigger must be unused on each fresh token object',
+    ],
+    repeatability: { status: connect ? 'repeatable-combat-connect-hasty-copy' : 'repeatable-combat-hasty-copy', reason: 'the hasty copy source creates a fresh attacking token each combat and is reset by the extra-combat trigger' },
+  }, [
+    { resource: 'tokens', min: 1, max: Infinity },
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'combatPhases', min: 1, max: Infinity },
+  ]);
+}
+
+function proveAttachedSelfCopyExtraCombatPair(copySource, attacker, connect = false) {
+  const family = connect ? 'hasty-copy→connect-extra-combat-loop' : 'hasty-copy→attack-extra-combat-loop';
+  const extraCap = connect ? 'is-combat-damage-extra-combat-source' : 'is-attack-extra-combat-source';
+  if (!canAttachedSelfCopyTarget(copySource, attacker, [extraCap])) {
+    return failure(
+      'proof:attached-copy-extra-combat-target-illegal:' + sorted([copySource.id, attacker.id]).join('|'),
+      [copySource, attacker],
+      'attached self-copy source requires a nonlegendary creature extra-combat source to avoid legend-rule failure',
+      { targetIsCreature: isCreaturePermanent(attacker), targetIsLegendary: isLegendaryPermanent(attacker), connect },
+    );
+  }
+  const ok = attachedCopyWindowSafe(copySource)
+    && hasCap(copySource, 'attached-copy-token-has-haste')
+    && (!hasCap(copySource, 'attached-copy-activation-taps-enchanted-creature') || extraCombatTriggerUntapsCopySource(attacker, attacker, connect, [extraCap]))
+    && (connect
+      ? hasCap(attacker, 'combat-damage-extra-combat-requires-connect') && hasCap(attacker, 'fresh-token-unused-combat-damage-trigger') && hasCap(attacker, 'combat-damage-extra-combat-adds-combat') && !hasCap(attacker, 'combat-damage-extra-combat-restricts-next-combat-attackers')
+      : hasCap(attacker, 'extra-combat-repeatable-with-fresh-token') && hasCap(attacker, 'fresh-token-unused-attack-trigger') && hasCap(attacker, 'attack-trigger-can-be-declared'));
+  if (!ok) {
+    return failure(
+      'proof:attached-copy-extra-combat-not-repeatable:' + sorted([copySource.id, attacker.id]).join('|'),
+      [copySource, attacker],
+      'attached self-copy source is not reset/timed safely for a fresh-token extra-combat loop',
+      {
+        attachedCopyWindowSafe: attachedCopyWindowSafe(copySource),
+        hastyToken: hasCap(copySource, 'attached-copy-token-has-haste'),
+        tapsEnchantedCreature: hasCap(copySource, 'attached-copy-activation-taps-enchanted-creature'),
+        sourceUntappedByTrigger: extraCombatTriggerUntapsCopySource(attacker, attacker, connect, [extraCap]),
+        connect,
+      },
+    );
+  }
+  return success('proof:attached-copy-extra-combat:' + sorted([copySource.id, attacker.id]).join('|'), family, [copySource, attacker], {
+    requiredFacts: [
+      fact(copySource, 'is-attached-self-hasty-creature-copy'),
+      fact(copySource, 'attached-copy-target-creature'),
+      fact(copySource, 'attached-copy-token-has-haste'),
+      fact(copySource, 'attached-copy-activation-taps-enchanted-creature'),
+      fact(attacker, 'is-nonlegendary-permanent'),
+      fact(attacker, extraCap),
+      fact(attacker, 'is-creature-permanent'),
+      { card: copySource.id, kind: 'precondition', predicate: 'copy-aura-attached-to-extra-combat-source-at-loop-entry' },
+      { card: copySource.id, kind: 'precondition', predicate: 'copy-activation-window-before-declare-attackers' },
+      { card: attacker.id, kind: 'precondition', predicate: 'copy-source-reset-by-extra-combat-trigger' },
+      ...(connect ? [
+        fact(attacker, 'combat-damage-extra-combat-requires-connect'),
+        fact(attacker, 'fresh-token-unused-combat-damage-trigger'),
+        fact(attacker, 'combat-damage-extra-combat-adds-combat'),
+        { card: attacker.id, kind: 'precondition', predicate: 'combat-damage-connects' },
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-combat-damage-trigger-unused-at-loop-entry' },
+      ] : [
+        fact(attacker, 'extra-combat-repeatable-with-fresh-token'),
+        fact(attacker, 'fresh-token-unused-attack-trigger'),
+        fact(attacker, 'attack-trigger-can-be-declared'),
+        fact(attacker, 'attack-extra-combat-adds-combat'),
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-unused-attack-trigger-at-loop-entry' },
+      ]),
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-can-be-declared-attacker' },
+    ],
+    steps: [
+      { card: copySource.id, action: 'the attached Aura grants the enchanted extra-combat source a tap ability that creates a hasty token copy before declare attackers' },
+      connect
+        ? { card: attacker.id, action: 'the fresh token attacks, connects with a player, and creates an additional combat phase' }
+        : { card: attacker.id, action: 'the fresh token attacks with an unused attack trigger and creates an additional combat phase' },
+      { card: attacker.id, action: 'the extra-combat trigger untaps/resets the enchanted original for the next combat' },
+      { action: 'the next combat repeats from the same attached-copy state with a new fresh token' },
+    ],
+    assumptions: [
+      'the Aura is attached to the nonlegendary extra-combat source before the loop starts',
+      connect ? 'the fresh token connects with a player each combat' : 'the fresh token is declared as an attacker each combat',
+    ],
+    limitingClauses: [
+      'legendary targets, sorcery-speed copy windows, random copies, and tapped-and-attacking token copies are not accepted',
+      connect ? 'evasion/blocker state is not inferred; connection is an explicit precondition' : 'the attack trigger must be unused on each fresh token object',
+    ],
+    repeatability: { status: connect ? 'repeatable-combat-connect-attached-copy' : 'repeatable-combat-attached-copy', reason: 'the attached copy ability creates a fresh hasty token each combat and the trigger resets the enchanted original' },
+  }, [
+    { resource: 'tokens', min: 1, max: Infinity },
+    { resource: 'etbTriggers', min: 1, max: Infinity },
+    { resource: 'combatPhases', min: 1, max: Infinity },
+  ]);
+}
+
+function extraTurnTriggerReady(attacker, connect = false) {
+  if (!hasCap(attacker, 'extra-turn-repeatable-with-fresh-token')) return false;
+  if (hasCap(attacker, 'extra-turn-source-cannot-attack-extra-turns')) return false;
+  if (hasCap(attacker, 'extra-turn-source-requires-optional-payment')) return false;
+  if (connect) {
+    return hasCap(attacker, 'is-combat-damage-extra-turn-source')
+      && hasCap(attacker, 'extra-turn-requires-combat-damage-to-player')
+      && hasCap(attacker, 'fresh-token-unused-combat-damage-trigger');
+  }
+  return hasCap(attacker, 'is-attack-extra-turn-source')
+    && hasCap(attacker, 'extra-turn-requires-declared-attack')
+    && hasCap(attacker, 'fresh-token-unused-attack-trigger')
+    && hasCap(attacker, 'attack-trigger-can-be-declared');
+}
+
+function resetsDuringExtraTurnUntapStep(subject) {
+  return !/doesn'?t untap during your untap step/i.test(subject?.text || '');
+}
+
+function provePrecombatCopyExtraTurnPair(copier, attacker, connect = false) {
+  const family = connect ? 'combat-copy-token→connect-extra-turn-loop' : 'combat-copy-token→attack-extra-turn-loop';
+  const extraCap = connect ? 'is-combat-damage-extra-turn-source' : 'is-attack-extra-turn-source';
+  if (!canPrecombatCopyTarget(copier, attacker, [extraCap])) {
+    return failure(
+      'proof:precombat-copy-extra-turn-target-illegal:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'precombat copy source cannot legally create a surviving fresh token copy of the extra-turn attacker',
+      {
+        targetIsCreature: isCreaturePermanent(attacker),
+        targetIsLegendary: isLegendaryPermanent(attacker),
+        tokenNonlegendary: hasCap(copier, 'precombat-copy-token-nonlegendary'),
+        connect,
+      },
+    );
+  }
+  const ok = hasCap(copier, 'precombat-copy-token-has-haste')
+    && hasCap(copier, 'precombat-copy-created-before-attack')
+    && hasCap(copier, 'precombat-copy-repeatable-each-combat')
+    && extraTurnTriggerReady(attacker, connect);
+  if (!ok) {
+    return failure(
+      'proof:precombat-copy-extra-turn-not-repeatable:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'fresh-copy extra-turn proof requires pre-attack hasty token timing and an extra-turn trigger that remains legal during extra turns',
+      {
+        hastyToken: hasCap(copier, 'precombat-copy-token-has-haste'),
+        createdBeforeAttack: hasCap(copier, 'precombat-copy-created-before-attack'),
+        repeatsEachCombat: hasCap(copier, 'precombat-copy-repeatable-each-combat'),
+        extraTurnRepeatable: hasCap(attacker, 'extra-turn-repeatable-with-fresh-token'),
+        cannotAttackExtraTurns: hasCap(attacker, 'extra-turn-source-cannot-attack-extra-turns'),
+        optionalPayment: hasCap(attacker, 'extra-turn-source-requires-optional-payment'),
+        connect,
+      },
+    );
+  }
+  return success('proof:precombat-copy-extra-turn:' + sorted([copier.id, attacker.id]).join('|'), family, [copier, attacker], {
+    requiredFacts: [
+      fact(copier, 'is-precombat-hasty-creature-copy-source'),
+      fact(copier, 'precombat-copy-target-creature'),
+      fact(copier, 'precombat-copy-token-has-haste'),
+      fact(copier, 'precombat-copy-created-before-attack'),
+      fact(copier, 'precombat-copy-repeatable-each-combat'),
+      { card: copier.id, kind: 'precondition', predicate: 'copy-token-legend-safe' },
+      fact(attacker, extraCap),
+      fact(attacker, 'is-creature-permanent'),
+      fact(attacker, 'extra-turn-repeatable-with-fresh-token'),
+      ...(connect ? [
+        fact(attacker, 'extra-turn-requires-combat-damage-to-player'),
+        fact(attacker, 'fresh-token-unused-combat-damage-trigger'),
+        { card: attacker.id, kind: 'precondition', predicate: 'combat-damage-connects' },
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-combat-damage-trigger-unused-at-loop-entry' },
+      ] : [
+        fact(attacker, 'extra-turn-requires-declared-attack'),
+        fact(attacker, 'fresh-token-unused-attack-trigger'),
+        fact(attacker, 'attack-trigger-can-be-declared'),
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-unused-attack-trigger-at-loop-entry' },
+      ]),
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-can-be-declared-attacker' },
+    ],
+    steps: [
+      { card: copier.id, action: 'at the beginning of combat, create a hasty token copy of the extra-turn attacker before attackers are declared' },
+      connect
+        ? { card: attacker.id, action: 'the fresh token attacks, connects with a player, and creates an extra turn' }
+        : { card: attacker.id, action: 'the fresh token attacks with an unused attack trigger and creates an extra turn' },
+      { action: 'the extra turn untap step resets permanents, then its combat creates another fresh hasty token copy' },
+    ],
+    assumptions: [
+      'the precombat copy source is attached to or can legally target the extra-turn creature before the loop starts',
+      connect ? 'the fresh token connects with a player each extra turn' : 'the fresh token is declared as an attacker each extra turn',
+    ],
+    limitingClauses: ['sources that cannot attack during extra turns, require optional payments, create tapped-and-attacking tokens, or fail legend safety are not accepted'],
+    repeatability: { status: connect ? 'repeatable-turn-connect-fresh-token' : 'repeatable-turn-attack-fresh-token', reason: 'each extra turn reaches combat, creates a fresh hasty token before attackers, and that token creates the next extra turn' },
+  }, [
+    { resource: 'turns', min: 1, max: Infinity },
+  ]);
+}
+
+function proveHastyCopyExtraTurnPair(copier, attacker, connect = false) {
+  const family = connect ? 'hasty-copy→connect-extra-turn-loop' : 'hasty-copy→attack-extra-turn-loop';
+  const extraCap = connect ? 'is-combat-damage-extra-turn-source' : 'is-attack-extra-turn-source';
+  if (!canHastyCopyTarget(copier, attacker, [extraCap])) {
+    return failure(
+      'proof:hasty-copy-extra-turn-target-illegal:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'repeatable hasty creature-copy target restrictions or legend-rule survival cannot copy the extra-turn attacker',
+      {
+        targetIsCreature: isCreaturePermanent(attacker),
+        targetIsLegendary: isLegendaryPermanent(attacker),
+        requiresNonlegendary: hasCap(copier, 'hasty-copy-target-requires-nonlegendary'),
+        tokenNonlegendary: hasCap(copier, 'hasty-copy-token-nonlegendary'),
+        connect,
+      },
+    );
+  }
+  const ok = hasCap(copier, 'hasty-copy-token-has-haste')
+    && (!hasCap(copier, 'hasty-copy-activation-taps-source') || resetsDuringExtraTurnUntapStep(copier))
+    && extraTurnTriggerReady(attacker, connect);
+  if (!ok) {
+    return failure(
+      'proof:hasty-copy-extra-turn-not-repeatable:' + sorted([copier.id, attacker.id]).join('|'),
+      [copier, attacker],
+      'activated hasty copy source is not reset/timed safely for a fresh-token extra-turn loop',
+      {
+        hastyToken: hasCap(copier, 'hasty-copy-token-has-haste'),
+        tapsSource: hasCap(copier, 'hasty-copy-activation-taps-source'),
+        sourceUntapsDuringExtraTurn: resetsDuringExtraTurnUntapStep(copier),
+        extraTurnRepeatable: hasCap(attacker, 'extra-turn-repeatable-with-fresh-token'),
+        cannotAttackExtraTurns: hasCap(attacker, 'extra-turn-source-cannot-attack-extra-turns'),
+        optionalPayment: hasCap(attacker, 'extra-turn-source-requires-optional-payment'),
+        connect,
+      },
+    );
+  }
+  return success('proof:hasty-copy-extra-turn:' + sorted([copier.id, attacker.id]).join('|'), family, [copier, attacker], {
+    requiredFacts: [
+      fact(copier, 'is-repeatable-hasty-creature-copy'),
+      fact(copier, 'hasty-copy-target-creature'),
+      fact(copier, 'hasty-copy-token-has-haste'),
+      { card: copier.id, kind: 'precondition', predicate: 'copy-token-legend-safe' },
+      ...(hasCap(copier, 'hasty-copy-activation-taps-source') ? [
+        fact(copier, 'hasty-copy-activation-taps-source'),
+        { card: copier.id, kind: 'precondition', predicate: 'copy-source-reset-by-extra-turn-untap-step' },
+      ] : []),
+      fact(attacker, extraCap),
+      fact(attacker, 'is-creature-permanent'),
+      fact(attacker, 'extra-turn-repeatable-with-fresh-token'),
+      ...(connect ? [
+        fact(attacker, 'extra-turn-requires-combat-damage-to-player'),
+        fact(attacker, 'fresh-token-unused-combat-damage-trigger'),
+        { card: attacker.id, kind: 'precondition', predicate: 'combat-damage-connects' },
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-combat-damage-trigger-unused-at-loop-entry' },
+      ] : [
+        fact(attacker, 'extra-turn-requires-declared-attack'),
+        fact(attacker, 'fresh-token-unused-attack-trigger'),
+        fact(attacker, 'attack-trigger-can-be-declared'),
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-unused-attack-trigger-at-loop-entry' },
+      ]),
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-can-be-declared-attacker' },
+    ],
+    steps: [
+      { card: copier.id, action: 'create a hasty fresh token copy of the extra-turn attacker before combat each turn' },
+      connect
+        ? { card: attacker.id, action: 'the fresh token attacks, connects with a player, and creates an extra turn' }
+        : { card: attacker.id, action: 'the fresh token attacks with an unused attack trigger and creates an extra turn' },
+      { action: 'the extra turn untap step resets the copy source and the next precombat window creates another fresh token' },
+    ],
+    assumptions: [
+      'the repeatable copy source starts ready and can legally target the extra-turn creature',
+      connect ? 'the fresh token connects with a player each extra turn' : 'the fresh token is declared as an attacker each extra turn',
+    ],
+    limitingClauses: ['sources that cannot attack during extra turns, require optional payments, or fail legend safety are not accepted'],
+    repeatability: { status: connect ? 'repeatable-turn-connect-hasty-copy' : 'repeatable-turn-attack-hasty-copy', reason: 'each extra turn resets the copy source, creates a fresh hasty token, and that token creates the next extra turn' },
+  }, [
+    { resource: 'turns', min: 1, max: Infinity },
+  ]);
+}
+
+function proveAttachedSelfCopyExtraTurnPair(copySource, attacker, connect = false) {
+  const family = connect ? 'hasty-copy→connect-extra-turn-loop' : 'hasty-copy→attack-extra-turn-loop';
+  const extraCap = connect ? 'is-combat-damage-extra-turn-source' : 'is-attack-extra-turn-source';
+  if (!canAttachedSelfCopyTarget(copySource, attacker, [extraCap])) {
+    return failure(
+      'proof:attached-copy-extra-turn-target-illegal:' + sorted([copySource.id, attacker.id]).join('|'),
+      [copySource, attacker],
+      'attached self-copy source requires a nonlegendary creature extra-turn source to avoid legend-rule failure',
+      { targetIsCreature: isCreaturePermanent(attacker), targetIsLegendary: isLegendaryPermanent(attacker), connect },
+    );
+  }
+  const ok = hasCap(copySource, 'attached-copy-token-has-haste')
+    && (!hasCap(copySource, 'attached-copy-activation-taps-enchanted-creature') || resetsDuringExtraTurnUntapStep(attacker))
+    && extraTurnTriggerReady(attacker, connect);
+  if (!ok) {
+    return failure(
+      'proof:attached-copy-extra-turn-not-repeatable:' + sorted([copySource.id, attacker.id]).join('|'),
+      [copySource, attacker],
+      'attached self-copy source is not reset/timed safely for a fresh-token extra-turn loop',
+      {
+        hastyToken: hasCap(copySource, 'attached-copy-token-has-haste'),
+        tapsEnchantedCreature: hasCap(copySource, 'attached-copy-activation-taps-enchanted-creature'),
+        enchantedCreatureUntapsDuringExtraTurn: resetsDuringExtraTurnUntapStep(attacker),
+        extraTurnRepeatable: hasCap(attacker, 'extra-turn-repeatable-with-fresh-token'),
+        cannotAttackExtraTurns: hasCap(attacker, 'extra-turn-source-cannot-attack-extra-turns'),
+        optionalPayment: hasCap(attacker, 'extra-turn-source-requires-optional-payment'),
+        connect,
+      },
+    );
+  }
+  return success('proof:attached-copy-extra-turn:' + sorted([copySource.id, attacker.id]).join('|'), family, [copySource, attacker], {
+    requiredFacts: [
+      fact(copySource, 'is-attached-self-hasty-creature-copy'),
+      fact(copySource, 'attached-copy-target-creature'),
+      fact(copySource, 'attached-copy-token-has-haste'),
+      fact(copySource, 'attached-copy-activation-taps-enchanted-creature'),
+      fact(attacker, 'is-nonlegendary-permanent'),
+      fact(attacker, extraCap),
+      fact(attacker, 'is-creature-permanent'),
+      fact(attacker, 'extra-turn-repeatable-with-fresh-token'),
+      { card: copySource.id, kind: 'precondition', predicate: 'copy-aura-attached-to-extra-turn-source-at-loop-entry' },
+      { card: attacker.id, kind: 'precondition', predicate: 'copy-source-reset-by-extra-turn-untap-step' },
+      ...(connect ? [
+        fact(attacker, 'extra-turn-requires-combat-damage-to-player'),
+        fact(attacker, 'fresh-token-unused-combat-damage-trigger'),
+        { card: attacker.id, kind: 'precondition', predicate: 'combat-damage-connects' },
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-combat-damage-trigger-unused-at-loop-entry' },
+      ] : [
+        fact(attacker, 'extra-turn-requires-declared-attack'),
+        fact(attacker, 'fresh-token-unused-attack-trigger'),
+        fact(attacker, 'attack-trigger-can-be-declared'),
+        { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-unused-attack-trigger-at-loop-entry' },
+      ]),
+      { card: attacker.id, kind: 'precondition', predicate: 'fresh-token-can-be-declared-attacker' },
+    ],
+    steps: [
+      { card: copySource.id, action: 'the attached Aura grants the extra-turn source a tap ability that creates a hasty token copy before combat each turn' },
+      connect
+        ? { card: attacker.id, action: 'the fresh token attacks, connects with a player, and creates an extra turn' }
+        : { card: attacker.id, action: 'the fresh token attacks with an unused attack trigger and creates an extra turn' },
+      { action: 'the extra turn untap step resets the enchanted original and the next turn creates another fresh token' },
+    ],
+    assumptions: [
+      'the Aura is attached to the nonlegendary extra-turn source before the loop starts',
+      connect ? 'the fresh token connects with a player each extra turn' : 'the fresh token is declared as an attacker each extra turn',
+    ],
+    limitingClauses: ['legendary targets, cannot-attack-extra-turn clauses, optional payments, and tapped-and-attacking token copies are not accepted'],
+    repeatability: { status: connect ? 'repeatable-turn-connect-attached-copy' : 'repeatable-turn-attack-attached-copy', reason: 'each extra turn resets the enchanted original, creates a fresh hasty token, and that token creates the next extra turn' },
+  }, [
+    { resource: 'turns', min: 1, max: Infinity },
+  ]);
+}
+
+function proveFreshCopyExtraCombatLoops(cards) {
+  const attackers = cards.filter(c => hasCap(c, 'is-attack-extra-combat-source'));
+  const connectAttackers = cards.filter(c => hasCap(c, 'is-combat-damage-extra-combat-source'));
+  if (!attackers.length && !connectAttackers.length) return null;
+  const precombatCopiers = cards.filter(c => hasCap(c, 'is-precombat-hasty-creature-copy-source'));
+  const activeCopiers = cards.filter(c => hasCap(c, 'is-repeatable-hasty-creature-copy'));
+  const attachedCopiers = cards.filter(c => hasCap(c, 'is-attached-self-hasty-creature-copy'));
+  const failures = [];
+
+  for (const attacker of attackers) {
+    for (const copier of precombatCopiers.filter(c => c !== attacker && !hasCap(c, 'is-combat-copy-token-equipment'))) {
+      const result = provePrecombatCopyAttackExtraCombatPair(copier, attacker);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+    for (const copier of activeCopiers.filter(c => c !== attacker)) {
+      const result = proveHastyCopyExtraCombatPair(copier, attacker, false);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+    for (const copier of attachedCopiers.filter(c => c !== attacker)) {
+      const result = proveAttachedSelfCopyExtraCombatPair(copier, attacker, false);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+  }
+  for (const attacker of connectAttackers) {
+    for (const copier of precombatCopiers.filter(c => c !== attacker)) {
+      const result = provePrecombatCopyConnectExtraCombatPair(copier, attacker);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+    for (const copier of activeCopiers.filter(c => c !== attacker)) {
+      const result = proveHastyCopyExtraCombatPair(copier, attacker, true);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+    for (const copier of attachedCopiers.filter(c => c !== attacker)) {
+      const result = proveAttachedSelfCopyExtraCombatPair(copier, attacker, true);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+  }
+  if (!failures.length) return null;
+  if (failures.length === 1) return failures[0];
+  return failure(
+    'proof:fresh-copy-extra-combat-all-rejected:' + sorted(cards.map(c => c.id)).join('|'),
+    cards,
+    'no fresh hasty copy and extra-combat attacker pairing satisfied strict timing, target, reset, and trigger gates',
+    { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
+  );
+}
+
+function proveFreshCopyExtraTurnLoops(cards) {
+  const attackTurners = cards.filter(c => hasCap(c, 'is-attack-extra-turn-source'));
+  const connectTurners = cards.filter(c => hasCap(c, 'is-combat-damage-extra-turn-source'));
+  if (!attackTurners.length && !connectTurners.length) return null;
+  const precombatCopiers = cards.filter(c => hasCap(c, 'is-precombat-hasty-creature-copy-source'));
+  const activeCopiers = cards.filter(c => hasCap(c, 'is-repeatable-hasty-creature-copy'));
+  const attachedCopiers = cards.filter(c => hasCap(c, 'is-attached-self-hasty-creature-copy'));
+  const failures = [];
+
+  for (const attacker of attackTurners) {
+    for (const copier of precombatCopiers.filter(c => c !== attacker)) {
+      const result = provePrecombatCopyExtraTurnPair(copier, attacker, false);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+    for (const copier of activeCopiers.filter(c => c !== attacker)) {
+      const result = proveHastyCopyExtraTurnPair(copier, attacker, false);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+    for (const copier of attachedCopiers.filter(c => c !== attacker)) {
+      const result = proveAttachedSelfCopyExtraTurnPair(copier, attacker, false);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+  }
+  for (const attacker of connectTurners) {
+    for (const copier of precombatCopiers.filter(c => c !== attacker)) {
+      const result = provePrecombatCopyExtraTurnPair(copier, attacker, true);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+    for (const copier of activeCopiers.filter(c => c !== attacker)) {
+      const result = proveHastyCopyExtraTurnPair(copier, attacker, true);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+    for (const copier of attachedCopiers.filter(c => c !== attacker)) {
+      const result = proveAttachedSelfCopyExtraTurnPair(copier, attacker, true);
+      if (result.status === 'proven') return result;
+      failures.push(result);
+    }
+  }
+  if (!failures.length) return null;
+  if (failures.length === 1) return failures[0];
+  return failure(
+    'proof:fresh-copy-extra-turn-all-rejected:' + sorted(cards.map(c => c.id)).join('|'),
+    cards,
+    'no fresh hasty copy and extra-turn attacker pairing satisfied strict turn, target, trigger, and blocker gates',
+    { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
+  );
 }
 
 function proveSpellCopyCreatureCopyLoop(cards) {
@@ -1550,6 +2966,11 @@ function provePackage(rawCards, options = {}) {
     proveMillLifeLossLoop(cards),
     proveDrawDamageFeedback(cards),
     proveSelfCopySpellMagecraftDrain(cards),
+    proveVariableBoardCountManaLoop(cards),
+    proveCombatResourceExtraCombatLoop(cards),
+    proveCombatSacrificeAuraExtraCombatLoop(cards),
+    proveArtifactTokenExtraTurnLoop(cards),
+    proveBuybackCopyRitualLoop(cards),
     proveLifelinkCounterDamageLoop(cards),
     proveLifePaidDamageRecoveryLoop(cards),
     proveOpponentDrawPunisherWin(cards),
@@ -1558,9 +2979,11 @@ function provePackage(rawCards, options = {}) {
     proveTopLoop(cards),
     proveRecursiveBodySacrificeMana(cards),
     proveLifePaidTreasureRecursiveDrain(cards),
+    proveEscapeWheelManaLoop(cards),
     proveExileRecastCreatureMana(cards),
     proveMutualEtbBlinkReset(cards),
     proveTokenReplacementSacrificeMana(cards),
+    proveKodamaBounceLandLandfallLoop(cards),
     proveAristocrats(cards),
     proveTokenModifierPayoff(cards),
     proveLibraryExileWin(cards),
@@ -1568,6 +2991,8 @@ function provePackage(rawCards, options = {}) {
     proveSelfUntapAbilityCopyLoop(cards),
     proveHastyCopyEtbUntapLoop(cards),
     proveCombatCopyTokenExtraCombatLoop(cards),
+    proveFreshCopyExtraCombatLoops(cards),
+    proveFreshCopyExtraTurnLoops(cards),
     proveSpellCopyCreatureCopyLoop(cards),
     proveDeathCopySpellEtbCopyLoop(cards),
     proveCounterTokenEtbCounterLoop(cards),

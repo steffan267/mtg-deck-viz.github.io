@@ -74,6 +74,12 @@ function capabilityIdsStartingWith(indexes, prefix) {
   return sortedUnique(ids);
 }
 
+function intersectIds(...groups) {
+  if (!groups.length) return [];
+  const [first, ...rest] = groups.map(group => new Set(group || []));
+  return [...first].filter(id => rest.every(group => group.has(id))).sort(compareId);
+}
+
 function addCandidate(map, cards) {
   const ids = sortedUnique(cards);
   if (!ids.length || ids.length > 3) return;
@@ -256,6 +262,15 @@ function seedCandidates(indexes, options) {
 
   pairCandidates(
     candidates,
+    capabilityIds(indexes, 'is-variable-board-count-mana-source'),
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-repeatable-creature-untap-ability'),
+      ...capabilityIds(indexes, 'is-attached-creature-untapper'),
+    ]),
+  );
+
+  pairCandidates(
+    candidates,
     sortedUnique([
       ...capabilityIds(indexes, 'is-cost-reducer'),
       ...capabilityIds(indexes, 'is-artifact-activated-ability-cost-reducer'),
@@ -273,6 +288,54 @@ function seedCandidates(indexes, options) {
     candidates,
     capabilityIds(indexes, 'is-combat-copy-token-equipment'),
     capabilityIds(indexes, 'is-attack-extra-combat-source'),
+  );
+
+  pairCandidates(
+    candidates,
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-precombat-hasty-creature-copy-source'),
+      ...capabilityIds(indexes, 'is-repeatable-hasty-creature-copy'),
+      ...capabilityIds(indexes, 'is-attached-self-hasty-creature-copy'),
+    ]),
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-attack-extra-combat-source'),
+      ...capabilityIds(indexes, 'is-combat-damage-extra-combat-source'),
+    ]),
+  );
+
+  pairCandidates(
+    candidates,
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-precombat-hasty-creature-copy-source'),
+      ...capabilityIds(indexes, 'is-repeatable-hasty-creature-copy'),
+      ...capabilityIds(indexes, 'is-attached-self-hasty-creature-copy'),
+    ]),
+    sortedUnique([
+      ...intersectIds(capabilityIds(indexes, 'is-attack-extra-turn-source'), capabilityIds(indexes, 'extra-turn-repeatable-with-fresh-token')),
+      ...intersectIds(capabilityIds(indexes, 'is-combat-damage-extra-turn-source'), capabilityIds(indexes, 'extra-turn-repeatable-with-fresh-token')),
+    ]),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-combat-sacrifice-extra-combat-aura'),
+    capabilityIds(indexes, 'is-fresh-attack-carrier-source'),
+  );
+
+  pairCandidates(
+    candidates,
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-combat-damage-land-untap-engine'),
+      ...capabilityIds(indexes, 'is-attack-land-untap-engine'),
+      ...capabilityIds(indexes, 'is-combat-damage-treasure-engine'),
+    ]),
+    capabilityIds(indexes, 'is-repeatable-extra-combat-engine'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-turn-cycle-artifact-token-engine'),
+    capabilityIds(indexes, 'is-artifact-sacrifice-extra-turn-engine'),
   );
 
   pairCandidates(
@@ -360,6 +423,7 @@ function proofEvidence(indexes, fact) {
   const source = indexes.cardsById[fact.card] || {};
   const faces = FACE_CLASSIFICATION.compactFaceSources(FACE_CLASSIFICATION.faceSourcesForFact(source, fact));
   return {
+    ...fact,
     card: fact.card,
     predicate: fact.predicate || fact.event || fact.kind,
     kind: fact.kind,

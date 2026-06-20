@@ -876,6 +876,7 @@
       const sym = m[1].toLowerCase();
       if (/^\d+$/.test(sym)) total += parseInt(sym, 10);
       else if (/^[wubrgc]$/.test(sym)) total += 1;
+      else if (sym === "t" || sym === "q") total += 0;
       else if (sym === "x") total += 0;
       else total += 1;
     }
@@ -900,7 +901,7 @@
       } else if (sym === "c") {
         profile.colorless++;
         profile.total++;
-      } else if (sym !== "x") {
+      } else if (sym !== "x" && sym !== "t" && sym !== "q") {
         profile.generic++;
         profile.total++;
       }
@@ -934,6 +935,19 @@
     return numberWordValue(count && count[1]);
   }
 
+  function artifactTokenCountFor(text) {
+    const s = String(text || "").toLowerCase();
+    let total = 0;
+    for (const match of s.matchAll(/\bcreate\b[^.]{0,160}\btokens?\b/g)) {
+      const phrase = match[0];
+      if (!/\b(artifact|treasure|clue|food|blood|map)\b/.test(phrase)) continue;
+      if (/\b(that many|x)\b/.test(phrase)) continue;
+      const count = phrase.match(/\b(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\b/);
+      total += numberWordValue(count && count[1]);
+    }
+    return total;
+  }
+
   const TOKEN_COLOR_WORDS = { white: "w", blue: "u", black: "b", red: "r", green: "g" };
   function creatureTokenColors(text) {
     const s = String(text || "").toLowerCase();
@@ -952,6 +966,7 @@
     const s = String(text || "").toLowerCase();
     const profile = { total: maxManaProduced(s), any: 0, colorless: 0, colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])) };
     if (/\badd\b.{0,40}\bmana of any (one )?color\b/.test(s)) profile.any = Math.max(profile.any, profile.total || 1);
+    if (/\badd\b.{0,80}\bmana in any combination of colors\b/.test(s)) profile.any = Math.max(profile.any, profile.total || 1);
     for (const m of s.matchAll(/\badd ((?:\{[wubrgc]\})+)/g)) {
       const symbols = [...m[1].matchAll(/\{([wubrgc])\}/g)].map(match => match[1].toLowerCase());
       for (const sym of symbols) {
@@ -967,6 +982,30 @@
     return profile;
   }
 
+  function variableManaUnitProfile(text) {
+    const s = String(text || "").toLowerCase();
+    const hasVariableQuantity = /\bfor each\b|\bwhere x is\b|\bequal to\b|\badd x mana\b|\badd an amount\b|\bthat much mana\b/.test(s);
+    const hasMana = /\badd\b/.test(s) && (/\bmana\b/.test(s) || /\{[wubrgc]\}/.test(s));
+    if (!hasVariableQuantity || !hasMana) return null;
+    const profile = { total: 1, any: 0, colorless: 0, colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])) };
+    if (/\bmana in any combination of colors\b|\bmana of any (one )?color\b/.test(s)) {
+      profile.any = 1;
+      return profile;
+    }
+    const symbolMatch = s.match(/\badd (?:an amount of |x )?((?:\{[wubrgc]\})+)/);
+    if (symbolMatch) {
+      for (const m of symbolMatch[1].matchAll(/\{([wubrgc])\}/g)) {
+        const sym = m[1].toLowerCase();
+        if (MANA_COLORS.includes(sym)) profile.colors[sym]++;
+        else if (sym === "c") profile.colorless++;
+      }
+      profile.total = Math.max(1, (symbolMatch[1].match(/\{/g) || []).length);
+      return profile;
+    }
+    profile.any = 1;
+    return profile;
+  }
+
   function addManaCostCaps(caps, prefix, profile) {
     caps.add(prefix + "-cost:" + profile.total);
     caps.add(prefix + "-generic-cost:" + profile.generic);
@@ -974,11 +1013,30 @@
     for (const color of MANA_COLORS) if (profile.colors[color]) caps.add(prefix + "-color-" + color + ":" + profile.colors[color]);
   }
 
+  function addManaCostProfiles(...profiles) {
+    return {
+      total: profiles.reduce((sum, profile) => sum + (profile.total || 0), 0),
+      generic: profiles.reduce((sum, profile) => sum + (profile.generic || 0), 0),
+      colorless: profiles.reduce((sum, profile) => sum + (profile.colorless || 0), 0),
+      colors: Object.fromEntries(MANA_COLORS.map(color => [
+        color,
+        profiles.reduce((sum, profile) => sum + (profile.colors[color] || 0), 0),
+      ])),
+    };
+  }
+
   function addProducedManaCaps(caps, prefix, profile) {
     caps.add(prefix + "-mana-produced:" + Math.max(1, profile.total));
     if (profile.any) caps.add(prefix + "-mana-any:" + profile.any);
     if (profile.colorless) caps.add(prefix + "-mana-c:" + profile.colorless);
     for (const color of MANA_COLORS) if (profile.colors[color]) caps.add(prefix + "-mana-" + color + ":" + profile.colors[color]);
+  }
+
+  function addVariableManaUnitCaps(caps, profile) {
+    caps.add("variable-mana-unit-produced:" + Math.max(1, profile.total));
+    if (profile.any) caps.add("variable-mana-unit-any:" + profile.any);
+    if (profile.colorless) caps.add("variable-mana-unit-c:" + profile.colorless);
+    for (const color of MANA_COLORS) if (profile.colors[color]) caps.add("variable-mana-unit-" + color + ":" + profile.colors[color]);
   }
 
   const NON_ACCESS_EXILE_COUNTERS = new Set([
@@ -1020,6 +1078,11 @@
       const effectAndRaw = e + " " + s.raw;
       const effectAndTrigger = e + " " + s.trigger;
       const triggerAndEffect = s.trigger + " " + e;
+      if (isLand
+          && /\bwhen this land enters\b/.test(s.trigger)
+          && /\breturn (a|another) land you control to (its|their) owner'?s hand\b/.test(e)) {
+        caps.add("is-self-bounce-land");
+      }
       const exileAccessMarkers = exiledCardAccessMarkers(effectAndRaw);
       if (exileAccessMarkers.length) {
         const grantsMarkedExileAccess =
@@ -1048,6 +1111,33 @@
           caps.add("taps-for-mana");
           caps.add("mana-produced:" + Math.max(1, maxManaProduced(e)));
           if (producedManaProfile(e).colorless > 0) caps.add("produces-colorless-mana");
+          const variableMana = variableManaUnitProfile(e);
+          if (variableMana) {
+            caps.add("is-variable-count-mana-source");
+            addVariableManaUnitCaps(caps, variableMana);
+            let proofEligibleBoardCount = false;
+            const countMatch = e.match(/(?:for each|equal to the number of) ([a-z][a-z-]*)s? (?:you control|on the battlefield)/);
+            if (countMatch) {
+              const subject = countMatch[1].replace(/s$/, "");
+              caps.add("variable-mana-counts:" + subject);
+              caps.add("board-count-scope:" + subject);
+              proofEligibleBoardCount = true;
+            }
+            if (/\bgreatest power among creatures you control\b/.test(e)) {
+              caps.add("variable-mana-counts:greatest-creature-power");
+              caps.add("board-count-scope:greatest-creature-power");
+              proofEligibleBoardCount = true;
+            }
+            if (/\bequal to\b.{0,80}\b(this|its|this creature|[a-z' -]+)'?s power\b/.test(e)) {
+              caps.add("variable-mana-counts:source-power");
+              caps.add("board-count-scope:source-power");
+              proofEligibleBoardCount = true;
+            }
+            if (proofEligibleBoardCount) {
+              caps.add("is-variable-board-count-mana-source");
+              if (/creature/.test(classified._type || "")) caps.add("is-variable-creature-mana-source");
+            }
+          }
           const mt = classified._type || "";
           if (/creature/.test(mt)) caps.add("mana-from-creature");
           else if (/artifact/.test(mt)) caps.add("mana-from-artifact");
@@ -1110,6 +1200,20 @@
         if (s.kind === "activated" && /\buntap (this|it|this artifact|this creature|this permanent)/.test(e)) {
           caps.add("is-self-untapper");
           caps.add("self-untap-cost:" + manaCostValue(c));
+          addManaCostCaps(caps, "self-untap", manaCostProfile(c));
+        }
+        if (s.kind === "activated" && /\buntap target creature\b/.test(e)) {
+          caps.add("is-repeatable-creature-untap-ability");
+          addManaCostCaps(caps, "creature-untap-ability", manaCostProfile(c));
+          if (/\{t\}|\{q\}/.test(c)) caps.add("creature-untap-ability-taps-source");
+        }
+        if (s.kind === "activated" && /\{t\}|\{q\}/.test(c) && /\bdraw (a card|two cards|three cards)\b/.test(e)) {
+          caps.add("is-repeatable-tap-draw-ability");
+          addManaCostCaps(caps, "tap-draw-ability", manaCostProfile(c));
+        }
+        if (s.kind === "activated" && /\{t\}|\{q\}/.test(c) && /\byou gain \d+ life\b/.test(e)) {
+          caps.add("is-repeatable-tap-lifegain-ability");
+          addManaCostCaps(caps, "tap-lifegain-ability", manaCostProfile(c));
         }
         if (s.kind === "etb") {
           const lm = e.match(/untap (?:up to )?(one|two|three|four|five|six|seven|eight|nine|ten|\d+)? ?(?:target )?lands?/);
@@ -1131,6 +1235,23 @@
         caps.add("has-death-untap-self");
       // blink/flicker: exile then return to the battlefield
       if (/exile .* return (it|them|that card|those cards|the exiled)/.test(e) && /battlefield/.test(e)) caps.add("is-blink");
+      if (s.kind === "activated" && /\buntap enchanted creature\b/.test(e)) {
+        caps.add("is-attached-creature-untapper");
+        caps.add("attached-untap-target:enchanted-creature");
+        addManaCostCaps(caps, "attached-creature-untap", manaCostProfile(c));
+      }
+      {
+        const grantedAbility = effectAndRaw.match(/equipped creature has ["“]([^"”]+)["”]/);
+        const grantedSelfUntap = grantedAbility && grantedAbility[1].match(/^((?:\{[^}]+\}|,\s*)+):([\s\S]*)$/);
+        if (grantedSelfUntap && (/\{q\}/.test(grantedSelfUntap[1]) || /\buntap (this|equipped) creature\b/.test(grantedSelfUntap[2]))) {
+          const grantedCost = grantedSelfUntap[1].replace(/\{q\}/g, "");
+          caps.add("is-attached-creature-untapper");
+          caps.add("attached-untap-target:equipped-creature");
+          if (/\{q\}/.test(grantedSelfUntap[1])) caps.add("attached-untap-uses-untap-symbol");
+          addManaCostCaps(caps, "attached-creature-untap", manaCostProfile(grantedCost));
+          if (/gets \+\d+\/\+\d+/.test(grantedSelfUntap[2])) caps.add("attached-untap-adds-pump");
+        }
+      }
       if (s.kind === "etb"
           && /exile (another target |target |up to one target )?(non-angel )?(creature|permanent)( you control)?/.test(effectAndRaw)
           && /return (that card|it|the exiled card|the exiled cards|them) to the battlefield/.test(effectAndRaw)) {
@@ -1171,6 +1292,16 @@
           addProducedManaCaps(caps, "sac-outlet", producedManaProfile(e));
         }
       }
+      const artifactExtraTurnSacMatch = c.match(/\bsacrifice (one|two|three|four|five|six|seven|eight|nine|ten|\d+) artifacts?\b/);
+      if (s.kind === "activated"
+          && artifactExtraTurnSacMatch
+          && /\btake an extra turn\b/.test(e)
+          && !/activate only once (each|per) turn/.test(effectAndRaw)) {
+        const sacCount = numberWordValue(artifactExtraTurnSacMatch[1]);
+        caps.add("is-artifact-sacrifice-extra-turn-engine");
+        caps.add("is-artifact-sac-outlet");
+        caps.add("artifact-extra-turn-sac-count:" + sacCount);
+      }
       // cost reducer (Round-3 gate): only a reducer of ACTIVATED ABILITIES is
       // relevant to the cost-reduction→ability family. Scope-specific reducers
       // (creatures, Foods, etc.) must not fan out to all tap abilities.
@@ -1191,6 +1322,12 @@
       }
       else if (/(spells?|creature spells?) .* cost \{?\d* ?[^ ]* ?less|costs? \{\d+\} less to cast/.test(e))
         caps.add("is-spell-cost-reducer");
+      if (/(spells?|creature spells?|instant and sorcery spells?) .* cost \{?\d* ?[^ ]* ?less|costs? \{\d+\} less to cast/.test(e)) {
+        const spellReduction = e.match(/cost \{?(\d+)\}? less|costs? \{(\d+)\} less to cast/);
+        caps.add("spell-cost-reduction:" + (spellReduction ? (spellReduction[1] || spellReduction[2]) : "1"));
+        if (/\bred spells?\b/.test(e)) caps.add("spell-cost-reduction-scope:r");
+        if (/\binstant and sorcery spells?\b|\binstant or sorcery spells?\b/.test(e)) caps.add("spell-cost-reduction-scope:instant-sorcery");
+      }
       if (/(another target |target )creature.{0,40}gains? lifelink until end of turn/.test(e))
         caps.add("grants-lifelink-to-creature");
       if (/\bartifact spells? you cast cost \{?\d* ?[^ ]* ?less|artifact spells? cost \{?\d* ?[^ ]* ?less/.test(e)
@@ -1210,10 +1347,55 @@
         if (/copy target (creature|permanent)|copy of (up to one )?(other )?target|copy of target creature|copy of (a|another) creature|copy of a permanent/.test(e))
           caps.add("is-permanent-copy");
       }
+      if (s.kind === "activated"
+          && /\bdiscard your hand\b/.test(c)
+          && /\bsacrifice (this|this artifact|this permanent|it)\b/.test(c)
+          && /\badd\b/.test(e)) {
+        caps.add("is-discard-hand-sac-mana-source");
+        addProducedManaCaps(caps, "discard-hand-sac", producedManaProfile(e));
+        addManaCostCaps(caps, "discard-hand-sac-source", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
+      }
       if (s.kind === "activated" && /create .*token that.?s a copy of target .*creature/.test(e) && /haste/.test(e)) {
         caps.add("is-repeatable-hasty-creature-copy");
         caps.add("hasty-copy-target-creature");
         if (/target nonlegendary creature/.test(e)) caps.add("hasty-copy-target-requires-nonlegendary");
+        caps.add("hasty-copy-token-has-haste");
+        if (/(?:token (?:isn'?t|is not) legendary|except (?:it|that token) (?:isn'?t|is not) legendary)/.test(e))
+          caps.add("hasty-copy-token-nonlegendary");
+        if (/\{t\}/.test(c)) caps.add("hasty-copy-activation-taps-source");
+        caps.add(/activate only as a sorcery/.test(effectAndRaw)
+          ? "hasty-copy-activation-window:sorcery"
+          : "hasty-copy-activation-window:instant");
+        if (/(sacrifice|exile) (?:it|that token|those tokens) at the beginning of the next end step/.test(effectAndRaw))
+          caps.add("hasty-copy-token-expires-next-end-step");
+      }
+      if (/\baura\b/.test(typeText)
+          && /enchanted creature has/.test(effectAndRaw)
+          && /\{t\}:\s*create .*token that.?s a copy of this creature/.test(effectAndRaw)
+          && /haste/.test(effectAndRaw)) {
+        caps.add("is-attached-self-hasty-creature-copy");
+        caps.add("attached-copy-target-creature");
+        caps.add("attached-copy-token-has-haste");
+        caps.add("attached-copy-activation-taps-enchanted-creature");
+        caps.add("attached-copy-activation-window:instant");
+        if (/(sacrifice|exile) (?:it|that token|those tokens) at the beginning of the next end step/.test(effectAndRaw))
+          caps.add("attached-copy-token-expires-next-end-step");
+      }
+      const precombatCopyText = effectAndRaw;
+      const precombatCopyCreatesHastyToken = /beginning of combat on your turn/.test(precombatCopyText)
+          && /create\b.{0,140}\btokens?\b.{0,100}\bcop(?:y|ies) of (?:equipped creature|(?:another )?target creature you control)/.test(precombatCopyText)
+          && /\b(?:gains?|have) haste\b/.test(precombatCopyText)
+          && !/\btapped and attacking\b|\broll a d20\b|\brandom\b|\bcoin flip\b/.test(precombatCopyText)
+          && (!/\bcreate x tokens?\b/.test(precombatCopyText) || /\bwhere x is one plus\b/.test(precombatCopyText));
+      if (precombatCopyCreatesHastyToken) {
+        caps.add("is-precombat-hasty-creature-copy-source");
+        caps.add("precombat-copy-target-creature");
+        caps.add("precombat-copy-token-has-haste");
+        caps.add("precombat-copy-created-before-attack");
+        caps.add("precombat-copy-repeatable-each-combat");
+        caps.add("precombat-copy-min-tokens:1");
+        if (/token (?:isn'?t|is not) legendary|it'?s not legendary|except (?:the )?token isn'?t legendary/.test(precombatCopyText))
+          caps.add("precombat-copy-token-nonlegendary");
       }
       if (/beginning of combat on your turn/.test(effectAndRaw)
           && /create .*token that.?s a copy of equipped creature/.test(effectAndRaw)
@@ -1223,16 +1405,157 @@
         caps.add("combat-copy-token-haste");
         caps.add("combat-copy-token-nonlegendary");
       }
+      const extraCombatAttackOnceLimited = /this ability triggers? only once|triggers? only once (each|per) turn|only triggers? once/.test(effectAndRaw);
+      const extraCombatAttackConditional = /\bif (?:it'?s|it is|this is|there are|you pay|you do|.*attacking the player|.*first combat phase|.*delirium)\b/.test(effectAndRaw);
+      const attackExtraCombatUntapsAll = /\buntap (?:all|each) creatures? you control\b/.test(effectAndRaw);
+      const attackExtraCombatUntapsOther = /\buntap all other creatures? you control\b/.test(effectAndRaw);
       if (/attacks? for the first time each turn/.test(effectAndRaw)
-          && /additional combat phase/.test(effectAndRaw)) {
+          && /additional combat phase/.test(effectAndRaw)
+          && !extraCombatAttackOnceLimited
+          && !extraCombatAttackConditional) {
         caps.add("is-attack-extra-combat-source");
         caps.add("extra-combat-repeatable-with-fresh-token");
+        caps.add("attack-extra-combat-trigger:declared-attack");
+        caps.add("fresh-token-unused-attack-trigger");
+        caps.add("attack-trigger-can-be-declared");
+        caps.add("attack-extra-combat-adds-combat");
+        if (attackExtraCombatUntapsAll) caps.add("attack-extra-combat-untaps-creatures");
+        if (attackExtraCombatUntapsOther) caps.add("attack-extra-combat-untaps-other-creatures");
       }
       if (/hasn'?t been exerted this turn/.test(allText)
           && /as it attacks/.test(allText)
           && /additional combat phase/.test(allText)) {
         caps.add("is-attack-extra-combat-source");
         caps.add("extra-combat-repeatable-with-fresh-token");
+        caps.add("attack-extra-combat-trigger:declared-attack");
+        caps.add("fresh-token-unused-attack-trigger");
+        caps.add("fresh-token-unused-exert-state");
+        caps.add("attack-trigger-can-be-declared");
+        caps.add("attack-extra-combat-adds-combat");
+        if (/\buntap (?:all|each) creatures? you control\b/.test(allText)) caps.add("attack-extra-combat-untaps-creatures");
+        if (/\buntap all other creatures? you control\b/.test(allText)) caps.add("attack-extra-combat-untaps-other-creatures");
+      }
+      const selfPattern = selfNamePattern(classified._name);
+      const selfDealsCombatDamageToPlayer = new RegExp("\\b(?:this creature" + (selfPattern ? "|" + selfPattern : "") + ") deals? combat damage to (?:a |an |one or more )?(?:players?|opponents?)\\b").test(effectAndRaw);
+      const combatDamageToPlayer = selfDealsCombatDamageToPlayer;
+      const combatDamageExtraCombat = combatDamageToPlayer && /additional combat phase/.test(effectAndRaw);
+      const combatDamageExtraCombatRestricted = /only [^.]{0,80} can attack during that combat phase/.test(effectAndRaw);
+      const combatDamageExtraCombatOptionalPayment = /\bmay pay\b|\bif you pay\b/.test(effectAndRaw);
+      if (combatDamageExtraCombat) {
+        caps.add("combat-damage-extra-combat-requires-connect");
+        if (combatDamageExtraCombatRestricted) caps.add("combat-damage-extra-combat-restricts-next-combat-attackers");
+        if (/can'?t attack a player it has already attacked this turn/.test(effectAndRaw))
+          caps.add("combat-damage-extra-combat-fresh-token-defending-player-reset");
+      }
+      if (combatDamageExtraCombat
+          && !combatDamageExtraCombatRestricted
+          && !combatDamageExtraCombatOptionalPayment
+          && !extraCombatAttackOnceLimited) {
+        caps.add("is-combat-damage-extra-combat-source");
+        caps.add("extra-combat-repeatable-with-fresh-token");
+        caps.add("fresh-token-unused-combat-damage-trigger");
+        caps.add("combat-damage-extra-combat-adds-combat");
+        if (/\buntap (?:all|each) creatures? you control\b/.test(effectAndRaw))
+          caps.add("combat-damage-extra-combat-untaps-creatures");
+        if (/\buntap all attacking creatures\b/.test(effectAndRaw))
+          caps.add("combat-damage-extra-combat-untaps-attacking-creatures");
+      }
+      const combatDamageExtraTurn = combatDamageToPlayer && /\btake an extra turn after this one\b/.test(effectAndRaw);
+      const attackExtraTurn = /whenever [^.]{0,120}\battacks\b[^.]{0,160}\btake an extra turn after this one\b/.test(effectAndRaw);
+      if (combatDamageExtraTurn || attackExtraTurn) {
+        caps.add(combatDamageExtraTurn ? "is-combat-damage-extra-turn-source" : "is-attack-extra-turn-source");
+        if (combatDamageExtraTurn) caps.add("extra-turn-requires-combat-damage-to-player");
+        if (attackExtraTurn) caps.add("extra-turn-requires-declared-attack");
+        if (/can'?t attack during extra turns/.test(effectAndRaw)) caps.add("extra-turn-source-cannot-attack-extra-turns");
+        if (/\bmay sacrifice\b|\bif you do\b|\bmay pay\b|\bif you pay\b/.test(effectAndRaw)) caps.add("extra-turn-source-requires-optional-payment");
+        if (!/can'?t attack during extra turns/.test(effectAndRaw)
+            && !/\bmay sacrifice\b|\bif you do\b|\bmay pay\b|\bif you pay\b/.test(effectAndRaw)
+            && !extraCombatAttackOnceLimited) {
+          caps.add("extra-turn-repeatable-with-fresh-token");
+          if (combatDamageExtraTurn) caps.add("fresh-token-unused-combat-damage-trigger");
+          if (attackExtraTurn) {
+            caps.add("fresh-token-unused-attack-trigger");
+            caps.add("attack-trigger-can-be-declared");
+          }
+        }
+      }
+      const combatSacrificeAuraText = effectAndRaw;
+      const isAuraType = /\baura\b/.test(typeText);
+      const auraConnects = /\b(?:enchanted|equipped|attached) creature deals? combat damage to (?:a |an |one or more )?(?:players?|opponents?)/.test(combatSacrificeAuraText);
+      const auraSacrificesCarrier = /\bsacrifice (?:it|that creature|enchanted creature|equipped creature|attached creature)\b/.test(combatSacrificeAuraText);
+      const auraReattaches = /\battach (?:this aura|this enchantment|it|[a-z][a-z' -]{1,60}) to (?:(?:another )?target |another |a )?creature you control\b/.test(combatSacrificeAuraText);
+      const auraUntapsCreatures = /\buntap all creatures you control\b/.test(combatSacrificeAuraText);
+      const auraAddsCombat = /\b(?:additional combat phase|extra combat phase)\b/.test(combatSacrificeAuraText);
+      const auraOnceLimited = /only once (each|per) turn|triggers? only once/.test(combatSacrificeAuraText);
+      const auraOptionalReset = /\bmay (?:sacrifice|attach|untap)\b/.test(combatSacrificeAuraText);
+      if (isAuraType && auraConnects) caps.add("combat-sacrifice-aura-requires-connect");
+      if (isAuraType && auraSacrificesCarrier) caps.add("combat-sacrifice-aura-sacrifices-carrier");
+      if (isAuraType && auraReattaches) caps.add("combat-sacrifice-aura-reattaches");
+      if (isAuraType && auraUntapsCreatures) caps.add("combat-sacrifice-aura-untaps-creatures");
+      if (isAuraType && auraAddsCombat) caps.add("combat-sacrifice-aura-adds-combat");
+      if (isAuraType
+          && auraConnects
+          && auraSacrificesCarrier
+          && auraReattaches
+          && auraUntapsCreatures
+          && auraAddsCombat
+          && !auraOnceLimited
+          && !auraOptionalReset) {
+        caps.add("is-combat-sacrifice-extra-combat-aura");
+      }
+      if (!/only once (each|per) turn|triggers? only once/.test(effectAndRaw)
+          && /additional combat phase|extra combat phase/.test(effectAndRaw)) {
+        const extraCombatCostMatch = s.kind === "triggered"
+          ? effectAndRaw.match(/\bpay\s+((?:\{[^}]+\})+)/)
+          : null;
+        if (s.kind === "activated" || extraCombatCostMatch) {
+          caps.add("is-repeatable-extra-combat-engine");
+          caps.add(s.kind === "activated" ? "is-repeatable-extra-combat-activator" : "is-repeatable-extra-combat-attack-trigger");
+          caps.add(s.kind === "activated" && /activate only as a sorcery/.test(effectAndRaw) ? "extra-combat-activation-window:sorcery" : "extra-combat-activation-window:any");
+          if (/additional combat phase followed by an additional main phase|followed by an additional main phase|additional main phase after/i.test(effectAndRaw)) caps.add("extra-combat-adds-main-phase");
+          addManaCostCaps(caps, "extra-combat", manaCostProfile(extraCombatCostMatch ? extraCombatCostMatch[1] : c));
+          if (s.kind === "activated" && /\{t\}/.test(c)) caps.add("extra-combat-activation-taps-source");
+          if (s.kind === "activated" && /\{q\}/.test(c)) caps.add("extra-combat-activation-uses-untap-symbol");
+          if (/untap (?:all )?(?:attacking )?creatures?|untap all creatures you control/.test(effectAndRaw)) caps.add("extra-combat-untaps-creatures");
+          if (/\buntap (?:all|each) creatures? you control\b|\buntap all creatures\b/.test(effectAndRaw)) caps.add("extra-combat-untaps-activating-creature");
+        }
+      }
+      const attackExtraCombatCostMatch = effectAndRaw.match(/\bwhenever\b[^.]{0,100}\battacks?\b[^.]{0,160}\bpay\s+((?:\{[^}]+\})+)[^.]{0,220}\badditional combat phase\b/);
+      if (attackExtraCombatCostMatch && !/only once (each|per) turn|triggers? only once/.test(effectAndRaw)) {
+        caps.add("is-repeatable-extra-combat-engine");
+        caps.add("is-repeatable-extra-combat-attack-trigger");
+        caps.add("extra-combat-activation-window:attack-trigger");
+        if (/additional combat phase followed by an additional main phase|followed by an additional main phase|additional main phase after/i.test(effectAndRaw)) caps.add("extra-combat-adds-main-phase");
+        addManaCostCaps(caps, "extra-combat", manaCostProfile(attackExtraCombatCostMatch[1]));
+        if (/untap (?:all )?(?:attacking )?creatures?|untap all creatures you control/.test(effectAndRaw)) caps.add("extra-combat-untaps-creatures");
+      }
+      const combatDamageResourceText = effectAndRaw;
+      const hasCombatDamageResourceTrigger = /\bdeals? combat damage to (?:a |an |one or more )?(?:players?|opponents?|planeswalkers?)/.test(combatDamageResourceText);
+      if (!/only once (each|per) turn|triggers? only once/.test(combatDamageResourceText)
+          && hasCombatDamageResourceTrigger
+          && /\buntap all lands you control\b/.test(combatDamageResourceText)) {
+        caps.add("is-combat-damage-land-untap-engine");
+        caps.add("combat-resource-requires-connect");
+      }
+      if (!/only once (each|per) turn|triggers? only once/.test(combatDamageResourceText)
+          && hasCombatDamageResourceTrigger
+          && /\bcreate\b[^.]{0,120}\btreasure tokens?\b/.test(combatDamageResourceText)) {
+        caps.add("combat-resource-requires-connect");
+        if (/\broll (?:a )?d\d+\b|\bd\d+\b[^.]{0,80}\btreasure tokens?\b|\btreasure tokens? equal to the result\b/.test(combatDamageResourceText)) {
+          caps.add("is-random-combat-damage-treasure-source");
+        } else if (/\bthat many treasure tokens?\b|\bnumber of treasure tokens? equal to (?:the amount of )?(?:combat )?damage\b|\btreasure tokens? equal to (?:that|the) damage\b|\bcreate x treasure tokens?\b/.test(combatDamageResourceText)) {
+          caps.add("is-combat-damage-treasure-engine");
+          caps.add("combat-damage-treasure-per-damage:1");
+        } else {
+          caps.add("is-fixed-combat-damage-treasure-source");
+          caps.add("combat-damage-treasure-produced:" + Math.max(1, tokenCountFor(combatDamageResourceText, "treasure")));
+        }
+      }
+      if (!/only once (each|per) turn|triggers? only once/.test(effectAndRaw)
+          && /\b(?:whenever|when)\b[^.]{0,80}\battacks?\b/.test(effectAndRaw)
+          && /\buntap all lands you control\b/.test(effectAndRaw)) {
+        caps.add("is-attack-land-untap-engine");
+        caps.add("combat-resource-requires-attack");
       }
       if (/\bwhen\b.*enters\b.*copy target instant or sorcery spell/.test(s.raw))
         caps.add("is-etb-spell-copier");
@@ -1256,6 +1579,22 @@
           && /\bthat player may copy this spell\b/.test(e)
           && /\bmay choose (a )?new target\b/.test(e))
         caps.add("is-self-copying-targeted-spell");
+      if (/\b(instant|sorcery)\b/.test(typeText)
+          && /\bbuyback\s+\{/.test(effectAndRaw)
+          && /\bcopy target instant or sorcery spell\b/.test(effectAndRaw)) {
+        const buyback = effectAndRaw.match(/\bbuyback\s+((?:\{[^}]+\})+)/);
+        const spellCost = manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc));
+        const buybackCost = manaCostProfile(buyback ? buyback[1] : "");
+        caps.add("is-buyback-spell-copy");
+        addManaCostCaps(caps, "buyback-copy", addManaCostProfiles(spellCost, buybackCost));
+      }
+      if (/\b(each player|target player|you) discards? (their|his or her|your) hand,? (then|and) draws? (one|two|three|four|five|six|seven|eight|nine|ten|\d+) cards?\b/.test(effectAndRaw)
+          && /\b(instant|sorcery)\b/.test(typeText)) {
+        const wheelDraw = effectAndRaw.match(/\b(each player|target player|you) discards? (their|his or her|your) hand,? (then|and) draws? (one|two|three|four|five|six|seven|eight|nine|ten|\d+) cards?\b/);
+        caps.add("is-wheel-draw-discard-spell");
+        caps.add("wheel-draw-count:" + numberWordValue(wheelDraw && wheelDraw[4]));
+        addManaCostCaps(caps, "wheel-spell", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
+      }
       if (/when .* enters\b/.test(s.raw) && /if .*number of cards in your library.*you win the game/.test(e))
         caps.add("is-empty-library-win-payoff");
       if (/name a card[\s\S]{0,180}reveal cards? from the top of your library until/.test(allText)
@@ -1354,6 +1693,11 @@
           && (/\bcast\b.{0,100}\bartifact spells?\b.{0,120}\b(from|off) the top of your library\b/.test(effectAndRaw)
               || /\bplay artifact cards? from the top of your library\b/.test(effectAndRaw)))
         caps.add("is-artifact-cast-from-top-enabler");
+      if (/\beach nonland card in your graveyard has escape\b/.test(effectAndRaw)) {
+        const escapeFuel = effectAndRaw.match(/\b(?:exile|exiling) (one|two|three|four|five|six|seven|eight|nine|ten|\d+) other cards? from your graveyard\b/);
+        caps.add("is-graveyard-escape-enabler");
+        caps.add("graveyard-escape-extra-card-cost:" + numberWordValue(escapeFuel && escapeFuel[1]));
+      }
       if (/\bcreature\b/.test(typeText)
           && /\byou may cast this card from your graveyard\b|\bcast this card from your graveyard\b/.test(effectAndRaw)) {
         caps.add("is-recursive-body");
@@ -1390,6 +1734,35 @@
           && /\bspend this mana only to cast creature spells\b/.test(effectAndRaw)) {
         caps.add("is-creature-exile-cast-mana-outlet");
         caps.add("creature-exile-cast-mana-surplus:1");
+      }
+      const freshCarrierText = effectAndRaw;
+      const freshCarrierAtBeginningOfCombat = /\bat the beginning of combat on your turn\b/.test(freshCarrierText);
+      const freshCarrierCreatesCreature = /\bcreate\b[^.]{0,160}\bcreature tokens?\b/.test(freshCarrierText);
+      const freshCarrierTokenHasHaste =
+        /\bcreate\b[^.]{0,180}\bcreature tokens?\b[^.]{0,80}\bwith haste\b/.test(freshCarrierText)
+        || /\bcreate\b[\s\S]{0,220}\bcreature tokens?\b[\s\S]{0,180}\b(?:that token|those tokens|they|it|tokens?) gains? haste\b/.test(freshCarrierText);
+      const freshCarrierTappedAttacking = /\btapped and attacking\b/.test(freshCarrierText);
+      const freshCarrierConditionText = freshCarrierText
+        .replace(/\b(?:it|that token|those tokens|they|tokens?) attacks? this combat if able\b/g, " ")
+        .replace(/\battacks? this combat if able\b/g, " ");
+      const freshCarrierConditional = /\bif\b|\bunless\b|\bas long as\b|\bfor as long as\b|\bonly if\b|\bfirst combat phase\b/.test(freshCarrierConditionText);
+      const freshCarrierRandom = /\broll (?:a )?d\d+\b|\bd\d+\b|\bflip a coin\b|\bat random\b|\brandom\b|\bwhere x is\b|\bcreate x\b|\bfor each\b/.test(freshCarrierText);
+      if (freshCarrierAtBeginningOfCombat
+          && freshCarrierCreatesCreature
+          && freshCarrierTokenHasHaste
+          && !freshCarrierTappedAttacking
+          && !freshCarrierConditional
+          && !freshCarrierRandom
+          && !/only once (each|per) turn|triggers? only once/.test(freshCarrierText)) {
+        const freshCarrierTokens = Math.max(1, tokenCountFor(freshCarrierText, "creature"));
+        caps.add("is-fresh-attack-carrier-source");
+        caps.add("fresh-carrier-token-attacks");
+        caps.add("fresh-carrier-token-has-haste");
+        caps.add("fresh-carrier-continuity");
+        caps.add("fresh-carrier-repeatable-each-combat");
+        caps.add("fresh-carrier-legal-next-reattach-target");
+        caps.add("fresh-carrier-timing:beginning-of-combat");
+        caps.add("fresh-carrier-tokens-created:" + freshCarrierTokens);
       }
 
       // --- Wave 2: directional payoff engines the audit found missing ---
@@ -1444,6 +1817,17 @@
         caps.add("is-token-producer");
         if (/\d+\/\d+ .*creature tokens?|creature tokens?|creature token with|populate|amass|\bfabricate \d+/.test(e))
           caps.add("is-creature-token-producer");
+        const artifactTokenCount = artifactTokenCountFor(e);
+        if (artifactTokenCount > 0) {
+          caps.add("is-artifact-token-producer");
+          caps.add("artifact-tokens-produced:" + artifactTokenCount);
+          if (/\bbeginning of (?:your|each) upkeep\b/.test(s.trigger)
+              && !/triggers? only once (each|per) turn|only once (each|per) turn/.test(effectAndRaw)) {
+            caps.add("is-turn-cycle-artifact-token-engine");
+            caps.add("artifact-tokens-per-turn:" + artifactTokenCount);
+            caps.add("artifact-token-turn-trigger:upkeep");
+          }
+        }
       }
       if (/if one or more tokens? would be created under your control|if .* would create .* tokens?.* instead|tokens? plus .* token .* created instead|twice that many tokens|double .* tokens/.test(e))
         caps.add("is-token-doubler");
@@ -1490,8 +1874,27 @@
       // generic graveyard family.
       if (/play lands? from your graveyard|land cards? from your graveyard|return .* land cards? .* graveyard .* battlefield/.test(effectAndRaw))
         caps.add("is-land-recursion");
-      if (/\blandfall\b|whenever a land (you control )?enters/.test(triggerAndEffect))
+      if (/\blandfall\b|whenever a land (you control )?enters/.test(triggerAndEffect)) {
         caps.add("is-landfall-payoff");
+        if (/\badd\b/.test(e)) {
+          caps.add("is-landfall-mana-payoff");
+          addProducedManaCaps(caps, "landfall", producedManaProfile(e));
+        }
+        if (/\bcreate\b[^.]{0,120}\btokens?\b/.test(e)) {
+          caps.add("is-landfall-token-payoff");
+          if (/\bcreature tokens?\b/.test(e)) caps.add("is-landfall-creature-token-payoff");
+          if (/\btreasure tokens?\b/.test(e)) {
+            const treasureCount = Math.max(1, tokenCountFor(e, "treasure"));
+            caps.add("is-landfall-treasure-payoff");
+            addProducedManaCaps(caps, "landfall-token", { total: treasureCount, any: treasureCount, colorless: 0, colors: Object.fromEntries(MANA_COLORS.map(color => [color, 0])) });
+          }
+        }
+      }
+      if ((s.kind === "triggered" || s.kind === "etb")
+          && /\bwhenever another permanent you control enters\b/.test(s.trigger)
+          && /\bput a permanent card with equal or lesser mana value from your hand onto the battlefield\b/.test(e)) {
+        caps.add("is-permanent-etb-hand-dropper");
+      }
 
       // ETB / trigger doublers: multiplicative hubs that should be explicit
       // rather than hidden as generic copy/ETB text.
@@ -1544,6 +1947,20 @@
         caps.add("is-magecraft-drain-payoff");
         const amount = s.raw.match(/(?:each opponent|opponents?).{0,40}loses? (\d+) life/);
         if (amount) caps.add("magecraft-drain-amount:" + amount[1]);
+      }
+      if ((s.kind === "triggered" || /\bwhenever\b/.test(s.trigger))
+          && /\bwhenever you cast (a |an |one or more )?(spell|instant or sorcery spell|instant or sorcery)\b/.test(s.trigger)
+          && /\badd\b/.test(e)) {
+        caps.add("is-spellcast-mana-payoff");
+        addProducedManaCaps(caps, "spellcast", producedManaProfile(e));
+      }
+      if (/\b(instant|sorcery)\b/.test(typeText) && /\badd\b/.test(e)) {
+        const ritualMana = producedManaProfile(e);
+        if (ritualMana.total > 0) {
+          caps.add("is-ritual-mana-spell");
+          addProducedManaCaps(caps, "ritual-spell", ritualMana);
+          addManaCostCaps(caps, "ritual-spell", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
+        }
       }
       // MILL as engine: opponent-mill source + graveyard-size payoff
       if (/(target (player|opponent)|each opponent|that player) (mills?|puts? the top)/.test(e) || /\bmills? (a|an|\d+|that many)/.test(e))
@@ -1708,6 +2125,14 @@
     { family: "token-production→replacement", from: "is-token-producer", to: "is-token-replacement-modifier", kind: "synergy", strength: "moderate" },
     { family: "vehicle→payoff",    from: "is-vehicle", to: "is-vehicle-payoff", kind: "synergy",     strength: "moderate" },
     { family: "land-recursion→landfall", from: "is-land-recursion", to: "is-landfall-payoff", kind: "synergy", strength: "moderate" },
+    { family: "kodama-bounce-land-landfall-loop", from: "is-permanent-etb-hand-dropper", to: "is-self-bounce-land", kind: "enablement", strength: "strong" },
+    { family: "kodama-bounce-land-landfall-loop", from: "is-self-bounce-land", to: "is-landfall-payoff", kind: "enablement", strength: "strong" },
+    { family: "variable-board-count-mana-loop", from: "is-variable-board-count-mana-source", to: "is-repeatable-creature-untap-ability", kind: "enablement", strength: "strong" },
+    { family: "variable-board-count-mana-loop", from: "is-variable-board-count-mana-source", to: "is-attached-creature-untapper", kind: "enablement", strength: "strong" },
+    { family: "combat-resource→extra-combat-loop", from: "is-combat-damage-land-untap-engine", to: "is-repeatable-extra-combat-engine", kind: "enablement", strength: "strong" },
+    { family: "combat-resource→extra-combat-loop", from: "is-attack-land-untap-engine", to: "is-repeatable-extra-combat-engine", kind: "enablement", strength: "strong" },
+    { family: "combat-resource→extra-combat-loop", from: "is-combat-damage-treasure-engine", to: "is-repeatable-extra-combat-engine", kind: "enablement", strength: "strong" },
+    { family: "artifact-token→extra-turn-loop", from: "is-turn-cycle-artifact-token-engine", to: "is-artifact-sacrifice-extra-turn-engine", kind: "enablement", strength: "strong" },
     // --- Wave 2 payoff engines (the two biggest missed archetypes) ---
     // aristocrats: creature-token makers/sacrifice outlets feed death payoffs;
     // noncreature tokens do not.
@@ -1759,9 +2184,16 @@
     { family: "self-untap-mana→ability-copy-loop", from: "is-activated-ability-copier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
     { family: "hasty-copy→etb-untap-loop", from: "is-repeatable-hasty-creature-copy", to: "etb-untaps-permanent", kind: "enablement", strength: "combo-critical" },
     { family: "combat-copy-token→extra-combat-loop", from: "is-combat-copy-token-equipment", to: "is-attack-extra-combat-source", kind: "enablement", strength: "combo-critical" },
+    { family: "combat-sacrifice-aura→extra-combat-loop", from: "is-combat-sacrifice-extra-combat-aura", to: "is-fresh-attack-carrier-source", kind: "enablement", strength: "combo-critical" },
     { family: "spell-copy-etb→creature-copy-spell-loop", from: "is-etb-spell-copier", to: "is-hasty-creature-copy-spell", kind: "enablement", strength: "combo-critical" },
     { family: "death-copy-spell-etb-copy-loop", from: "is-etb-spell-copier", to: "is-death-copy-creature-spell", kind: "enablement", strength: "combo-critical" },
     { family: "self-copy-spell→magecraft-drain-loop", from: "is-self-copying-targeted-spell", to: "is-magecraft-drain-payoff", kind: "enablement", strength: "combo-critical" },
+    { family: "buyback-copy-ritual-loop", from: "is-buyback-spell-copy", to: "is-ritual-mana-spell", kind: "enablement", strength: "strong" },
+    { family: "buyback-copy-ritual-loop", from: "is-spell-cost-reducer", to: "is-buyback-spell-copy", kind: "enablement", strength: "strong" },
+    { family: "buyback-copy-ritual-loop", from: "is-spellcast-mana-payoff", to: "is-buyback-spell-copy", kind: "enablement", strength: "strong" },
+    { family: "escape-wheel-mana-loop", from: "is-graveyard-escape-enabler", to: "is-wheel-draw-discard-spell", kind: "enablement", strength: "strong" },
+    { family: "escape-wheel-mana-loop", from: "is-graveyard-escape-enabler", to: "is-discard-hand-sac-mana-source", kind: "enablement", strength: "strong" },
+    { family: "escape-wheel-mana-loop", from: "is-discard-hand-sac-mana-source", to: "is-wheel-draw-discard-spell", kind: "enablement", strength: "strong" },
     { family: "life-paid-damage-lifeloss-recovery-loop", from: "is-life-paid-damage-source", to: "is-lifegain-from-opponent-lifeloss", kind: "enablement", strength: "combo-critical" },
     { family: "exile-recast-creature-mana-loop", from: "is-creature-exile-cast-mana-outlet", to: "is-recursive-exile-cast-body", kind: "enablement", strength: "combo-critical" },
     { family: "counter-token→etb-counter-loop", from: "is-counter-to-creature-token-engine", to: "is-creature-etb-counter-granter", kind: "enablement", strength: "combo-critical" },
@@ -1866,6 +2298,12 @@
   };
   const isCreaturePermanent = (node) => capAvailable(node, "is-creature-permanent") || /\bcreature\b/i.test(node.type || "");
   const isLegendaryPermanent = (node) => hasCap(node, "is-legendary-permanent") || /\blegendary\b/i.test(node.type || "");
+  const copyTokenLegendSafe = (copier, target, tokenNonlegendaryCap, targetCaps = []) => {
+    if (hasCap(copier, tokenNonlegendaryCap)) return true;
+    if (faceCompatibleCaps(target, [...targetCaps, "is-nonlegendary-permanent"])) return true;
+    if (!target?.faceFacts?.length && !isLegendaryPermanent(target)) return true;
+    return false;
+  };
   const canHastyCopyTarget = (copier, target, extraTargetCaps = []) => {
     if (!hasCap(copier, "hasty-copy-target-creature")) return false;
     const targetCaps = ["is-creature-permanent", ...extraTargetCaps];
@@ -1873,7 +2311,7 @@
     if (!faceCompatibleCaps(target, targetCaps)) return false;
     if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
     if (!target?.faceFacts?.length && hasCap(copier, "hasty-copy-target-requires-nonlegendary") && isLegendaryPermanent(target)) return false;
-    return true;
+    return copyTokenLegendSafe(copier, target, "hasty-copy-token-nonlegendary", targetCaps);
   };
   const canHastyCopySpellTarget = (copySpell, target, extraTargetCaps = []) => {
     if (!hasCap(copySpell, "hasty-copy-spell-target-creature")) return false;
@@ -2042,6 +2480,62 @@
               freshTokenRepeatsExtraCombat: hasCap(dst, "extra-combat-repeatable-with-fresh-token"),
             };
             if (!evidence.targetIsCreature || !evidence.createsNonlegendaryHastyToken || !evidence.freshTokenRepeatsExtraCombat) continue;
+          }
+          if (f.family === "combat-sacrifice-aura→extra-combat-loop") {
+            const freshCarrierCount = maxCapNumber(dst, "fresh-carrier-tokens-created:");
+            evidence = {
+              from: f.from,
+              to: f.to,
+              auraRequiresConnect: hasCap(src, "combat-sacrifice-aura-requires-connect"),
+              auraSacrificesCarrier: hasCap(src, "combat-sacrifice-aura-sacrifices-carrier"),
+              auraReattaches: hasCap(src, "combat-sacrifice-aura-reattaches"),
+              auraUntapsCreatures: hasCap(src, "combat-sacrifice-aura-untaps-creatures"),
+              auraAddsCombat: hasCap(src, "combat-sacrifice-aura-adds-combat"),
+              freshCarrierTiming: hasCap(dst, "fresh-carrier-timing:beginning-of-combat"),
+              freshCarrierAttacks: hasCap(dst, "fresh-carrier-token-attacks"),
+              freshCarrierContinuity: hasCap(dst, "fresh-carrier-continuity"),
+              freshCarrierCount,
+              legalTargetAtTriggerResolution: freshCarrierCount > 0 && hasCap(dst, "fresh-carrier-continuity"),
+            };
+            if (!evidence.auraRequiresConnect
+                || !evidence.auraSacrificesCarrier
+                || !evidence.auraReattaches
+                || !evidence.auraUntapsCreatures
+                || !evidence.auraAddsCombat
+                || !evidence.freshCarrierTiming
+                || !evidence.freshCarrierAttacks
+                || !evidence.legalTargetAtTriggerResolution) continue;
+          }
+          if (f.family === "combat-resource→extra-combat-loop") {
+            const cost = manaCostProfileFromCaps(dst, "extra-combat");
+            evidence = {
+              from: f.from,
+              to: f.to,
+              extraCombatCost: cost.total,
+              extraCombatColors: cost.colors,
+              extraCombatUntapsCreatures: hasCap(dst, "extra-combat-untaps-creatures"),
+              activationTimingSafe: hasCap(dst, "is-repeatable-extra-combat-activator"),
+              createsPostCombatMainPhase: hasCap(dst, "extra-combat-adds-main-phase"),
+              activationWindow: capSuffixes(dst, "extra-combat-activation-window:")[0] || "unknown",
+              activationTapsSource: hasCap(dst, "extra-combat-activation-taps-source"),
+              activationUsesUntapSymbol: hasCap(dst, "extra-combat-activation-uses-untap-symbol"),
+              sourceIsCreature: isCreaturePermanent(dst),
+              activationSourceResetSafe: true,
+              resourceRequiresConnect: hasCap(src, "combat-resource-requires-connect"),
+              resourceRequiresAttack: hasCap(src, "combat-resource-requires-attack"),
+            };
+            const canRepeatActivation = evidence.activationTimingSafe
+              && (evidence.createsPostCombatMainPhase || evidence.activationWindow !== "sorcery");
+            evidence.activationSourceResetSafe = (!evidence.activationTapsSource && !evidence.activationUsesUntapSymbol)
+              || (evidence.sourceIsCreature
+                && (!evidence.activationTapsSource || hasCap(dst, "extra-combat-untaps-activating-creature")));
+            if (!evidence.extraCombatUntapsCreatures || !canRepeatActivation || !evidence.activationSourceResetSafe || !(cost.total > 0)) continue;
+          }
+          if (f.family === "artifact-token→extra-turn-loop") {
+            const artifactTokens = maxCapNumber(src, "artifact-tokens-per-turn:");
+            const sacrificeCount = maxCapNumber(dst, "artifact-extra-turn-sac-count:");
+            evidence = { from: f.from, to: f.to, artifactTokens, sacrificeCount };
+            if (!(artifactTokens >= sacrificeCount && sacrificeCount > 0)) continue;
           }
           if (f.family === "spell-copy-etb→creature-copy-spell-loop") {
             evidence = {
@@ -2228,6 +2722,9 @@
   EVENT_LABEL["enable:self-untap-mana→ability-copy-loop"] = "self-untap mana ability copy loop";
   EVENT_LABEL["enable:hasty-copy→etb-untap-loop"] = "hasty copy → ETB untap loop";
   EVENT_LABEL["enable:combat-copy-token→extra-combat-loop"] = "combat copy token → extra combat loop";
+  EVENT_LABEL["enable:combat-sacrifice-aura→extra-combat-loop"] = "combat-sacrifice Aura → extra combat loop";
+  EVENT_LABEL["enable:combat-resource→extra-combat-loop"] = "combat resource trigger → extra combat loop";
+  EVENT_LABEL["enable:artifact-token→extra-turn-loop"] = "turn-cycle artifact tokens → extra turn loop";
   EVENT_LABEL["enable:spell-copy-etb→creature-copy-spell-loop"] = "ETB spell copy → creature-copy spell loop";
   EVENT_LABEL["enable:death-copy-spell-etb-copy-loop"] = "ETB spell copy → death-copy creature spell loop";
   EVENT_LABEL["enable:self-copy-spell→magecraft-drain-loop"] = "self-copying spell → magecraft drain loop";
