@@ -262,9 +262,20 @@ function build(decklist, idx, options = {}) {
   });
 
   const graph = { nodes, edges, zoneEdges, zones: MODEL.ZONES, eventLabels: MODEL.EVENT_LABEL, missing };
-  if (buildOptions.includeInteractionProofs) graph.interactionProofs = PROOF_PACKAGES.buildInteractionProofPackages(nodes);
+  if (buildOptions.includeInteractionProofs) {
+    graph.interactionProofs = PROOF_PACKAGES.buildInteractionProofPackages(nodes);
+    applyInteractionProofCounts(graph.nodes, graph.interactionProofs);
+  }
   graph.metrics = METRICS.compute(graph);
   return graph;
+}
+
+function applyInteractionProofCounts(nodes, proofs = []) {
+  const counts = new Map();
+  for (const proof of proofs) {
+    for (const card of new Set(proof.cards || [])) counts.set(card, (counts.get(card) || 0) + 1);
+  }
+  for (const node of nodes) node.comboPackageCount = counts.get(node.id) || 0;
 }
 
 

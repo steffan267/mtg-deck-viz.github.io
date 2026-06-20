@@ -90,8 +90,19 @@ export function createBrowserGraphBuilder(model: InteractionModelModule, metrics
 
     const zoneEdges = nodes.flatMap(node => (node.zones || []).map(zone => ({ source: node.id, target: zone })))
     const graph: DeckGraph = { nodes: [...nodes, ...zoneNodes], edges, zoneEdges, zones: model.ZONES, eventLabels: model.EVENT_LABEL, missing }
-    if (options.includeInteractionProofs) graph.interactionProofs = options.buildInteractionProofPackages?.(nodes) || []
+    if (options.includeInteractionProofs) {
+      graph.interactionProofs = options.buildInteractionProofPackages?.(nodes) || []
+      applyInteractionProofCounts(graph.nodes, graph.interactionProofs)
+    }
     graph.metrics = metrics.compute(graph)
     return graph
   }
+}
+
+function applyInteractionProofCounts(nodes: GraphNode[], proofs: DeckGraph['interactionProofs'] = []) {
+  const counts = new Map<string, number>()
+  for (const proof of proofs) {
+    for (const card of new Set(proof.cards || [])) counts.set(card, (counts.get(card) || 0) + 1)
+  }
+  for (const node of nodes) node.comboPackageCount = counts.get(node.id) || 0
 }

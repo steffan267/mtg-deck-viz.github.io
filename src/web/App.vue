@@ -21,6 +21,7 @@ import { createBrowserGraphBuilder } from './services/browserGraphBuilder'
 import { useDeckImport } from './composables/useDeckImport'
 import { layoutStrategies } from './services/graphLayoutStrategies'
 import { cardFaceOverview } from './services/cardFaceDisplay'
+import { comboPackageCount, linkCount, nodeConnectivitySummary, pluralize } from './services/nodeConnectivity'
 import * as INTERACTION_MODEL from '../interaction-model.js'
 import * as DECK_METRICS_NAMESPACE from '../metrics.js'
 import { useRecommendations } from './composables/useRecommendations'
@@ -199,7 +200,9 @@ const activeNodePills = computed(() => {
   if (!node) return []
   const pills = [{ label: ROLE_LABELS[node.role] || node.role, color: ROLE_COLORS[node.role] || '#888' }]
   if (activeNodeFaceOverview.value) pills.push({ label: activeNodeFaceOverview.value.chip, color: '#9cc8ff' })
-  if (node.degree != null) pills.push({ label: `${node.degree} links`, color: '#ff8a93' })
+  if (node.degree != null) pills.push({ label: pluralize(linkCount(node), 'link'), color: '#ff8a93' })
+  const comboPackages = comboPackageCount(node)
+  if (comboPackages > 0) pills.push({ label: pluralize(comboPackages, 'combo package'), color: '#ff7a3d' })
   if (node.power) pills.push({ label: `power ${node.power}`, color: '#e0c85a' })
   if (node.linkMass) pills.push({ label: `link mass ${node.linkMass}`, color: '#5aa6ff' })
   return pills
@@ -773,7 +776,7 @@ function categoryCards(category: BreakdownTab) {
   return [...ids]
     .map(id => cardNodes.value.find(node => node.id === id))
     .filter((node): node is GraphNode => !!node)
-    .map(node => ({ id: node.id, label: shortName(node.id), role: ROLE_LABELS[node.role] || node.role, degree: node.degree || 0, text: node.text }))
+    .map(node => ({ id: node.id, label: shortName(node.id), role: ROLE_LABELS[node.role] || node.role, connectivity: nodeConnectivitySummary(node), text: node.text }))
 }
 
 function firstCategoryFamily(category: BreakdownTab): string | undefined {
@@ -951,7 +954,7 @@ function formatBreakdownValue(value: unknown): string | number {
           <div v-if="activeBreakdownCards.length" class="category-card-drawer__cards">
             <button v-for="card in activeBreakdownCards" :key="card.id" type="button" @click="selectCard(card.id)">
               <strong>{{ card.label }}</strong>
-              <span>{{ card.role }} · {{ card.degree }} links</span>
+              <span>{{ card.role }} · {{ card.connectivity }}</span>
               <small v-if="card.text">{{ card.text }}</small>
             </button>
           </div>

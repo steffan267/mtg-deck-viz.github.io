@@ -1,4 +1,4 @@
-import type { DeckGraph, DeckGraphEdge, GraphInteraction, RenderGraphModel, RenderLink, RenderNode } from '../types/graph'
+import type { DeckGraph, DeckGraphEdge, InteractionProofPackage, RenderGraphModel, RenderLink, RenderNode } from '../types/graph'
 
 export const STRENGTH_RANK: Record<string, number> = {
   weak: 1,
@@ -14,11 +14,13 @@ export interface GraphModelOptions {
 }
 
 export function createGraphModel(graph: DeckGraph, options: GraphModelOptions = {}): RenderGraphModel {
+  const proofCounts = countProofPackagesByCard(graph.interactionProofs || [])
   const nodes = (graph.nodes || [])
     .filter((node) => node.role !== 'zone')
     .map<RenderNode>((node) => ({
       ...node,
       role: String(node.role || 'utility'),
+      comboPackageCount: proofCounts.get(node.id) ?? numericComboPackageCount(node),
       x: 0,
       y: 0,
       vx: 0,
@@ -37,7 +39,7 @@ export function createGraphModel(graph: DeckGraph, options: GraphModelOptions = 
   computeMass(nodes, links, options.cardPower)
 
   const centerNode = chooseCenterNode(nodes)
-  const comboNodes = computeComboNodes(links)
+  const comboNodes = computeComboNodes(links, nodes)
 
   return {
     nodes,
@@ -47,6 +49,16 @@ export function createGraphModel(graph: DeckGraph, options: GraphModelOptions = 
     comboNodes,
     eventLabels: graph.eventLabels || {},
   }
+}
+
+export function countProofPackagesByCard(proofs: InteractionProofPackage[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const proof of proofs) {
+    for (const card of new Set(proof.cards || [])) {
+      counts.set(card, (counts.get(card) || 0) + 1)
+    }
+  }
+  return counts
 }
 
 export function edgeStrength(link: Pick<RenderLink, 'interactions'>): number {
@@ -178,7 +190,7 @@ function chooseCenterNode(nodes: RenderNode[]): RenderNode | null {
   }, null)
 }
 
-function computeComboNodes(links: RenderLink[]): Set<string> {
+function computeComboNodes(links: RenderLink[], nodes: RenderNode[]): Set<string> {
   const comboNodes = new Set<string>()
   for (const link of links) {
     if ((link.interactions || []).some((interaction) => interaction.strength === 'combo-critical')) {
@@ -186,5 +198,13 @@ function computeComboNodes(links: RenderLink[]): Set<string> {
       comboNodes.add(link.target.id)
     }
   }
+  for (const node of nodes) {
+    if (numericComboPackageCount(node) > 0) comboNodes.add(node.id)
+  }
   return comboNodes
+}
+
+function numericComboPackageCount(node: { comboPackageCount?: unknown }): number {
+  const value = node.comboPackageCount
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
 }

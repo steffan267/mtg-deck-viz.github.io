@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 const decklist = await import('../../src/web/services/import/decklist.ts')
 const graphModel = await import('../../src/web/services/graphModel.ts')
 const layout = await import('../../src/web/services/graphLayoutStrategies.ts')
+const nodeConnectivity = await import('../../src/web/services/nodeConnectivity.ts')
 
 function test(name, fn) {
   try {
@@ -67,6 +68,28 @@ test('createGraphModel chooses the commander as the center node', () => {
 test('createGraphModel marks combo-critical link endpoints as combo nodes', () => {
   const model = graphModel.createGraphModel(sampleGraph())
   assert.deepEqual([...model.comboNodes].sort(), ['Combo A', 'Combo B'])
+})
+
+test('createGraphModel counts proof package membership separately from pairwise links', () => {
+  const graph = sampleGraph()
+  graph.nodes = graph.nodes.map(node => ({ ...node, degree: node.id === 'Sink' || node.id === 'Ramp' || node.id === 'Combo A' || node.id === 'Combo B' ? 1 : 0 }))
+  graph.interactionProofs = [
+    { id: 'proof-1', family: 'value-loop', familyTitle: 'Value loop', cards: ['Commander', 'Sink', 'Sink'], cardCount: 2 },
+    { id: 'proof-2', family: 'value-loop', familyTitle: 'Value loop', cards: ['Commander', 'Combo A'], cardCount: 2 },
+  ]
+
+  const model = graphModel.createGraphModel(graph)
+
+  assert.equal(model.byId.get('Commander').degree, 0)
+  assert.equal(model.byId.get('Commander').comboPackageCount, 2)
+  assert.equal(model.byId.get('Sink').comboPackageCount, 1)
+  assert.equal(model.byId.get('Ramp').comboPackageCount, 0)
+  assert.equal(model.comboNodes.has('Commander'), true)
+})
+
+test('nodeConnectivitySummary separates links from combo packages', () => {
+  assert.equal(nodeConnectivity.nodeConnectivitySummary({ degree: 1, comboPackageCount: 2 }), '1 link · 2 combo packages')
+  assert.equal(nodeConnectivity.nodeConnectivitySummary({ degree: 0, comboPackageCount: 0 }), '0 links')
 })
 
 test('nodeFamilies returns labeled families for incident links', () => {

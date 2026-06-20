@@ -84,6 +84,7 @@ export function normalizeGraphNode(value: unknown): GraphNode {
     ci: asStringArray(input.ci),
     edh: asNullableNumber(input.edh),
     degree: asNumber(input.degree),
+    comboPackageCount: asNumber(input.comboPackageCount),
     produces: asDictionary(input.produces),
     consumes: asDictionary(input.consumes),
     zones: asArray(input.zones, normalizeZone),
@@ -203,8 +204,19 @@ export function normalizeDeckGraph(value: unknown): DeckGraph {
     missing: asStringArray(input.missing),
     metrics: input.metrics as DeckGraph['metrics'],
   }
-  if ('interactionProofs' in input) graph.interactionProofs = asArray(input.interactionProofs, normalizeInteractionProof)
+  if ('interactionProofs' in input) {
+    graph.interactionProofs = asArray(input.interactionProofs, normalizeInteractionProof)
+    applyInteractionProofCounts(graph.nodes, graph.interactionProofs)
+  }
   return graph
+}
+
+function applyInteractionProofCounts(nodes: GraphNode[], proofs: InteractionProofPackage[]) {
+  const counts = new Map<string, number>()
+  for (const proof of proofs) {
+    for (const card of new Set(proof.cards || [])) counts.set(card, (counts.get(card) || 0) + 1)
+  }
+  for (const node of nodes) node.comboPackageCount = counts.get(node.id) || 0
 }
 
 export function normalizeDeckPayloadEntry(value: unknown): DeckPayloadEntry {

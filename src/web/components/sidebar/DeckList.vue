@@ -29,6 +29,7 @@ import { computed } from 'vue'
 import EmptyState from '../common/EmptyState.vue'
 import SectionBlock from '../common/SectionBlock.vue'
 import { cardFaceListSummary } from '../../services/cardFaceDisplay'
+import { nodeConnectivitySummary } from '../../services/nodeConnectivity'
 import type { DeckNode } from '../../types/deck'
 
 const props = withDefaults(defineProps<{
@@ -57,7 +58,7 @@ function cardSummary(node: DeckNode): string {
   return [
     roleLabel(node),
     `MV ${node.cmc || 0}`,
-    `${node.degree || 0} links`,
+    nodeConnectivitySummary(node),
     cardFaceListSummary(node),
   ].filter(Boolean).join(' · ')
 }

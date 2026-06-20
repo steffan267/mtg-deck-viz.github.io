@@ -89,6 +89,7 @@ export interface GraphNode {
   ci: string[]
   edh: number | null
   degree: number
+  comboPackageCount?: number
   produces: Record<string, unknown>
   consumes: Record<string, unknown>
   zones: ZoneDescriptor[]

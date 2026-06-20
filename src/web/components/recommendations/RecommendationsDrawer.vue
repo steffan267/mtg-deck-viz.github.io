@@ -38,7 +38,7 @@
         <button type="button" class="rec-head" @click="emit('select-card', node.id)">
           <span>
             <strong class="rec-name">{{ node.id }}</strong>
-            <small class="rec-meta">{{ roleLabels?.[node.role] || node.role }} · MV {{ node.cmc || 0 }} · {{ node.degree || 0 }} links</small>
+            <small class="rec-meta">{{ roleLabels?.[node.role] || node.role }} · MV {{ node.cmc || 0 }} · {{ nodeConnectivitySummary(node) }}</small>
           </span>
         </button>
       </AppPanel>
@@ -52,6 +52,7 @@ import { computed, ref } from 'vue'
 import type { CandidateCard, DeckNode } from '../../types/deck'
 import type { RecommendationMode, RecommendationRow } from '../../services/recommendations'
 import { candidateByName, recommendationDetail, recommendationModes } from '../../services/recommendations'
+import { nodeConnectivitySummary } from '../../services/nodeConnectivity'
 import RecommendationCard from './RecommendationCard.vue'
 import AppPanel from '../common/AppPanel.vue'
 import ErrorNotice from '../common/ErrorNotice.vue'
