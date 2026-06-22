@@ -202,16 +202,18 @@ The strict family proved three real EDHREC rows:
 attack-trigger, non-hasty, copy-token, and haste-support shapes remain later
 stories rather than being counted through unsafe raw graph signals.
 
-## G015 implementation plan — fresh-copy extra-combat loops
+## G015 implementation plan — fresh-token extra-combat and extra-turn loops
 
-`G015` generalizes fresh hasty copy loops for extra-combat attackers while
-keeping them strict-proof-only and card-name-agnostic.
+`G015` generalizes fresh hasty copy-token loops for extra-combat and
+extra-turn attackers while keeping them strict-proof-only and
+card-name-agnostic.
 
 ### Scope
 
 - In scope: deterministic hasty creature-copy sources that create a fresh
   nonlegendary or legend-safe token before that token must attack or connect,
-  paired with attack-trigger or combat-damage-to-player extra-combat attackers.
+  paired with attack-trigger or combat-damage-to-player extra-combat or
+  extra-turn attackers.
 - In scope: three copy timing/attachment buckets:
   - beginning-of-combat/precombat copy engines that create hasty creature
     tokens before attackers are declared;
@@ -221,12 +223,12 @@ keeping them strict-proof-only and card-name-agnostic.
     creature before attacks and are reset by the extra-combat loop.
 - Out of scope: tapped-and-attacking copy engines, random or conditional copy
   counts, first-combat-only engines, restricted next-combat attacker clauses,
-  non-player combat-damage triggers, raw damage/win claims, and attacker
+  non-player combat-damage triggers, raw damage/win claims, and unsafe
   extra-turn loops that cannot prove the same per-turn repeatability.
 
 ### Families
 
-This story hardens the existing family and adds three narrow families:
+This story hardens the existing family and adds seven narrow families:
 
 - `combat-copy-token→extra-combat-loop`:
   precombat hasty creature copy + attack-trigger extra-combat attacker.
@@ -238,9 +240,18 @@ This story hardens the existing family and adds three narrow families:
 - `hasty-copy→connect-extra-combat-loop`:
   activated or attached hasty copy + combat-damage-to-player extra-combat
   attacker.
+- `combat-copy-token→attack-extra-turn-loop`:
+  precombat hasty creature copy + attack-trigger extra-turn attacker.
+- `combat-copy-token→connect-extra-turn-loop`:
+  precombat hasty creature copy + combat-damage-to-player extra-turn attacker.
+- `hasty-copy→attack-extra-turn-loop`:
+  activated or attached hasty copy + attack-trigger extra-turn attacker.
+- `hasty-copy→connect-extra-turn-loop`:
+  activated or attached hasty copy + combat-damage-to-player extra-turn
+  attacker.
 
-All four families are proof-only for result coverage. They are deliberately not
-raw edge-result mappings in the evaluator.
+All eight families are proof-only for result coverage. They are deliberately
+not raw edge-result mappings in the evaluator.
 
 ### Capability and proof contract
 
@@ -263,18 +274,25 @@ the package must prove:
    precondition and require player/opponent combat damage text;
 9. next-combat restrictions, once-only triggers, optional payment dependencies,
    random outcomes, first-combat-only text, and “can't attack during extra
-   turns” text reject or defer the package.
+   turns” text reject or defer the package;
+10. extra-turn families must also prove repeated extra-turn legality and may
+    only claim the `infinite-turns` axis.
 
-Allowed proof result axes are conservative: `combat`, `infinite-etb`, and
-`infinite-tokens` from proof deltas only. The story does not claim
-`infinite-damage`, `win`, or `infinite-turns`.
+Allowed proof result axes are conservative:
+
+- extra-combat families may claim only `combat`, `infinite-etb`, and
+  `infinite-tokens` from proof deltas;
+- extra-turn families may claim only `infinite-turns`.
+
+The story does not claim `infinite-damage`, `win`, or broad mana/card axes from
+these copy-loop proofs.
 
 ### Evaluator guardrail
 
 The previous capability-only evaluator path for
-`combat-copy-token→extra-combat-loop` was removed. The old and new fresh-copy
-combat families are not present in `EDGE_RESULT_CLASS_MAP`; EDHREC coverage
-comes only from strict proof/package evidence and proof-delta result classes.
+`combat-copy-token→extra-combat-loop` was removed. The fresh-copy combat/turn
+families are not present in `EDGE_RESULT_CLASS_MAP`; EDHREC coverage comes only
+from strict proof/package evidence and proof-delta result classes.
 
 ### Regression matrix
 
@@ -295,23 +313,28 @@ comes only from strict proof/package evidence and proof-delta result classes.
 
 ### G015 completion evidence
 
-Implemented the strict fresh-copy extra-combat slice without adding runtime or
-evaluator card-name matching.
+Implemented the strict fresh-copy extra-combat and extra-turn slice without
+adding runtime or evaluator card-name matching.
 
 Runtime changes:
 
 - `src/interaction-model.js` now extracts precombat hasty creature-copy,
-  activated hasty-copy, attached self-copy Aura, attack-trigger extra-combat,
-  connect-trigger extra-combat, and blocker/defer capabilities.
-- `src/interaction-proof-search.js` now proves the four strict families only
+  activated hasty-copy, attached self-copy Aura, attack-trigger and
+  combat-damage extra-combat/extra-turn capabilities, plus
+  `extra-turn-repeatable-with-fresh-token`,
+  `extra-turn-source-cannot-attack-extra-turns`, and
+  `extra-turn-source-requires-optional-payment`.
+- `src/interaction-proof-search.js` now proves the eight strict families only
   when target legality, token haste, legend safety, timing, unused per-token
   trigger state, attacker declaration, source reset, and connect preconditions
-  are satisfied.
-- `src/interaction-proof-packages.js` seeds fresh-copy/extra-combat packages
-  without broad card-name or generic-edge matching.
-- `src/combo-family-library.js` declares the old and new fresh-copy combat
-  family contracts, required facts, disqualifiers, and conservative proof-delta
-  result axes.
+  are satisfied; the G015 follow-up fix also enforces same-face DFC legend
+  safety and same-face creature reset for tapping copy sources.
+- `src/interaction-proof-packages.js` seeds fresh-copy extra-combat and
+  extra-turn packages without broad card-name or generic-edge matching.
+- `src/combo-family-library.js` declares the fresh-copy combat and extra-turn
+  family contracts, required facts, disqualifiers, and conservative
+  proof-delta result axes; extra-turn families are exactly
+  `['infinite-turns']`.
 - `analysis/edhrec-combos/evaluate-edhrec-combos.js` no longer counts the old
   combat-copy family through capability-only detection; all fresh-copy combat
   coverage is proof/package-derived.
@@ -327,25 +350,30 @@ node test/edhrec-combo-evaluator.test.js
 node ./scripts/check-no-combo-name-hardcoding.js
 npm run test:combo-detection
 npm run typecheck:combo-detection
+npm run check
+npm test
+npm run build
 node ./analysis/edhrec-combos/evaluate-edhrec-combos.js
+git diff --check
 ```
 
-Full evaluator after G015 (`2026-06-20T16:03:32.690Z`):
+Full evaluator after G015 (`2026-06-20T16:58:11.637Z`):
 
 - detailed combos evaluated: **54,710**;
 - local card resolution: **54,367 / 54,710**;
-- strict proved bucket: **1,096**;
-- proof-status `proven`: **1,088**;
+- strict proved bucket: **1,097**;
+- proof-status `proven`: **1,089**;
 - combo-family detected: **65.4%**;
-- expected result-class coverage: **31,672 / 54,161 (58.5%)**;
-- proof-only expected coverage: **2,312 / 54,161 (4.3%)**.
+- expected result-class coverage: **31,673 / 54,161 (58.5%)**;
+- proof-only expected coverage: **2,313 / 54,161 (4.3%)**.
 
-The strict fresh-copy extra-combat families prove eleven real EDHREC rows:
+The strict fresh-copy extra-combat families prove twelve real EDHREC rows:
 
 - `combat-copy-token→extra-combat-loop`:
   `Aurelia, the Warleader + Helm of the Host`,
   `Godo, Bandit Warlord + Helm of the Host`, and
-  `Combat Celebrant + Helm of the Host`;
+  `Combat Celebrant + Helm of the Host`, and
+  `Rionya, Fire Dancer + Combat Celebrant`;
 - `hasty-copy→attack-extra-combat-loop`:
   `Combat Celebrant + Kiki-Jiki, Mirror Breaker`,
   `Combat Celebrant + Splinter Twin`, and
@@ -358,8 +386,67 @@ The strict fresh-copy extra-combat families prove eleven real EDHREC rows:
   `Kiki-Jiki, Mirror Breaker + Port Razer` and
   `Port Razer + Splinter Twin`.
 
-Attacker extra-turn rows remain intentionally unresolved until a later story can
-prove turn-cycle repeatability with the same strictness. Medomai-style “can't
-attack during extra turns” and Wanderwine-style optional sacrifice/fodder
-dependencies are classified as blockers/deferred cases instead of being counted
-through unsafe graph signals.
+The extra-turn families are implemented generically but prove **zero** current
+EDHREC rows in the full corpus. Medomai-style “can't attack during extra turns”
+and Wanderwine-style optional sacrifice/fodder dependencies remain classified
+as blockers/deferred cases instead of being counted through unsafe graph
+signals. Extra-turn proofs do not leak token, ETB, combat, damage, mana, or
+win axes.
+
+## G016 implementation update — counter-threshold/proliferate extra-turn loops
+
+G016 is now implemented as two strict-proof-only families:
+
+- `counter-threshold-doubler→extra-turn-loop`
+- `counter-threshold-proliferate→extra-turn-loop`
+
+What changed:
+
+- `src/interaction-model.js` now extracts counter-threshold extra-turn engines,
+  repeatable counter doublers, repeatable/turn-cycle proliferators,
+  proliferate counts per turn, and proliferate multipliers.
+- `src/interaction-proof-search.js` now proves:
+  - threshold-preserving free counter-doubler extra-turn loops from an explicit
+    established threshold state;
+  - seeded proliferate extra-turn loops from an explicit one-counter seed when
+    the package proliferates enough times per turn to regain the threshold and
+    leave a seed behind.
+- `src/interaction-proof-packages.js` now seeds bounded pairs/triples for those
+  strict families.
+- `src/combo-family-library.js` keeps both families `infinite-turns` only.
+
+Safety contract:
+
+- only package-local zero-mana support is accepted;
+- the proof must name the threshold or seed counter precondition explicitly;
+- threshold-only loops do **not** claim `infinite-counters`, mana, combat,
+  token, or win axes.
+
+Fresh validation:
+
+```sh
+node --check src/interaction-model.js src/combo-family-library.js src/interaction-proof-search.js src/interaction-proof-packages.js test/interaction-model.test.js test/combo-family-library.test.js test/interaction-proof-search.test.js test/interaction-proof-packages.test.js test/edhrec-combo-evaluator.test.js
+node test/interaction-model.test.js
+node test/combo-family-library.test.js
+node test/interaction-proof-search.test.js
+node test/interaction-proof-packages.test.js
+node test/edhrec-combo-evaluator.test.js
+node ./scripts/check-no-combo-name-hardcoding.js
+npm test
+npm run check
+node ./analysis/edhrec-combos/evaluate-edhrec-combos.js
+```
+
+Full evaluator after G016 (`2026-06-22T07:09:13.653Z`) remains:
+
+- detailed combos evaluated: **54,710**;
+- local card resolution: **54,367 / 54,710**;
+- strict proved bucket: **1,097**;
+- proof-status `proven`: **1,089**;
+- combo-family detected: **65.4%**;
+- expected result-class coverage: **31,673 / 54,161 (58.5%)**;
+- proof-only expected coverage: **2,313 / 54,161 (4.3%)**.
+
+The current EDHREC corpus contributes **zero** real rows to the new G016
+families. That is intentional: mana-paid or ambient-board-state Scepter lines
+remain residuals instead of being counted through unsafe threshold assumptions.

@@ -122,9 +122,22 @@ The current combo corpus work established these reusable constraints:
 - **Proof-package seeds are product behavior.** If `provePackage()` learns a new
   family, `interaction-proof-packages.js` must seed the same bounded candidate
   shape so static/UI `interactionProofs` do not lag the proof engine.
-- **Fresh-token loops need freshness facts.** Combat-copy Equipment is only a
-  proof when it creates a hasty nonlegendary token and the copied attacker gets a
-  repeatable extra-combat trigger from each fresh token.
+- **Fresh-token combat/turn loops need freshness and axis guards.** Hasty
+  copy-token loops are only a proof when the token is created before attacker
+  declaration, survives copy/legend restrictions on the same compatible face,
+  has an unused fresh-token attack or connect trigger, and the copy source
+  resets for the next iteration.
+- Extra-combat variants may project only `combat`, `infinite-etb`, and
+  `infinite-tokens`.
+- Extra-turn variants may project only `infinite-turns`; they reject
+  cannot-attack-extra-turns, optional payment/fodder, tapped-and-attacking,
+  random, first-combat-only, non-player-damage, and legend-unsafe cases.
+- **Counter-threshold extra-turn loops need explicit seeded states.** Charge-
+  or counter-threshold turn engines are only proof-safe when the package names
+  the threshold, states the established seed/threshold counters at loop entry,
+  and uses package-local zero-mana doubler or proliferate support. Threshold-
+  only loops stay `infinite-turns` only; they must not leak `infinite-counters`
+  unless a separate proof establishes real positive counter growth.
 - **Optional self-copy spells can be proof-safe when the payoff is specific.**
   A targeted spell that lets the target copy it is not a win by itself; it
   becomes a proved drain loop only with a payoff that triggers on copying

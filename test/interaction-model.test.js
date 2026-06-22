@@ -157,6 +157,468 @@ When Gilded Goose enters, create a Food token.
   assertHasCap(marionetteApprentice, 'has-death-trigger');
   assertHasCap(marionetteApprentice, 'is-death-drain-payoff');
 
+  const counterThresholdExtraTurnEngine = node(
+    'Counter Threshold Extra-Turn Engine',
+    'Artifact',
+    '{T}, Remove three charge counters from this artifact: Take an extra turn after this one.',
+    3,
+  );
+  const freeCounterDoubler = node(
+    'Free Counter Doubler',
+    'Artifact',
+    '{T}: Double the number of each kind of counter on target artifact.',
+    2,
+  );
+  const manaPaidCounterDoubler = node(
+    'Mana-Paid Counter Doubler',
+    'Artifact',
+    '{2}, {T}: Double the number of each kind of counter on target artifact.',
+    3,
+  );
+  const freeProliferator = node(
+    'Free Proliferator',
+    'Artifact',
+    '{T}: Proliferate three times.',
+    4,
+  );
+  const singleProliferator = node(
+    'Single Proliferator',
+    'Artifact',
+    'At the beginning of your end step, proliferate.',
+    4,
+  );
+  const proliferateDoubler = node(
+    'Proliferate Doubler',
+    'Creature — Phyrexian Wizard',
+    'If you would proliferate, proliferate twice instead.',
+    4,
+  );
+  const forcedExileCastEngine = node(
+    'Forced Exile Cast Engine',
+    'Artifact',
+    'Whenever a player casts a spell from their hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with this artifact without paying its mana cost.',
+    6,
+  );
+  const forcedDrawReplacementCastEngine = node(
+    'Forced Draw Replacement Cast Engine',
+    'Artifact',
+    "Players can't draw cards. At the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.",
+    5,
+  );
+  const nonhandCastLockpiece = node(
+    'Nonhand Cast Lockpiece',
+    'Creature — Human Wizard',
+    "Your opponents can't cast spells from anywhere other than their hands.",
+    2,
+  );
+  const spellCountLockpiece = node(
+    'Spell Count Lockpiece',
+    'Enchantment',
+    "Each player can't cast more than one spell each turn.",
+    3,
+  );
+  const sorceryTimingLockpiece = node(
+    'Sorcery Timing Lockpiece',
+    'Legendary Planeswalker',
+    'Each opponent can cast spells only any time they could cast a sorcery.',
+    3,
+  );
+  const freeCastCounterLockpiece = node(
+    'Free Cast Counter Lockpiece',
+    'Artifact',
+    'Whenever a player casts a spell, if no mana was spent to cast it, counter that spell.',
+    1,
+  );
+  const opponentFreeCastCounterLockpiece = node(
+    'Opponent Free Cast Counter Lockpiece',
+    'Creature — Human Soldier',
+    'Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell.',
+    2,
+  );
+  const noncreatureExileLockpiece = node(
+    'Noncreature Exile Lockpiece',
+    'Artifact Creature — Phyrexian Golem',
+    "Players can't cast noncreature spells from graveyards or exile.",
+    2,
+  );
+  const counterSuppressionStatic = node(
+    'Counter Suppression Static',
+    'Enchantment',
+    "Players can't get counters. Counters can't be put on artifacts, creatures, enchantments, or lands.",
+    3,
+  );
+  const counterBurdenPreventionShield = node(
+    'Counter Burden Prevention Shield',
+    'Enchantment',
+    'If a source would deal damage to you, prevent that damage and put an incarnation counter on this enchantment. When there are nine or more incarnation counters on this enchantment, exile it.',
+    3,
+  );
+  const delayedCounterShield = node(
+    'Delayed Counter Shield',
+    'Enchantment',
+    'If damage would be dealt to you, put that many delay counters on this enchantment instead. At the beginning of your upkeep, remove all delay counters from this enchantment. For each delay counter removed this way, you lose 1 life unless you pay {1}{W}.',
+    4,
+  );
+  const depletionCounterspellLockpiece = node(
+    'Depletion Counterspell Lockpiece',
+    'Enchantment',
+    'Whenever an opponent casts a spell, counter that spell and put a depletion counter on this enchantment. If there are three or more depletion counters on this enchantment, sacrifice it.',
+    8,
+  );
+  const zeroLifePoisonShield = node(
+    'Zero Life Poison Shield',
+    'Enchantment',
+    "You don't lose the game for having 0 or less life. As long as you have 0 or less life, all damage is dealt to you as though its source had infect.",
+    3,
+  );
+  const ageCounterPreventionSource = node(
+    'Age Counter Prevention Source',
+    'Land',
+    'Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) Creatures you control can\'t attack. Prevent all damage that would be dealt to you.',
+    0,
+  );
+  const replayablePreventionLand = node(
+    'Replayable Prevention Land',
+    'Land',
+    'Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) When this land enters, sacrifice a land. Creatures you control can\'t attack. Prevent all damage that would be dealt to you.',
+    0,
+  );
+  const landReplaySupport = node(
+    'Land Replay Support',
+    'Artifact',
+    'You may play lands from your graveyard.',
+    3,
+  );
+  const extraLandSupport = node(
+    'Extra Land Support',
+    'Enchantment',
+    'You may play an additional land on each of your turns.',
+    1,
+  );
+  const drawStepHandCycler = node(
+    'Draw-Step Hand Cycler',
+    'Artifact',
+    "At the beginning of each player's draw step, that player puts the cards in their hand on the bottom of their library in any order, then draws that many cards.",
+    4,
+  );
+  const opponentDrawLimit = node(
+    'Opponent Draw Limit',
+    'Planeswalker',
+    "Each opponent can't draw more than one card each turn.",
+    3,
+  );
+  const playerDrawLimit = node(
+    'Player Draw Limit',
+    'Creature — Spirit',
+    "Each player can't draw more than one card each turn.",
+    2,
+  );
+  const opponentDrawReplacementLimit = node(
+    'Opponent Draw Replacement Limit',
+    'Creature — Rogue',
+    'If an opponent would draw a card except the first one they draw in each of their draw steps, instead that player skips that draw and you draw a card.',
+    4,
+  );
+  const noDrawSearchStepEngine = node(
+    'No-Draw Search-Step Engine',
+    'Creature — Elf Wizard',
+    "Players can't draw cards. At the beginning of each player's draw step, that player loses 3 life, searches their library for a card, puts it into their hand, then shuffles.",
+    3,
+  );
+  const opponentSearchLockpiece = node(
+    'Opponent Search Lockpiece',
+    'Creature — Human Rogue',
+    "You control your opponents while they're searching their libraries. While an opponent is searching their library, they exile each card they find.",
+    3,
+  );
+  const playerSearchLockpiece = node(
+    'Player Search Lockpiece',
+    'Artifact',
+    "Players can't search libraries.",
+    4,
+  );
+  const noFlyingAttackYouLockpiece = node(
+    'No-Flying Attack You Lockpiece',
+    'Enchantment',
+    "Creatures without flying can't attack you.",
+    5,
+  );
+  const noFlyingAttackAllLockpiece = node(
+    'No-Flying Attack All Lockpiece',
+    'Enchantment',
+    "Creatures without flying can't attack.",
+    4,
+  );
+  const flyersCantAttackYouLockpiece = node(
+    'Flyers Cant Attack You Lockpiece',
+    'Enchantment',
+    "Creatures with flying can't attack you.",
+    8,
+  );
+  const flyingIslandwalkOnlyAttackYouLockpiece = node(
+    'Flying Islandwalk Only Attack You Lockpiece',
+    'Enchantment',
+    "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.",
+    2,
+  );
+  const flyingIslandwalkOnlyAttackAllLockpiece = node(
+    'Flying Islandwalk Only Attack All Lockpiece',
+    'Creature — Leviathan',
+    "All lands are Islands in addition to their other types. Creatures without flying or islandwalk can't attack.",
+    8,
+  );
+  const opponentFlyingRemovalSupport = node(
+    'Opponent Flying Removal Support',
+    'Enchantment Creature — Human Wizard',
+    "Creatures you control have flying. Creatures your opponents control lose flying and can't have or gain flying.",
+    6,
+  );
+  const globalFlyingIslandwalkRemovalSupport = node(
+    'Global Flying Islandwalk Removal Support',
+    'World Enchantment',
+    'All creatures lose flying and islandwalk.',
+    4,
+  );
+  const globalFlyingRemovalSupport = node(
+    'Global Flying Removal Support',
+    'Enchantment',
+    'All creatures lose flying.',
+    1,
+  );
+  const globalUntapSkipper = node(
+    'Global Untap Skipper',
+    'Enchantment',
+    "Players skip their untap steps. At the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.",
+    2,
+  );
+  const allPermanentsAreArtifactsEngine = node(
+    'All-Permanents Are Artifacts Engine',
+    'Artifact',
+    'All permanents are artifacts in addition to their other types.',
+    6,
+  );
+  const artifactActivationLockpiece = node(
+    'Artifact Activation Lockpiece',
+    'Artifact',
+    "Activated abilities of artifacts can't be activated.",
+    2,
+  );
+  const opponentArtifactActivationLockpiece = node(
+    'Opponent Artifact Activation Lockpiece',
+    'Planeswalker',
+    "Activated abilities of artifacts your opponents control can't be activated.",
+    4,
+  );
+  const allLandsAreIslandsEngine = node(
+    'All-Lands Are Islands Engine',
+    'Creature — Leviathan',
+    "All lands are Islands in addition to their other types. Creatures without flying or islandwalk can't attack.",
+    8,
+  );
+  const nonbasicLandsAreIslandsEngine = node(
+    'Nonbasic Lands Are Islands Engine',
+    'Creature — Merfolk Wizard',
+    'Nonbasic lands are Islands.',
+    3,
+  );
+  const islandUntapLockpiece = node(
+    'Island Untap Lockpiece',
+    'Enchantment',
+    "Islands don't untap during their controllers' untap steps.",
+    3,
+  );
+  const islandTapUntapLockpiece = node(
+    'Island Tap Untap Lockpiece',
+    'Enchantment',
+    "When this enchantment enters, tap all Islands. Islands don't untap during their controllers' untap steps.",
+    4,
+  );
+  const faceUpUntapSkipper = node(
+    'Face-Up Untap Skipper',
+    'Creature — Elemental',
+    'Morph {5}{U}{U} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.) When this creature is turned face up, each opponent skips their next untap step.',
+    6,
+  );
+  const upkeepResetCopier = node(
+    'Upkeep Reset Copier',
+    'Creature — Shapeshifter',
+    'As this creature enters or is turned face up, you may choose another creature on the battlefield. If you do, until this creature is turned face down, it becomes a copy of that creature, except it has "At the beginning of your upkeep, you may turn this creature face down." Morph {1}{U}',
+    5,
+  );
+  const globalUpkeepSkipper = node(
+    'Global Upkeep Skipper',
+    'Artifact',
+    'Players skip their upkeep steps.',
+    5,
+  );
+  const selfEndStepNonlandUntapper = node(
+    'Self End Step Nonland Untapper',
+    'Enchantment',
+    'At the beginning of your end step, untap all nonland permanents you control.',
+    3,
+  );
+  const upkeepUntapManaLand = node(
+    'Upkeep Untap Mana Land',
+    'Land',
+    "This land doesn't untap during your untap step. At the beginning of your upkeep, you may exile a card from your hand. If you do, untap this land. {T}: Add one mana of any color.",
+    0,
+  );
+  const graveyardArtifactCastSupport = node(
+    'Graveyard Artifact Cast Support',
+    'Legendary Creature — Merfolk Wizard',
+    '{T}: Choose target artifact card in your graveyard. You may cast that card this turn.',
+    2,
+  );
+  const combatGraveyardArtifactCastSupport = node(
+    'Combat Graveyard Artifact Cast Support',
+    'Legendary Artifact Creature — Human',
+    'Whenever this creature deals combat damage to a player, choose target artifact card in your graveyard. You may cast that card this turn.',
+    3,
+  );
+  const graveyardPermanentCastSupport = node(
+    'Graveyard Permanent Cast Support',
+    'Legendary Creature — Elemental Avatar',
+    'During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.',
+    6,
+  );
+  const constrainedGraveyardPermanentCastSupport = node(
+    'Constrained Graveyard Permanent Cast Support',
+    'Artifact',
+    "{T}: Choose target nonland permanent card in your graveyard. If you haven't cast a spell this turn, you may cast that card. If you do, you can't cast additional spells this turn. Activate only as a sorcery.",
+    4,
+  );
+  const castProtectionSource = node(
+    'Cast Protection Source',
+    'Legendary Artifact',
+    'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.',
+    4,
+  );
+  const artifactSelfBounceSupport = node(
+    'Artifact Self Bounce Support',
+    'Legendary Creature — Human Advisor',
+    '{1}{U}: Return target artifact you control to its owner\'s hand.',
+    2,
+  );
+  const permanentSelfBounceSupport = node(
+    'Permanent Self Bounce Support',
+    'Creature — Vedalken Wizard',
+    '{U}, {T}: Return target permanent you control to its owner\'s hand.',
+    2,
+  );
+  const discardSelfBounceSupport = node(
+    'Discard Self Bounce Support',
+    'Creature — Human Spellshaper',
+    'Flying {U}, {T}, Discard a card: Return target permanent you control to its owner\'s hand.',
+    4,
+  );
+  const yourTurnOnlySelfBounceSupport = node(
+    'Your-Turn-Only Self Bounce Support',
+    'Creature — Wizard',
+    '{U}, {T}: Return target permanent you control to its owner\'s hand. Activate only during your turn.',
+    2,
+  );
+  assertHasCap(counterThresholdExtraTurnEngine, 'is-counter-threshold-extra-turn-engine');
+  assertHasCap(counterThresholdExtraTurnEngine, 'counter-threshold-extra-turn-threshold:3');
+  assertHasCap(counterThresholdExtraTurnEngine, 'counter-threshold-extra-turn-type:charge');
+  assertHasCap(freeCounterDoubler, 'is-repeatable-counter-doubler');
+  assertHasCap(freeCounterDoubler, 'counter-doubler-target:artifact');
+  assertHasCap(manaPaidCounterDoubler, 'counter-doubler-cost:2');
+  assertHasCap(freeProliferator, 'is-repeatable-proliferator');
+  assertHasCap(freeProliferator, 'proliferate-count-per-turn:3');
+  assertHasCap(singleProliferator, 'is-turn-cycle-proliferator');
+  assertHasCap(singleProliferator, 'proliferate-count-per-turn:1');
+  assertHasCap(proliferateDoubler, 'is-proliferate-multiplier');
+  assertHasCap(proliferateDoubler, 'proliferate-multiplier:2');
+  assertHasCap(forcedExileCastEngine, 'is-forced-nonhand-cast-engine');
+  assertHasCap(forcedExileCastEngine, 'forced-cast-origin:exile');
+  assertHasCap(forcedExileCastEngine, 'forced-cast-trigger:spell-from-hand');
+  assertHasCap(forcedDrawReplacementCastEngine, 'is-forced-nonhand-cast-engine');
+  assertHasCap(forcedDrawReplacementCastEngine, 'forced-cast-origin:library-top');
+  assertHasCap(forcedDrawReplacementCastEngine, 'forced-cast-trigger:draw-step');
+  assertHasCap(nonhandCastLockpiece, 'is-cast-origin-lockpiece');
+  assertHasCap(nonhandCastLockpiece, 'cast-lock-origin:non-hand');
+  assertHasCap(spellCountLockpiece, 'cast-lock-axis:spell-count');
+  assertHasCap(sorceryTimingLockpiece, 'cast-lock-axis:timing-sorcery');
+  assertHasCap(freeCastCounterLockpiece, 'cast-lock-axis:free-cast');
+  assertHasCap(opponentFreeCastCounterLockpiece, 'cast-lock-axis:free-cast');
+  assertHasCap(opponentFreeCastCounterLockpiece, 'cast-lock-scope:opponents');
+  assertHasCap(noncreatureExileLockpiece, 'cast-lock-origin-exile-noncreature-only');
+  assertHasCap(yourTurnOnlySelfBounceSupport, 'self-bounce-window:your-turn');
+  assertHasCap(counterSuppressionStatic, 'is-counter-suppression-static');
+  assertHasCap(counterSuppressionStatic, 'counter-suppression:players');
+  assertHasCap(counterSuppressionStatic, 'counter-suppression:enchantments');
+  assertHasCap(counterSuppressionStatic, 'counter-suppression:lands');
+  assertHasCap(counterBurdenPreventionShield, 'is-damage-prevention-counter-burden');
+  assertHasCap(counterBurdenPreventionShield, 'counter-burden-type:incarnation');
+  assertHasCap(counterBurdenPreventionShield, 'counter-burden-threshold-failure');
+  assertHasCap(delayedCounterShield, 'is-damage-prevention-counter-burden');
+  assertHasCap(delayedCounterShield, 'counter-burden-type:delay');
+  assertHasCap(delayedCounterShield, 'counter-burden-upkeep-loss');
+  assertHasCap(depletionCounterspellLockpiece, 'is-spell-counter-depletion-lockpiece');
+  assertHasCap(zeroLifePoisonShield, 'is-zero-life-poison-shield');
+  assertHasCap(ageCounterPreventionSource, 'is-cumulative-upkeep-counter-burden');
+  assertHasCap(ageCounterPreventionSource, 'counter-burden-type:age');
+  assertHasCap(ageCounterPreventionSource, 'is-full-self-damage-prevention-source');
+  assertHasCap(replayablePreventionLand, 'is-replayable-prevention-land-lockpiece');
+  assertHasCap(landReplaySupport, 'is-land-recursion');
+  assertHasCap(extraLandSupport, 'is-extra-land-drop');
+  assertHasCap(extraLandSupport, 'extra-land-drops:1');
+  assertHasCap(drawStepHandCycler, 'is-draw-step-hand-cycler');
+  assertHasCap(opponentDrawLimit, 'is-draw-limit-lockpiece');
+  assertHasCap(opponentDrawLimit, 'draw-limit-scope:opponents');
+  assertHasCap(playerDrawLimit, 'draw-limit-scope:players');
+  assertHasCap(opponentDrawReplacementLimit, 'draw-limit-replacement:skip');
+  assertHasCap(noDrawSearchStepEngine, 'is-no-draw-search-step-engine');
+  assertHasCap(opponentSearchLockpiece, 'is-search-lockpiece');
+  assertHasCap(opponentSearchLockpiece, 'search-lock-scope:opponents');
+  assertHasCap(playerSearchLockpiece, 'search-lock-scope:players');
+  assertHasCap(noFlyingAttackYouLockpiece, 'attack-lock-axis:no-flying');
+  assertHasCap(noFlyingAttackYouLockpiece, 'attack-lock-scope:you');
+  assertHasCap(noFlyingAttackAllLockpiece, 'attack-lock-scope:players');
+  assertHasCap(flyersCantAttackYouLockpiece, 'attack-lock-axis:flying-only');
+  assertHasCap(flyingIslandwalkOnlyAttackYouLockpiece, 'attack-lock-axis:flying-or-islandwalk-only');
+  assertHasCap(flyingIslandwalkOnlyAttackAllLockpiece, 'attack-lock-axis:flying-or-islandwalk-only');
+  assertHasCap(opponentFlyingRemovalSupport, 'evasion-removal:flying');
+  assertHasCap(opponentFlyingRemovalSupport, 'evasion-removal-scope:opponents');
+  assertHasCap(globalFlyingIslandwalkRemovalSupport, 'evasion-removal:flying');
+  assertHasCap(globalFlyingIslandwalkRemovalSupport, 'evasion-removal:islandwalk');
+  assertHasCap(globalFlyingRemovalSupport, 'evasion-removal:flying');
+  assertHasCap(globalUntapSkipper, 'is-global-untap-skipper');
+  assertHasCap(allPermanentsAreArtifactsEngine, 'is-all-permanents-artifacts');
+  assertHasCap(artifactActivationLockpiece, 'is-artifact-activation-lockpiece');
+  assertHasCap(artifactActivationLockpiece, 'artifact-activation-lock-scope:players');
+  assertHasCap(opponentArtifactActivationLockpiece, 'artifact-activation-lock-scope:opponents');
+  assertHasCap(allLandsAreIslandsEngine, 'is-all-lands-are-islands');
+  assertHasCap(nonbasicLandsAreIslandsEngine, 'is-nonbasic-lands-are-islands');
+  assertHasCap(islandUntapLockpiece, 'is-island-untap-lockpiece');
+  assertHasCap(islandTapUntapLockpiece, 'is-island-untap-lockpiece');
+  assertHasCap(islandTapUntapLockpiece, 'island-untap-lockpiece-taps-islands-on-entry');
+  assertHasCap(faceUpUntapSkipper, 'is-face-up-opponent-next-untap-skipper');
+  assertHasCap(faceUpUntapSkipper, 'face-up-cost:7');
+  assertHasCap(upkeepResetCopier, 'is-upkeep-face-down-resetter');
+  assertHasCap(upkeepResetCopier, 'is-face-up-copy-creature');
+  assertHasCap(upkeepResetCopier, 'face-up-copy-target:another-creature');
+  assertHasCap(upkeepResetCopier, 'face-up-cost:2');
+  assertHasCap(globalUpkeepSkipper, 'is-global-upkeep-skipper');
+  assertHasCap(selfEndStepNonlandUntapper, 'is-self-end-step-nonland-untapper');
+  assertHasCap(upkeepUntapManaLand, 'is-upkeep-self-untap-mana-land');
+  assertHasCap(upkeepUntapManaLand, 'upkeep-self-untap-mana-land-produces:any');
+  assertHasCap(upkeepUntapManaLand, 'upkeep-self-untap-mana-land-requires-hand-card');
+  assertHasCap(graveyardArtifactCastSupport, 'is-graveyard-artifact-cast-support');
+  assertHasCap(graveyardArtifactCastSupport, 'graveyard-cast-support-target:artifact');
+  assertHasCap(graveyardArtifactCastSupport, 'graveyard-cast-support-window:your-turn');
+  assertHasCap(combatGraveyardArtifactCastSupport, 'graveyard-cast-support-requires-combat-damage');
+  assertHasCap(graveyardPermanentCastSupport, 'is-graveyard-permanent-cast-support');
+  assertHasCap(graveyardPermanentCastSupport, 'graveyard-cast-support-target:permanent');
+  assertHasCap(constrainedGraveyardPermanentCastSupport, 'graveyard-cast-support-precondition:no-spell-yet');
+  assertHasCap(constrainedGraveyardPermanentCastSupport, 'graveyard-cast-support-postcondition:no-more-spells');
+  assertHasCap(castProtectionSource, 'is-cast-gated-opponent-turn-protection-source');
+  assertHasCap(castProtectionSource, 'protection-source-type:artifact');
+  assertHasCap(artifactSelfBounceSupport, 'is-repeatable-self-bounce-support');
+  assertHasCap(artifactSelfBounceSupport, 'self-bounce-target:artifact-you-control');
+  assertHasCap(permanentSelfBounceSupport, 'self-bounce-target:permanent-you-control');
+  assertHasCap(discardSelfBounceSupport, 'self-bounce-additional-cost:discard');
+
   const satya = node('Satya, Aetherflux Genius', 'Legendary Creature — Human Artificer', 'Whenever Satya attacks, create a tapped and attacking token that’s a copy of up to one other target nontoken creature you control. You get {E}{E}.');
   assertHasCap(satya, 'is-copy');
   assertHasCap(satya, 'is-permanent-copy');
@@ -367,6 +829,60 @@ When Gilded Goose enters, create a Food token.
   const attachedSelfCopy = node('Attached Self Copy Aura', 'Enchantment — Aura', 'Enchant creature\nEnchanted creature has "{T}: Create a token that’s a copy of this creature, except it has haste. Exile that token at the beginning of the next end step."');
   const extraTurnCannotAttack = node('Extra Turn Cannot Attack', 'Legendary Creature — Sphinx', "Flying Whenever Extra Turn Cannot Attack deals combat damage to a player, take an extra turn after this one. Extra Turn Cannot Attack can't attack during extra turns.");
   const optionalSacrificeExtraTurn = node('Optional Sacrifice Extra Turn', 'Creature — Merfolk Wizard', 'Whenever this creature deals combat damage to a player, you may sacrifice a Merfolk. If you do, take an extra turn after this one.');
+  const legendaryExtraCombatDfc = faceAwareNode({
+    name: 'Legendary Extra Combat // Nonlegendary Creature',
+    layout: 'modal_dfc',
+    type_line: 'Legendary Creature // Creature',
+    cmc: 4,
+    card_faces: [
+      {
+        name: 'Legendary Extra Combat',
+        type_line: 'Legendary Creature — Angel',
+        oracle_text: 'Haste. Whenever this creature attacks for the first time each turn, untap all creatures you control. After this phase, there is an additional combat phase.',
+      },
+      {
+        name: 'Nonlegendary Creature',
+        type_line: 'Creature — Human',
+        oracle_text: 'A plain nonlegendary creature face.',
+      },
+    ],
+  });
+  const artifactFaceHastyCopyDfc = faceAwareNode({
+    name: 'Artifact Hasty Copy // Vanilla Creature',
+    layout: 'modal_dfc',
+    type_line: 'Artifact // Creature',
+    cmc: 5,
+    card_faces: [
+      {
+        name: 'Artifact Hasty Copy',
+        type_line: 'Artifact',
+        oracle_text: "{T}: Create a token that's a copy of target creature you control, except it has haste.",
+      },
+      {
+        name: 'Vanilla Creature',
+        type_line: 'Creature — Human',
+        oracle_text: 'A plain creature face with no activated copy ability.',
+      },
+    ],
+  });
+  const legendaryAttackExtraTurnDfc = faceAwareNode({
+    name: 'Legendary Attack Extra Turn // Nonlegendary Creature',
+    layout: 'modal_dfc',
+    type_line: 'Legendary Creature // Creature',
+    cmc: 4,
+    card_faces: [
+      {
+        name: 'Legendary Attack Extra Turn',
+        type_line: 'Legendary Creature — Human Warrior',
+        oracle_text: 'Whenever this creature attacks, take an extra turn after this one.',
+      },
+      {
+        name: 'Nonlegendary Creature',
+        type_line: 'Creature — Human',
+        oracle_text: 'A plain nonlegendary creature face.',
+      },
+    ],
+  });
   assertHasCap(combatCopyEquipment, 'is-combat-copy-token-equipment');
   assertHasCap(combatCopyEquipment, 'combat-copy-token-haste');
   assertHasCap(combatCopyEquipment, 'combat-copy-token-nonlegendary');
@@ -394,6 +910,10 @@ When Gilded Goose enters, create a Food token.
   assertNoCap(extraTurnCannotAttack, 'extra-turn-repeatable-with-fresh-token');
   assertHasCap(optionalSacrificeExtraTurn, 'extra-turn-source-requires-optional-payment');
   assertNoCap(optionalSacrificeExtraTurn, 'extra-turn-repeatable-with-fresh-token');
+  assertHasCap(legendaryExtraCombatDfc, 'is-attack-extra-combat-source');
+  assertHasCap(artifactFaceHastyCopyDfc, 'is-repeatable-hasty-creature-copy');
+  assertHasCap(artifactFaceHastyCopyDfc, 'is-creature-permanent');
+  assertHasCap(legendaryAttackExtraTurnDfc, 'is-attack-extra-turn-source');
   assertHasInteraction(combatCopyEquipment, firstAttackExtraCombat,
     it => it.family === 'combat-copy-token→extra-combat-loop' && it.strength === 'combo-critical',
     'combat-copy equipment plus first-attack extra combat creature should be detected generically');

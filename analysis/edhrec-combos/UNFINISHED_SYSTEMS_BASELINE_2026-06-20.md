@@ -220,37 +220,44 @@ Explicitly not generalized in G014:
 - The evaluator still does not map this family through raw edge classes; strict
   proof is required before any result-class coverage is counted.
 
-## G015 fresh-copy extra-combat strict proof update
+## G015 fresh-copy extra-combat and extra-turn strict proof update
 
 Implemented a strict, generalized, card-name-agnostic proof slice for hasty
-fresh-copy extra-combat loops. The story hardens
+fresh-copy extra-combat and extra-turn loops. The story hardens
 `combat-copy-token→extra-combat-loop` and adds:
 
 - `hasty-copy→attack-extra-combat-loop`;
 - `combat-copy-token→connect-extra-combat-loop`;
 - `hasty-copy→connect-extra-combat-loop`.
+- `combat-copy-token→attack-extra-turn-loop`;
+- `combat-copy-token→connect-extra-turn-loop`;
+- `hasty-copy→attack-extra-turn-loop`;
+- `hasty-copy→connect-extra-turn-loop`.
 
 The proof requires legal copy targets, hasty creature tokens, legend safety,
 pre-attack token timing, unused per-token attack or combat-damage triggers,
 attacker declaration, copy-source reset when the source tapped, and explicit
-player/opponent connect preconditions for connect-trigger loops.
+player/opponent connect preconditions for connect-trigger loops. Extra-turn
+proof additionally requires repeated extra-turn legality and rejects
+cannot-attack-extra-turns plus optional-payment/fodder-dependent turn triggers.
 
-Fresh evaluator after G015 (`2026-06-20T16:03:32.690Z`):
+Fresh evaluator after G015 (`2026-06-20T16:58:11.637Z`):
 
 | Metric | After G014 | After G015 |
 | --- | ---: | ---: |
-| Strict proved bucket | 1,090 | 1,096 |
-| Proof-status `proven` | 1,082 | 1,088 |
+| Strict proved bucket | 1,090 | 1,097 |
+| Proof-status `proven` | 1,082 | 1,089 |
 | Combo-family detected | 65.4% | 65.4% |
-| Signal/result-class coverage | 31,666 / 54,161 (58.5%) | 31,672 / 54,161 (58.5%) |
-| Proof-only expected coverage | 2,306 / 54,161 (4.3%) | 2,312 / 54,161 (4.3%) |
+| Signal/result-class coverage | 31,666 / 54,161 (58.5%) | 31,673 / 54,161 (58.5%) |
+| Proof-only expected coverage | 2,306 / 54,161 (4.3%) | 2,313 / 54,161 (4.3%) |
 
 Strict fresh-copy extra-combat proof rows:
 
-- `combat-copy-token→extra-combat-loop`: 3 rows
+- `combat-copy-token→extra-combat-loop`: 4 rows
   (`Aurelia, the Warleader + Helm of the Host`,
   `Godo, Bandit Warlord + Helm of the Host`,
-  `Combat Celebrant + Helm of the Host`);
+  `Combat Celebrant + Helm of the Host`,
+  `Rionya, Fire Dancer + Combat Celebrant`);
 - `hasty-copy→attack-extra-combat-loop`: 3 rows
   (`Combat Celebrant + Kiki-Jiki, Mirror Breaker`,
   `Combat Celebrant + Splinter Twin`,
@@ -264,17 +271,40 @@ Strict fresh-copy extra-combat proof rows:
   `Port Razer + Splinter Twin`).
 
 The evaluator no longer has capability-only result coverage for the old
-combat-copy family, and none of the fresh-copy combat families are mapped
+combat-copy family, and none of the fresh-copy combat/turn families are mapped
 through raw `EDGE_RESULT_CLASS_MAP` classes. Result coverage is proof/package
-only.
+only. Extra-combat proof families project only `combat`, `infinite-etb`, and
+`infinite-tokens`; extra-turn proof families project only `infinite-turns`.
 
 Explicitly not generalized in G015:
 
-- Attacker extra-turn rows remain deferred until a later turn-cycle proof can
-  establish repeatability safely.
+- The extra-turn families are implemented generically, but the current full
+  EDHREC corpus contributes zero real proof rows for them.
 - Medomai-style “can't attack during extra turns”, Wanderwine-style optional
   sacrifice/fodder dependencies, tapped-and-attacking copy tokens, first-combat
   only engines, random copy counts, non-player combat damage, and next-combat
   attack restrictions are rejected or recorded as residual blockers.
-- No fresh-copy combat family claims damage, win, mana, or infinite-turn result
-  axes.
+- No fresh-copy combat/turn family claims damage, win, or broad mana/card
+  result axes, and extra-turn families do not leak token, ETB, or combat axes.
+
+## G016 counter-threshold/proliferate extra-turn strict proof update
+
+The repo now has a conservative G016 slice for counter-threshold extra-turn
+engines:
+
+- `counter-threshold-doubler→extra-turn-loop`
+- `counter-threshold-proliferate→extra-turn-loop`
+
+The slice is intentionally narrow:
+
+- only self-spending charge-counter extra-turn engines are in scope;
+- the proof must state either an established threshold state or a seeded single
+  counter state at loop entry;
+- repeatable support must be package-local and zero-mana;
+- both families project only `infinite-turns`.
+
+This captures the generalized *shape* of seeded Scepter-style threshold loops
+without counting mana-paid or ambient-board-state setups. The fresh full
+evaluator (`2026-06-22T07:09:13.653Z`) shows **zero** real EDHREC proof rows
+for these families, so corpus metrics stay unchanged even though the proof
+infrastructure and regressions now exist.

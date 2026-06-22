@@ -497,6 +497,47 @@ const replacementAmplifiedArtifactExtraTurnNearMiss = provePackage([
 assert.equal(replacementAmplifiedArtifactExtraTurnNearMiss.status, 'not-repeatable');
 assert.equal(proofByFamily(replacementAmplifiedArtifactExtraTurnNearMiss, 'artifact-token→extra-turn-loop'), undefined, 'broad token replacement is deliberately not strict proof for artifact-token extra turns');
 
+const counterThresholdDoublerExtraTurnLoop = provePackage([
+  card('Counter Threshold Extra-Turn Engine', 'Artifact', '{T}, Remove three charge counters from this artifact: Take an extra turn after this one.', 3),
+  card('Free Counter Doubler', 'Artifact', '{T}: Double the number of each kind of counter on target artifact.', 2),
+]);
+assert.equal(counterThresholdDoublerExtraTurnLoop.status, 'proven');
+const counterThresholdDoublerProof = proofByFamily(counterThresholdDoublerExtraTurnLoop, 'counter-threshold-doubler→extra-turn-loop');
+assert.ok(counterThresholdDoublerProof);
+assert.ok(counterThresholdDoublerProof.positiveDeltas.some(delta => delta.resource === 'turns'));
+assert.equal(counterThresholdDoublerProof.positiveDeltas.some(delta => delta.resource === 'counters'), false, 'threshold-only counter extra-turn loops must not claim surplus counters');
+assert.ok(counterThresholdDoublerProof.proof.requiredFacts.some(f => f.predicate === 'counter-threshold-extra-turn-threshold' && f.value === 3));
+assert.ok(counterThresholdDoublerProof.proof.requiredFacts.some(f => f.predicate === 'established-counters-at-loop-entry' && f.value === 3));
+
+const manaPaidCounterThresholdNearMiss = provePackage([
+  card('Counter Threshold Extra-Turn Engine', 'Artifact', '{T}, Remove three charge counters from this artifact: Take an extra turn after this one.', 3),
+  card('Mana-Paid Counter Doubler', 'Artifact', '{2}, {T}: Double the number of each kind of counter on target artifact.', 3),
+]);
+assert.equal(manaPaidCounterThresholdNearMiss.status, 'not-repeatable');
+assert.ok(manaPaidCounterThresholdNearMiss.rejections.some(rejection => /mana cost/.test(rejection.reason)));
+assert.equal(proofByFamily(manaPaidCounterThresholdNearMiss, 'counter-threshold-doubler→extra-turn-loop'), undefined);
+
+const counterThresholdProliferateExtraTurnLoop = provePackage([
+  card('Counter Threshold Extra-Turn Engine', 'Artifact', '{T}, Remove three charge counters from this artifact: Take an extra turn after this one.', 3),
+  card('Single Proliferator', 'Artifact', 'At the beginning of your end step, proliferate.', 4),
+  card('Proliferate Doubler', 'Creature — Phyrexian Wizard', 'If you would proliferate, proliferate twice instead.', 4),
+]);
+assert.equal(counterThresholdProliferateExtraTurnLoop.status, 'not-repeatable');
+assert.equal(proofByFamily(counterThresholdProliferateExtraTurnLoop, 'counter-threshold-proliferate→extra-turn-loop'), undefined, 'two proliferates per turn are still below a three-counter threshold from a single seed');
+
+const strongCounterThresholdProliferateLoop = provePackage([
+  card('Counter Threshold Extra-Turn Engine', 'Artifact', '{T}, Remove three charge counters from this artifact: Take an extra turn after this one.', 3),
+  card('Free Proliferator', 'Artifact', '{T}: Proliferate three times.', 4),
+  card('Proliferate Doubler', 'Creature — Phyrexian Wizard', 'If you would proliferate, proliferate twice instead.', 4),
+]);
+assert.equal(strongCounterThresholdProliferateLoop.status, 'proven');
+const counterThresholdProliferateProof = proofByFamily(strongCounterThresholdProliferateLoop, 'counter-threshold-proliferate→extra-turn-loop');
+assert.ok(counterThresholdProliferateProof);
+assert.ok(counterThresholdProliferateProof.positiveDeltas.some(delta => delta.resource === 'turns'));
+assert.equal(counterThresholdProliferateProof.positiveDeltas.some(delta => delta.resource === 'counters'), false);
+assert.ok(counterThresholdProliferateProof.proof.requiredFacts.some(f => f.predicate === 'established-counters-at-loop-entry' && f.value === 1));
+assert.ok(counterThresholdProliferateProof.proof.requiredFacts.some(f => f.predicate === 'proliferate-count-per-turn' && f.value === 3));
+
 const lifelinkCounterDamageLoop = provePackage([
   card('Lifelink Counter Engine', 'Enchantment Creature — God', 'Whenever you gain life, put a +1/+1 counter on target creature or enchantment you control. {1}{W}: Another target creature gains lifelink until end of turn.', 3),
   card('Counter Damage Creature', 'Artifact Creature — Construct', 'This creature enters with X +1/+1 counters on it. Remove a +1/+1 counter from this creature: It deals 1 damage to any target.', 0),
@@ -1329,6 +1370,262 @@ const tokenEngine = provePackage([
 assert.equal(tokenEngine.status, 'proven');
 assert.ok(proofByFamily(tokenEngine, 'token-source-modifier-payoff'));
 assert.ok(tokenEngine.state.flags.replacementModifiers.includes('is-token-doubler'));
+
+const forcedOriginCastLock = provePackage([
+  card('Forced Exile Cast Engine', 'Artifact', 'Whenever a player casts a spell from their hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with this artifact without paying its mana cost.', 6),
+  card('Nonhand Cast Lockpiece', 'Creature — Human Wizard', "Your opponents can't cast spells from anywhere other than their hands.", 2),
+]);
+assert.equal(forcedOriginCastLock.status, 'proven');
+assert.ok(proofByFamily(forcedOriginCastLock, 'forced-cast→cast-lock'));
+
+const forcedSpellCountLock = provePackage([
+  card('Forced Exile Cast Engine', 'Artifact', 'Whenever a player casts a spell from their hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with this artifact without paying its mana cost.', 6),
+  card('Spell Count Lockpiece', 'Enchantment', "Each player can't cast more than one spell each turn.", 3),
+]);
+assert.equal(forcedSpellCountLock.status, 'proven');
+assert.ok(proofByFamily(forcedSpellCountLock, 'forced-cast→cast-lock'));
+
+const forcedTimingLock = provePackage([
+  card('Forced Draw Replacement Cast Engine', 'Artifact', "Players can't draw cards. At the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.", 5),
+  card('Sorcery Timing Lockpiece', 'Legendary Planeswalker', 'Each opponent can cast spells only any time they could cast a sorcery.', 3),
+]);
+assert.equal(forcedTimingLock.status, 'proven');
+assert.ok(proofByFamily(forcedTimingLock, 'forced-cast→cast-lock'));
+
+const forcedFreeCastLock = provePackage([
+  card('Forced Draw Replacement Cast Engine', 'Artifact', "Players can't draw cards. At the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.", 5),
+  card('Free Cast Counter Lockpiece', 'Artifact', 'Whenever a player casts a spell, if no mana was spent to cast it, counter that spell.', 1),
+]);
+assert.equal(forcedFreeCastLock.status, 'proven');
+assert.ok(proofByFamily(forcedFreeCastLock, 'forced-cast→cast-lock'));
+
+const forcedOpponentFreeCastLock = provePackage([
+  card('Forced Exile Cast Engine', 'Artifact', 'Whenever a player casts a spell from their hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with this artifact without paying its mana cost.', 6),
+  card('Opponent Free Cast Counter Lockpiece', 'Creature — Human Soldier', 'Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell.', 2),
+]);
+assert.equal(forcedOpponentFreeCastLock.status, 'proven');
+assert.ok(proofByFamily(forcedOpponentFreeCastLock, 'forced-cast→cast-lock'));
+
+const forcedNoncreatureOnlyNearMiss = provePackage([
+  card('Forced Draw Replacement Cast Engine', 'Artifact', "Players can't draw cards. At the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.", 5),
+  card('Noncreature Exile Lockpiece', 'Artifact Creature — Phyrexian Golem', "Players can't cast noncreature spells from graveyards or exile.", 2),
+]);
+assert.equal(forcedNoncreatureOnlyNearMiss.status, 'not-repeatable');
+assert.ok(forcedNoncreatureOnlyNearMiss.rejections.some(rejection => /strict origin, timing, spell-count, or free-cast lock axis/.test(rejection.reason)));
+
+const counterSuppressionPreventionLock = provePackage([
+  card('Counter Suppression Static', 'Enchantment', "Players can't get counters. Counters can't be put on artifacts, creatures, enchantments, or lands.", 3),
+  card('Counter Burden Prevention Shield', 'Enchantment', 'If a source would deal damage to you, prevent that damage and put an incarnation counter on this enchantment. When there are nine or more incarnation counters on this enchantment, exile it.', 3),
+]);
+assert.equal(counterSuppressionPreventionLock.status, 'proven');
+assert.ok(proofByFamily(counterSuppressionPreventionLock, 'counter-suppression→prevention-lock'));
+
+const counterSuppressionDelayedShieldLock = provePackage([
+  card('Counter Suppression Static', 'Enchantment', "Players can't get counters. Counters can't be put on artifacts, creatures, enchantments, or lands.", 3),
+  card('Delayed Counter Shield', 'Enchantment', 'If damage would be dealt to you, put that many delay counters on this enchantment instead. At the beginning of your upkeep, remove all delay counters from this enchantment. For each delay counter removed this way, you lose 1 life unless you pay {1}{W}.', 4),
+]);
+assert.equal(counterSuppressionDelayedShieldLock.status, 'proven');
+assert.ok(proofByFamily(counterSuppressionDelayedShieldLock, 'counter-suppression→prevention-lock'));
+
+const counterSuppressionDepletionLock = provePackage([
+  card('Counter Suppression Static', 'Enchantment', "Players can't get counters. Counters can't be put on artifacts, creatures, enchantments, or lands.", 3),
+  card('Depletion Counterspell Lockpiece', 'Enchantment', 'Whenever an opponent casts a spell, counter that spell and put a depletion counter on this enchantment. If there are three or more depletion counters on this enchantment, sacrifice it.', 8),
+]);
+assert.equal(counterSuppressionDepletionLock.status, 'proven');
+assert.ok(proofByFamily(counterSuppressionDepletionLock, 'counter-suppression→depletion-lock'));
+
+const counterSuppressionPoisonLock = provePackage([
+  card('Counter Suppression Static', 'Enchantment', "Players can't get counters. Counters can't be put on artifacts, creatures, enchantments, or lands.", 3),
+  card('Zero Life Poison Shield', 'Enchantment', "You don't lose the game for having 0 or less life. As long as you have 0 or less life, all damage is dealt to you as though its source had infect.", 3),
+]);
+assert.equal(counterSuppressionPoisonLock.status, 'proven');
+assert.ok(proofByFamily(counterSuppressionPoisonLock, 'counter-suppression→poison-loss-lock'));
+
+const counterSuppressionAgeLock = provePackage([
+  card('Counter Suppression Static', 'Enchantment', "Players can't get counters. Counters can't be put on artifacts, creatures, enchantments, or lands.", 3),
+  card('Age Counter Prevention Source', 'Land', 'Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) Creatures you control can\'t attack. Prevent all damage that would be dealt to you.', 0),
+]);
+assert.equal(counterSuppressionAgeLock.status, 'proven');
+assert.ok(proofByFamily(counterSuppressionAgeLock, 'counter-suppression→cumulative-upkeep-prevention-lock'));
+
+const faceUpUntapSkipResetLock = provePackage([
+  card('Face-Up Untap Skipper', 'Creature — Elemental', 'Morph {5}{U}{U} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.) When this creature is turned face up, each opponent skips their next untap step.', 6),
+  card('Upkeep Reset Copier', 'Creature — Shapeshifter', 'As this creature enters or is turned face up, you may choose another creature on the battlefield. If you do, until this creature is turned face down, it becomes a copy of that creature, except it has "At the beginning of your upkeep, you may turn this creature face down." Morph {1}{U}', 5),
+]);
+assert.equal(faceUpUntapSkipResetLock.status, 'proven');
+assert.ok(proofByFamily(faceUpUntapSkipResetLock, 'face-up-untap-skip→face-down-reset-lock'));
+
+const replayablePreventionLandLock = provePackage([
+  card('Replayable Prevention Land', 'Land', 'Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) When this land enters, sacrifice a land. Creatures you control can\'t attack. Prevent all damage that would be dealt to you.', 0),
+  card('Land Replay Support', 'Artifact', 'You may play lands from your graveyard.', 3),
+  card('Extra Land Support', 'Enchantment', 'You may play an additional land on each of your turns.', 1),
+]);
+assert.equal(replayablePreventionLandLock.status, 'proven');
+assert.ok(proofByFamily(replayablePreventionLandLock, 'prevention-land→graveyard-extra-land-lock'));
+
+const drawStepHandCycleDrawLimitLock = provePackage([
+  card('Draw-Step Hand Cycler', 'Artifact', "At the beginning of each player's draw step, that player puts the cards in their hand on the bottom of their library in any order, then draws that many cards.", 4),
+  card('Opponent Draw Limit', 'Planeswalker', "Each opponent can't draw more than one card each turn.", 3),
+]);
+assert.equal(drawStepHandCycleDrawLimitLock.status, 'proven');
+assert.ok(proofByFamily(drawStepHandCycleDrawLimitLock, 'draw-step-hand-cycle→draw-limit-lock'));
+
+const noDrawSearchStepSearchLock = provePackage([
+  card('No-Draw Search-Step Engine', 'Creature — Elf Wizard', "Players can't draw cards. At the beginning of each player's draw step, that player loses 3 life, searches their library for a card, puts it into their hand, then shuffles.", 3),
+  card('Opponent Search Lockpiece', 'Creature — Human Rogue', "You control your opponents while they're searching their libraries. While an opponent is searching their library, they exile each card they find.", 3),
+]);
+assert.equal(noDrawSearchStepSearchLock.status, 'proven');
+assert.ok(proofByFamily(noDrawSearchStepSearchLock, 'no-draw-search-step→search-lock'));
+
+const noFlyingAttackFlyingRemovalLock = provePackage([
+  card('No-Flying Attack All Lockpiece', 'Enchantment', "Creatures without flying can't attack.", 4),
+  card('Opponent Flying Removal Support', 'Enchantment Creature — Human Wizard', "Creatures you control have flying. Creatures your opponents control lose flying and can't have or gain flying.", 6),
+]);
+assert.equal(noFlyingAttackFlyingRemovalLock.status, 'proven');
+assert.ok(proofByFamily(noFlyingAttackFlyingRemovalLock, 'no-flying-attack→flying-removal-lock'));
+
+const flyingOnlyAttackGroundLock = provePackage([
+  card('Flyers Cant Attack You Lockpiece', 'Enchantment', "Creatures with flying can't attack you.", 8),
+  card('No-Flying Attack All Lockpiece', 'Enchantment', "Creatures without flying can't attack.", 4),
+]);
+assert.equal(flyingOnlyAttackGroundLock.status, 'proven');
+assert.ok(proofByFamily(flyingOnlyAttackGroundLock, 'flying-only-attack→ground-lock'));
+
+const flyingIslandwalkAttackRemovalLock = provePackage([
+  card('Flying Islandwalk Only Attack You Lockpiece', 'Enchantment', "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.", 2),
+  card('Global Flying Islandwalk Removal Support', 'World Enchantment', 'All creatures lose flying and islandwalk.', 4),
+]);
+assert.equal(flyingIslandwalkAttackRemovalLock.status, 'proven');
+assert.ok(proofByFamily(flyingIslandwalkAttackRemovalLock, 'flying-or-islandwalk-attack→evasion-removal-lock'));
+
+const allPermanentsArtifactActivationLock = provePackage([
+  card('All-Permanents Are Artifacts Engine', 'Artifact', 'All permanents are artifacts in addition to their other types.', 6),
+  card('Artifact Activation Lockpiece', 'Artifact', "Activated abilities of artifacts can't be activated.", 2),
+]);
+assert.equal(allPermanentsArtifactActivationLock.status, 'proven');
+assert.ok(proofByFamily(allPermanentsArtifactActivationLock, 'all-permanents-artifacts→artifact-activation-lock'));
+
+const allPermanentsOpponentArtifactActivationLock = provePackage([
+  card('All-Permanents Are Artifacts Engine', 'Artifact', 'All permanents are artifacts in addition to their other types.', 6),
+  card('Opponent Artifact Activation Lockpiece', 'Planeswalker', "Activated abilities of artifacts your opponents control can't be activated.", 4),
+]);
+assert.equal(allPermanentsOpponentArtifactActivationLock.status, 'proven');
+assert.ok(proofByFamily(allPermanentsOpponentArtifactActivationLock, 'all-permanents-artifacts→artifact-activation-lock'));
+
+const allLandsIslandUntapLock = provePackage([
+  card('All-Lands Are Islands Engine', 'Creature — Leviathan', "All lands are Islands in addition to their other types. Creatures without flying or islandwalk can't attack.", 8),
+  card('Island Untap Lockpiece', 'Enchantment', "Islands don't untap during their controllers' untap steps.", 3),
+]);
+assert.equal(allLandsIslandUntapLock.status, 'proven');
+assert.ok(proofByFamily(allLandsIslandUntapLock, 'all-lands-islands→island-untap-lock'));
+
+const allLandsIslandTapUntapLock = provePackage([
+  card('All-Lands Are Islands Engine', 'Creature — Leviathan', "All lands are Islands in addition to their other types. Creatures without flying or islandwalk can't attack.", 8),
+  card('Island Tap Untap Lockpiece', 'Enchantment', "When this enchantment enters, tap all Islands. Islands don't untap during their controllers' untap steps.", 3),
+]);
+assert.equal(allLandsIslandTapUntapLock.status, 'proven');
+assert.ok(proofByFamily(allLandsIslandTapUntapLock, 'all-lands-islands→island-untap-lock'));
+
+const nonbasicOnlyIslandNearMiss = provePackage([
+  card('Nonbasic Lands Are Islands Engine', 'Creature — Merfolk Wizard', 'Nonbasic lands are Islands.', 2),
+  card('Island Untap Lockpiece', 'Enchantment', "Islands don't untap during their controllers' untap steps.", 3),
+]);
+assert.equal(nonbasicOnlyIslandNearMiss.status, 'no-proof');
+
+const permanentOnlyPoisonNearMiss = provePackage([
+  card('Permanent Only Counter Suppression', 'Enchantment', "Counters can't be put on artifacts, creatures, enchantments, or lands.", 3),
+  card('Zero Life Poison Shield', 'Enchantment', "You don't lose the game for having 0 or less life. As long as you have 0 or less life, all damage is dealt to you as though its source had infect.", 3),
+]);
+assert.equal(permanentOnlyPoisonNearMiss.status, 'not-repeatable');
+assert.ok(permanentOnlyPoisonNearMiss.rejections.some(rejection => /does not apply to players/.test(rejection.reason)));
+
+const globalUntapUpkeepSkipLock = provePackage([
+  card('Global Untap Skipper', 'Enchantment', "Players skip their untap steps. At the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.", 2),
+  card('Global Upkeep Skipper', 'Artifact', 'Players skip their upkeep steps.', 5),
+]);
+assert.equal(globalUntapUpkeepSkipLock.status, 'proven');
+assert.ok(proofByFamily(globalUntapUpkeepSkipLock, 'global-untap-skip→upkeep-skip-lock'));
+
+const globalUntapEndStepUntapLock = provePackage([
+  card('Global Untap Skipper', 'Enchantment', "Players skip their untap steps. At the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.", 2),
+  card('Self End Step Nonland Untapper', 'Enchantment', 'At the beginning of your end step, untap all nonland permanents you control.', 3),
+]);
+assert.equal(globalUntapEndStepUntapLock.status, 'proven');
+assert.ok(proofByFamily(globalUntapEndStepUntapLock, 'global-untap-skip→end-step-untap-lock'));
+
+const globalUntapUpkeepLandLock = provePackage([
+  card('Global Untap Skipper', 'Enchantment', "Players skip their untap steps. At the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.", 2),
+  card('Upkeep Untap Mana Land', 'Land', "This land doesn't untap during your untap step. At the beginning of your upkeep, you may exile a card from your hand. If you do, untap this land. {T}: Add one mana of any color.", 0),
+]);
+assert.equal(globalUntapUpkeepLandLock.status, 'proven');
+assert.ok(proofByFamily(globalUntapUpkeepLandLock, 'global-untap-skip→upkeep-untap-land-lock'));
+
+const globalUntapSelfBounceLock = provePackage([
+  card('Global Untap Skipper', 'Enchantment', "Players skip their untap steps. At the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.", 2),
+  card('Permanent Self Bounce Support', 'Creature — Vedalken Wizard', '{U}, {T}: Return target permanent you control to its owner\'s hand.', 2),
+]);
+assert.equal(globalUntapSelfBounceLock.status, 'proven');
+assert.ok(proofByFamily(globalUntapSelfBounceLock, 'global-untap-skip→self-bounce-lock'));
+
+const globalUntapSelfBounceTimingNearMiss = provePackage([
+  card('Global Untap Skipper', 'Enchantment', "Players skip their untap steps. At the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.", 2),
+  card('Your-Turn-Only Self Bounce Support', 'Creature — Wizard', '{U}, {T}: Return target permanent you control to its owner\'s hand. Activate only during your turn.', 2),
+]);
+assert.equal(globalUntapSelfBounceTimingNearMiss.status, 'not-repeatable');
+assert.ok(globalUntapSelfBounceTimingNearMiss.rejections.some(rejection => /only works during your turn/.test(rejection.reason)));
+
+const castProtectionArtifactBounceLock = provePackage([
+  card('Cast Protection Source', 'Legendary Artifact', 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', 4),
+  card('Artifact Self Bounce Support', 'Legendary Creature — Human Advisor', '{1}{U}: Return target artifact you control to its owner\'s hand.', 2),
+]);
+assert.equal(castProtectionArtifactBounceLock.status, 'proven');
+assert.ok(proofByFamily(castProtectionArtifactBounceLock, 'cast-protection→self-bounce-lock'));
+
+const castProtectionPermanentBounceLock = provePackage([
+  card('Cast Protection Source', 'Legendary Artifact', 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', 4),
+  card('Permanent Self Bounce Support', 'Creature — Vedalken Wizard', '{U}, {T}: Return target permanent you control to its owner\'s hand.', 2),
+]);
+assert.equal(castProtectionPermanentBounceLock.status, 'proven');
+assert.ok(proofByFamily(castProtectionPermanentBounceLock, 'cast-protection→self-bounce-lock'));
+
+const castProtectionDiscardBounceLock = provePackage([
+  card('Cast Protection Source', 'Legendary Artifact', 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', 4),
+  card('Discard Self Bounce Support', 'Creature — Human Spellshaper', 'Flying {U}, {T}, Discard a card: Return target permanent you control to its owner\'s hand.', 4),
+]);
+assert.equal(castProtectionDiscardBounceLock.status, 'proven');
+assert.ok(proofByFamily(castProtectionDiscardBounceLock, 'cast-protection→self-bounce-lock'));
+
+const castProtectionArtifactGraveyardRecastLock = provePackage([
+  card('Cast Protection Source', 'Legendary Artifact', 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', 4),
+  card('Artifact Sac Outlet', 'Artifact', 'Sacrifice an artifact: Add {C}{C}.', 4),
+  card('Graveyard Artifact Cast Support', 'Legendary Creature — Merfolk Wizard', '{T}: Choose target artifact card in your graveyard. You may cast that card this turn.', 2),
+]);
+assert.equal(castProtectionArtifactGraveyardRecastLock.status, 'proven');
+assert.ok(proofByFamily(castProtectionArtifactGraveyardRecastLock, 'cast-protection→graveyard-recast-lock'));
+
+const castProtectionPermanentGraveyardRecastLock = provePackage([
+  card('Cast Protection Source', 'Legendary Artifact', 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', 4),
+  card('Artifact Sac Outlet', 'Artifact', 'Sacrifice an artifact: Add {C}{C}.', 4),
+  card('Graveyard Permanent Cast Support', 'Legendary Creature — Elemental Avatar', 'During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.', 6),
+]);
+assert.equal(castProtectionPermanentGraveyardRecastLock.status, 'proven');
+assert.ok(proofByFamily(castProtectionPermanentGraveyardRecastLock, 'cast-protection→graveyard-recast-lock'));
+
+const castProtectionConduitStyleLock = provePackage([
+  card('Cast Protection Source', 'Legendary Artifact', 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', 4),
+  card('Artifact Sac Outlet', 'Land', '{1}, {T}, Sacrifice an artifact: You gain 1 life.', 0),
+  card('Constrained Graveyard Permanent Cast Support', 'Artifact', "{T}: Choose target nonland permanent card in your graveyard. If you haven't cast a spell this turn, you may cast that card. If you do, you can't cast additional spells this turn. Activate only as a sorcery.", 4),
+]);
+assert.equal(castProtectionConduitStyleLock.status, 'proven');
+assert.ok(proofByFamily(castProtectionConduitStyleLock, 'cast-protection→graveyard-recast-lock'));
+
+const combatGatedGraveyardRecastNearMiss = provePackage([
+  card('Cast Protection Source', 'Legendary Artifact', 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', 4),
+  card('Artifact Sac Outlet', 'Artifact Creature — Beast', 'Sacrifice an artifact: Put a +1/+1 counter on this creature.', 2),
+  card('Combat Graveyard Artifact Cast Support', 'Legendary Artifact Creature — Human', 'Whenever this creature deals combat damage to a player, choose target artifact card in your graveyard. You may cast that card this turn.', 3),
+]);
+assert.equal(combatGatedGraveyardRecastNearMiss.status, 'not-repeatable');
+assert.ok(combatGatedGraveyardRecastNearMiss.rejections.some(rejection => /without combat/.test(rejection.reason)));
 
 const bounded = provePackage([
   card('A', 'Creature', ''),

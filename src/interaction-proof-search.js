@@ -134,6 +134,59 @@ function artifactExtraTurnSacCount(card) {
   return maxCapNumber(card, 'artifact-extra-turn-sac-count');
 }
 
+function counterThresholdExtraTurnCount(card) {
+  return maxCapNumber(card, 'counter-threshold-extra-turn-threshold');
+}
+
+function proliferateCountPerTurn(card) {
+  return maxCapNumber(card, 'proliferate-count-per-turn');
+}
+
+function proliferateMultiplier(card) {
+  return maxCapNumber(card, 'proliferate-multiplier') || (hasCap(card, 'is-proliferate-multiplier') ? 2 : 1);
+}
+
+function forcedCastOrigins(card) {
+  return capSuffixes(card, 'forced-cast-origin:');
+}
+
+function castLockScopes(card) {
+  return capSuffixes(card, 'cast-lock-scope:');
+}
+
+function castLockAppliesToOpponents(card) {
+  const scopes = castLockScopes(card);
+  return scopes.includes('players') || scopes.includes('opponents') || !scopes.length;
+}
+
+function counterSuppressionScopes(card) {
+  return capSuffixes(card, 'counter-suppression:');
+}
+
+function counterSuppressionApplies(card, scope) {
+  return counterSuppressionScopes(card).includes(scope);
+}
+
+function forcedCastLockAxes(engine, lockpiece) {
+  const axes = [];
+  const origins = forcedCastOrigins(engine);
+  if ((origins.includes('exile') || origins.includes('library-top'))
+      && (hasCap(lockpiece, 'cast-lock-origin:non-hand') || hasCap(lockpiece, 'cast-lock-origin-exile-any'))) {
+    axes.push('origin');
+  }
+  if (hasCap(engine, 'forced-cast-payment:free')
+      && (hasCap(lockpiece, 'cast-lock-axis:free-cast') || hasCap(lockpiece, 'cast-lock-axis:no-colored-mana'))) {
+    axes.push(hasCap(lockpiece, 'cast-lock-axis:no-colored-mana') ? 'no-colored-mana' : 'free-cast');
+  }
+  if (hasCap(engine, 'forced-cast-trigger:spell-from-hand') && hasCap(lockpiece, 'cast-lock-axis:spell-count')) {
+    axes.push('spell-count');
+  }
+  if (hasCap(engine, 'forced-cast-window:trigger-resolution') && hasCap(lockpiece, 'cast-lock-axis:timing-sorcery')) {
+    axes.push('timing');
+  }
+  return sorted(axes);
+}
+
 function addCostProfiles(...profiles) {
   return {
     total: profiles.reduce((sum, profile) => sum + (profile?.total || 0), 0),
@@ -994,6 +1047,179 @@ function proveArtifactTokenExtraTurnLoop(cards) {
     {
       rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12),
     },
+  );
+}
+
+function isArtifactCounterThresholdEngine(card) {
+  return hasCap(card, 'is-counter-threshold-extra-turn-engine')
+    && hasCap(card, 'counter-threshold-extra-turn-target:self-artifact')
+    && hasCap(card, 'counter-threshold-extra-turn-type:charge')
+    && /\bartifact\b/i.test(card.type || '');
+}
+
+function isZeroManaProfile(profile) {
+  return (profile.total || 0) === 0
+    && (profile.colorless || 0) === 0
+    && !Object.values(profile.colors || {}).some(Boolean);
+}
+
+function counterDoublerCanTargetEngine(doubler, engine) {
+  if (!/\bartifact\b/i.test(engine.type || '')) return false;
+  return hasCap(doubler, 'counter-doubler-target:artifact')
+    || hasCap(doubler, 'counter-doubler-target:any-permanent');
+}
+
+function proveCounterThresholdDoublerExtraTurnPair(doubler, engine) {
+  const threshold = counterThresholdExtraTurnCount(engine);
+  if (!(threshold > 0)) return null;
+  if (!counterDoublerCanTargetEngine(doubler, engine)) {
+    return failure(
+      'proof:counter-threshold-doubler-target-illegal:' + sorted([doubler.id, engine.id]).join('|'),
+      [doubler, engine],
+      'repeatable counter doubler cannot legally target the extra-turn engine',
+      { engineType: engine.type, doublerCaps: doubler.caps.filter(cap => cap.startsWith('counter-doubler-target:')) },
+    );
+  }
+  const manaCost = manaCostProfileFromCaps(doubler, 'counter-doubler');
+  if (!isZeroManaProfile(manaCost)) {
+    return failure(
+      'proof:counter-threshold-doubler-cost:' + sorted([doubler.id, engine.id]).join('|'),
+      [doubler, engine],
+      'counter doubler has a repeatable mana cost the package does not pay locally',
+      { manaCost },
+    );
+  }
+  return success('proof:counter-threshold-doubler-extra-turn:' + sorted([doubler.id, engine.id]).join('|'), 'counter-threshold-doubler→extra-turn-loop', [doubler, engine], {
+    requiredFacts: [
+      fact(doubler, 'is-repeatable-counter-doubler'),
+      fact(engine, 'is-counter-threshold-extra-turn-engine'),
+      { card: engine.id, kind: 'precondition', predicate: 'counter-threshold-extra-turn-threshold', value: threshold },
+      { card: engine.id, kind: 'precondition', predicate: 'established-counters-at-loop-entry', value: threshold },
+      { card: doubler.id, kind: 'precondition', predicate: 'counter-doubler-targets-extra-turn-engine' },
+    ],
+    steps: [
+      { card: engine.id, action: `begin the loop with ${threshold} charge counter(s) on the extra-turn engine` },
+      { card: doubler.id, action: `double the counters on the extra-turn engine from ${threshold} to ${threshold * 2}` },
+      { card: engine.id, action: `remove ${threshold} charge counter(s) to take an extra turn`, delta: { turns: 1, counters: -threshold } },
+      { action: `the extra turn untap step resets the doubler and leaves ${threshold} charge counter(s) on the engine for the next iteration`, delta: { counters: threshold } },
+    ],
+    assumptions: [
+      'the loop begins from an explicit established state where the extra-turn engine already has the threshold number of charge counters',
+      'the counter doubler starts untapped and can target the same artifact every extra turn',
+    ],
+    limitingClauses: [
+      'the proof does not infer ambient starting counters from the board',
+      'the proof does not claim infinite counters or mana when the doubled state only restores the threshold after payment',
+      'nonzero mana costs for the doubler remain outside this strict package',
+    ],
+    repeatability: { status: 'repeatable-turn-threshold', reason: 'doubling a threshold number of counters leaves the same threshold behind after each extra-turn activation' },
+  }, [{ resource: 'turns', min: 1, max: Infinity }]);
+}
+
+function proveCounterThresholdDoublerExtraTurnLoop(cards) {
+  const engines = (cards || []).filter(isArtifactCounterThresholdEngine);
+  if (!engines.length) return null;
+  const doublers = (cards || []).filter(c => hasCap(c, 'is-repeatable-counter-doubler'));
+  if (!doublers.length) {
+    return failure(
+      'proof:counter-threshold-doubler-missing-support:' + sorted(cards.map(c => c.id)).join('|'),
+      engines,
+      'counter-threshold extra-turn engine needs a package-local repeatable counter doubler',
+      { engines: engines.map(card => card.id) },
+    );
+  }
+  const failures = [];
+  for (const engine of engines) {
+    for (const doubler of doublers) {
+      const result = proveCounterThresholdDoublerExtraTurnPair(doubler, engine);
+      if (result && result.status === 'proven') return result;
+      if (result) failures.push(result);
+    }
+  }
+  if (failures.length === 1) return failures[0];
+  return failure(
+    'proof:counter-threshold-doubler-all-rejected:' + sorted(cards.map(c => c.id)).join('|'),
+    cards,
+    'no counter doubler and counter-threshold extra-turn pairing satisfied strict threshold gates',
+    { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
+  );
+}
+
+function proveCounterThresholdProliferateExtraTurnLoop(cards) {
+  const engines = (cards || []).filter(isArtifactCounterThresholdEngine);
+  if (!engines.length) return null;
+  const proliferators = (cards || []).filter(c => hasCap(c, 'is-repeatable-proliferator') || hasCap(c, 'is-turn-cycle-proliferator'));
+  if (!proliferators.length) {
+    return failure(
+      'proof:counter-threshold-proliferate-missing-support:' + sorted(cards.map(c => c.id)).join('|'),
+      engines,
+      'counter-threshold extra-turn engine needs a package-local proliferate source',
+      { engines: engines.map(card => card.id) },
+    );
+  }
+  const multipliers = (cards || []).filter(c => hasCap(c, 'is-proliferate-multiplier'));
+  const failures = [];
+  for (const engine of engines) {
+    const threshold = counterThresholdExtraTurnCount(engine);
+    for (const proliferator of proliferators) {
+      const manaCost = manaCostProfileFromCaps(proliferator, 'proliferate');
+      if (hasCap(proliferator, 'is-repeatable-proliferator') && !isZeroManaProfile(manaCost)) {
+        failures.push(failure(
+          'proof:counter-threshold-proliferate-cost:' + sorted([proliferator.id, engine.id]).join('|'),
+          [proliferator, engine],
+          'proliferate source has a repeatable mana cost the package does not pay locally',
+          { manaCost },
+        ));
+        continue;
+      }
+      const baseCount = proliferateCountPerTurn(proliferator);
+      const multiplier = multipliers.length ? Math.max(...multipliers.map(proliferateMultiplier)) : 1;
+      const totalCount = baseCount * multiplier;
+      if (!(baseCount > 0 && totalCount >= threshold)) {
+        failures.push(failure(
+          'proof:counter-threshold-proliferate-threshold:' + sorted([proliferator.id, engine.id]).join('|'),
+          uniqueCards([proliferator, engine, ...multipliers]),
+          'proliferate support does not reach the extra-turn counter threshold while preserving a seed counter',
+          { threshold, proliferateCountPerTurn: baseCount, proliferateMultiplier: multiplier, totalProliferatesPerTurn: totalCount },
+        ));
+        continue;
+      }
+      const proofCards = uniqueCards([proliferator, engine, ...multipliers.slice(0, 1)]);
+      return success('proof:counter-threshold-proliferate-extra-turn:' + sorted(proofCards.map(card => card.id)).join('|'), 'counter-threshold-proliferate→extra-turn-loop', proofCards, {
+        requiredFacts: [
+          fact(engine, 'is-counter-threshold-extra-turn-engine'),
+          fact(proliferator, hasCap(proliferator, 'is-turn-cycle-proliferator') ? 'is-turn-cycle-proliferator' : 'is-repeatable-proliferator'),
+          { card: engine.id, kind: 'precondition', predicate: 'counter-threshold-extra-turn-threshold', value: threshold },
+          { card: engine.id, kind: 'precondition', predicate: 'established-counters-at-loop-entry', value: 1 },
+          { card: proliferator.id, kind: 'precondition', predicate: 'proliferate-count-per-turn', value: baseCount },
+          ...(multiplier > 1 ? [{ card: multipliers[0].id, kind: 'precondition', predicate: 'proliferate-multiplier', value: multiplier }] : []),
+        ],
+        steps: [
+          { card: engine.id, action: 'begin the loop with one seeded charge counter on the extra-turn engine' },
+          { card: proliferator.id, action: `proliferate ${baseCount} time(s) during the turn`, delta: { counters: baseCount } },
+          ...(multiplier > 1 ? [{ card: multipliers[0].id, action: `double each proliferate event to ${totalCount} total proliferate applications this turn`, delta: { counters: totalCount - baseCount } }] : []),
+          { card: engine.id, action: `remove ${threshold} charge counter(s) to take an extra turn`, delta: { turns: 1, counters: -threshold } },
+          { action: `after paying the threshold, ${1 + totalCount - threshold} charge counter(s) remain on the engine, so the next extra turn begins with a valid proliferate seed`, delta: { counters: 1 + totalCount - threshold } },
+        ],
+        assumptions: [
+          'the loop begins from an explicit established state with one relevant counter already on the extra-turn engine',
+          'the proliferate source can resolve once each turn or extra turn without needing another local resource proof',
+        ],
+        limitingClauses: [
+          'proliferate cannot start from zero counters, so the seed counter is an explicit precondition rather than an inferred board state',
+          'the proof does not claim infinite counters or mana when the package only reaches the extra-turn threshold again',
+          'nonzero proliferate activation costs remain outside this strict package',
+        ],
+        repeatability: { status: 'repeatable-turn-threshold', reason: 'the package proliferates enough times every turn to reach the extra-turn threshold and still leave a seeded counter behind' },
+      }, [{ resource: 'turns', min: 1, max: Infinity }]);
+    }
+  }
+  if (failures.length === 1) return failures[0];
+  return failure(
+    'proof:counter-threshold-proliferate-all-rejected:' + sorted(cards.map(c => c.id)).join('|'),
+    cards,
+    'no proliferate and counter-threshold extra-turn pairing satisfied strict threshold gates',
+    { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
   );
 }
 
@@ -2927,6 +3153,890 @@ function proveDeathUntapDeathtouchPingerLock(cards) {
   });
 }
 
+function proveForcedCastLock(cards) {
+  const engines = (cards || []).filter(card => hasCap(card, 'is-forced-nonhand-cast-engine'));
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-cast-origin-lockpiece'));
+  if (!engines.length || !lockpieces.length) return null;
+  let firstRejected = null;
+  for (const engine of engines) {
+    for (const lockpiece of lockpieces) {
+      if (!castLockAppliesToOpponents(lockpiece)) {
+        firstRejected ||= { engine, lockpiece, axes: [] };
+        continue;
+      }
+      if (hasCap(lockpiece, 'cast-lock-origin-exile-noncreature-only')) {
+        firstRejected ||= { engine, lockpiece, axes: [] };
+        continue;
+      }
+      const axes = forcedCastLockAxes(engine, lockpiece);
+      if (!axes.length) {
+        firstRejected ||= { engine, lockpiece, axes };
+        continue;
+      }
+      const proofCards = uniqueCards([engine, lockpiece]);
+      return success('proof:forced-cast-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'forced-cast→cast-lock', proofCards, {
+        requiredFacts: [
+          fact(engine, 'is-forced-nonhand-cast-engine'),
+          ...(origins => origins.length ? origins.map(origin => fact(engine, 'forced-cast-origin:' + origin)) : [fact(engine, 'forced-cast-origin:exile')])(forcedCastOrigins(engine)),
+          ...(hasCap(engine, 'forced-cast-payment:free') ? [fact(engine, 'forced-cast-payment:free')] : []),
+          ...(hasCap(engine, 'forced-cast-trigger:spell-from-hand') ? [fact(engine, 'forced-cast-trigger:spell-from-hand')] : []),
+          ...(hasCap(engine, 'forced-cast-window:trigger-resolution') ? [fact(engine, 'forced-cast-window:trigger-resolution')] : []),
+          fact(lockpiece, 'is-cast-origin-lockpiece'),
+          ...axes.map(axis => {
+            if (axis === 'origin') {
+              return fact(lockpiece, hasCap(lockpiece, 'cast-lock-origin:non-hand') ? 'cast-lock-origin:non-hand' : 'cast-lock-origin-exile-any');
+            }
+            if (axis === 'spell-count') return fact(lockpiece, 'cast-lock-axis:spell-count');
+            if (axis === 'timing') return fact(lockpiece, 'cast-lock-axis:timing-sorcery');
+            if (axis === 'no-colored-mana') return fact(lockpiece, 'cast-lock-axis:no-colored-mana');
+            return fact(lockpiece, 'cast-lock-axis:free-cast');
+          }),
+        ],
+        steps: [
+          { card: engine.id, action: 'the engine consumes a normal cast or draw step and offers a replacement cast from a non-hand path' },
+          { card: lockpiece.id, action: `the lockpiece forbids or counters that replacement cast on the ${axes.join('/')} axis` },
+          { action: 'the attempted spell or draw replacement is blanked, returning the opponents to the same locked turn-structure state' },
+        ],
+        assumptions: ['the lock is evaluated against opponents or the table rather than your own main-line casts'],
+        limitingClauses: ['noncreature-only exile restrictions are deferred', 'the family claims only cast-denial lock coverage, not wins or extra resource axes'],
+        repeatability: { status: 'repeatable-lock', reason: 'each repeated attempt to cast through the same forced nonhand path is prohibited or countered on the matching axis' },
+      });
+    }
+  }
+  if (!firstRejected) return null;
+  const { engine, lockpiece } = firstRejected;
+  return failure(
+    'proof:forced-cast-lock-axis:' + sorted([engine.id, lockpiece.id]).join('|'),
+    [engine, lockpiece],
+    'forced cast engine and lockpiece do not align on a strict origin, timing, spell-count, or free-cast lock axis',
+    {
+      engineOrigins: forcedCastOrigins(engine),
+      engineTrigger: firstCap(engine, ['forced-cast-trigger:spell-from-hand', 'forced-cast-trigger:draw-step']),
+      lockScopes: castLockScopes(lockpiece),
+      lockAxes: capSuffixes(lockpiece, 'cast-lock-axis:'),
+      lockOrigins: sorted([
+        ...capSuffixes(lockpiece, 'cast-lock-origin:'),
+        ...capSuffixes(lockpiece, 'cast-lock-origin-exile-'),
+      ]),
+    },
+  );
+}
+
+function proveCounterSuppressionPreventionLock(cards) {
+  const suppressors = (cards || []).filter(card => hasCap(card, 'is-counter-suppression-static'));
+  const shields = (cards || []).filter(card => hasCap(card, 'is-damage-prevention-counter-burden'));
+  if (!suppressors.length || !shields.length) return null;
+  let firstRejected = null;
+  for (const suppression of suppressors) {
+    for (const shield of shields) {
+      if (!counterSuppressionApplies(suppression, 'enchantments')) {
+        firstRejected ||= { suppression, shield, needed: 'enchantments' };
+        continue;
+      }
+      const proofCards = uniqueCards([suppression, shield]);
+      return success('proof:counter-suppression-prevention-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'counter-suppression→prevention-lock', proofCards, {
+        requiredFacts: [
+          fact(suppression, 'is-counter-suppression-static'),
+          fact(suppression, 'counter-suppression:enchantments'),
+          fact(shield, 'is-damage-prevention-counter-burden'),
+          fact(shield, firstCap(shield, ['damage-prevention-scope:self-all', 'damage-prevention-scope:self-any-damage']) || 'damage-prevention-scope:self-any-damage'),
+        ],
+        steps: [
+          { card: shield.id, action: 'damage that would be dealt to you is prevented or redirected into burden counters on the shield' },
+          { card: suppression.id, action: 'counter suppression stops those counters from being placed on the enchantment' },
+          { action: 'the prevention text persists without the burden ever accumulating, keeping the same damage-prevention state' },
+        ],
+        limitingClauses: ['only direct counter-burdened damage-prevention shields qualify', 'the family claims only lock coverage'],
+        repeatability: { status: 'repeatable-lock', reason: 'every future damage event is prevented while the counter burden never accumulates' },
+      });
+    }
+  }
+  if (!firstRejected) return null;
+  return failure(
+    'proof:counter-suppression-prevention-lock-scope:' + sorted([firstRejected.suppression.id, firstRejected.shield.id]).join('|'),
+    [firstRejected.suppression, firstRejected.shield],
+    'counter suppression does not apply to the permanent class receiving the prevention counters',
+    { suppressionScopes: counterSuppressionScopes(firstRejected.suppression), neededScope: firstRejected.needed },
+  );
+}
+
+function proveCounterSuppressionDepletionLock(cards) {
+  const suppressors = (cards || []).filter(card => hasCap(card, 'is-counter-suppression-static'));
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-spell-counter-depletion-lockpiece'));
+  if (!suppressors.length || !lockpieces.length) return null;
+  let firstRejected = null;
+  for (const suppression of suppressors) {
+    for (const lockpiece of lockpieces) {
+      if (!counterSuppressionApplies(suppression, 'enchantments')) {
+        firstRejected ||= { suppression, lockpiece, needed: 'enchantments' };
+        continue;
+      }
+      const proofCards = uniqueCards([suppression, lockpiece]);
+      return success('proof:counter-suppression-depletion-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'counter-suppression→depletion-lock', proofCards, {
+        requiredFacts: [
+          fact(suppression, 'is-counter-suppression-static'),
+          fact(suppression, 'counter-suppression:enchantments'),
+          fact(lockpiece, 'is-spell-counter-depletion-lockpiece'),
+        ],
+        steps: [
+          { card: lockpiece.id, action: 'each opposing spell is countered and would normally place a depletion counter on the lockpiece' },
+          { card: suppression.id, action: 'counter suppression stops the depletion counter from being placed on the enchantment' },
+          { action: 'the sacrifice threshold never advances, so the opponent spell lock remains in place' },
+        ],
+        limitingClauses: ['only self-depleting counterspell lockpieces qualify', 'tax or delay effects without direct counters are excluded'],
+        repeatability: { status: 'repeatable-lock', reason: 'each opposing spell is countered while the depletion threshold never accumulates' },
+      });
+    }
+  }
+  if (!firstRejected) return null;
+  return failure(
+    'proof:counter-suppression-depletion-lock-scope:' + sorted([firstRejected.suppression.id, firstRejected.lockpiece.id]).join('|'),
+    [firstRejected.suppression, firstRejected.lockpiece],
+    'counter suppression does not apply to the permanent class receiving the depletion counters',
+    { suppressionScopes: counterSuppressionScopes(firstRejected.suppression), neededScope: firstRejected.needed },
+  );
+}
+
+function proveCounterSuppressionPoisonLossLock(cards) {
+  const suppressors = (cards || []).filter(card => hasCap(card, 'is-counter-suppression-static'));
+  const shields = (cards || []).filter(card => hasCap(card, 'is-zero-life-poison-shield'));
+  if (!suppressors.length || !shields.length) return null;
+  let firstRejected = null;
+  for (const suppression of suppressors) {
+    for (const shield of shields) {
+      if (!counterSuppressionApplies(suppression, 'players')) {
+        firstRejected ||= { suppression, shield, needed: 'players' };
+        continue;
+      }
+      const proofCards = uniqueCards([suppression, shield]);
+      return success('proof:counter-suppression-poison-loss-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'counter-suppression→poison-loss-lock', proofCards, {
+        requiredFacts: [
+          fact(suppression, 'is-counter-suppression-static'),
+          fact(suppression, 'counter-suppression:players'),
+          fact(shield, 'is-zero-life-poison-shield'),
+        ],
+        steps: [
+          { card: shield.id, action: 'you do not lose the game at zero or less life, and damage to you becomes poison counters instead of ordinary life loss' },
+          { card: suppression.id, action: 'player counter suppression stops those poison counters from being placed on you' },
+          { action: 'damage can no longer convert into a losing poison state, preserving the damage-survival lock' },
+        ],
+        assumptions: ['the lock-relevant state is at or below zero life, where the poison replacement matters'],
+        limitingClauses: ['the family claims only lock coverage; it does not prove a win condition or arbitrary life-total stability'],
+        repeatability: { status: 'repeatable-lock', reason: 'repeated damage cannot create poison counters on you while the zero-life shield remains active' },
+      });
+    }
+  }
+  if (!firstRejected) return null;
+  return failure(
+    'proof:counter-suppression-poison-loss-lock-scope:' + sorted([firstRejected.suppression.id, firstRejected.shield.id]).join('|'),
+    [firstRejected.suppression, firstRejected.shield],
+    'counter suppression does not apply to players, so poison counters can still be placed on you',
+    { suppressionScopes: counterSuppressionScopes(firstRejected.suppression), neededScope: firstRejected.needed },
+  );
+}
+
+function proveCounterSuppressionCumulativePreventionLock(cards) {
+  const suppressors = (cards || []).filter(card => hasCap(card, 'is-counter-suppression-static'));
+  const shields = (cards || []).filter(card => hasCap(card, 'is-cumulative-upkeep-counter-burden') && hasCap(card, 'is-full-self-damage-prevention-source'));
+  if (!suppressors.length || !shields.length) return null;
+  let firstRejected = null;
+  for (const suppression of suppressors) {
+    for (const shield of shields) {
+      if (!counterSuppressionApplies(suppression, 'lands')) {
+        firstRejected ||= { suppression, shield, needed: 'lands' };
+        continue;
+      }
+      const proofCards = uniqueCards([suppression, shield]);
+      return success('proof:counter-suppression-cumulative-prevention-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'counter-suppression→cumulative-upkeep-prevention-lock', proofCards, {
+        requiredFacts: [
+          fact(suppression, 'is-counter-suppression-static'),
+          fact(suppression, 'counter-suppression:lands'),
+          fact(shield, 'is-cumulative-upkeep-counter-burden'),
+          fact(shield, 'is-full-self-damage-prevention-source'),
+        ],
+        steps: [
+          { card: shield.id, action: 'the land prevents all damage that would be dealt to you, but cumulative upkeep would normally add an age counter first' },
+          { card: suppression.id, action: 'counter suppression stops the age counter from being placed on the land' },
+          { action: 'the cumulative-upkeep count never grows, so the upkeep burden does not advance while the damage-prevention lock stays active' },
+        ],
+        limitingClauses: ['only cumulative-upkeep prevention sources qualify', 'no extra-land-play or graveyard replay assumptions are used in this family'],
+        repeatability: { status: 'repeatable-lock', reason: 'each upkeep fails to add the age counter, preserving the prevention source turn after turn' },
+      });
+    }
+  }
+  if (!firstRejected) return null;
+  return failure(
+    'proof:counter-suppression-cumulative-prevention-lock-scope:' + sorted([firstRejected.suppression.id, firstRejected.shield.id]).join('|'),
+    [firstRejected.suppression, firstRejected.shield],
+    'counter suppression does not apply to the land receiving age counters',
+    { suppressionScopes: counterSuppressionScopes(firstRejected.suppression), neededScope: firstRejected.needed },
+  );
+}
+
+function proveGlobalUntapSkipUpkeepSkipLock(cards) {
+  const lockpiece = find(cards, card => hasCap(card, 'is-global-untap-skipper'));
+  const support = find(cards, card => card !== lockpiece && hasCap(card, 'is-global-upkeep-skipper'));
+  if (!lockpiece || !support) return null;
+  return success('proof:global-untap-skip-upkeep-skip-lock:' + sorted([lockpiece.id, support.id]).join('|'), 'global-untap-skip→upkeep-skip-lock', [lockpiece, support], {
+    requiredFacts: [
+      fact(lockpiece, 'is-global-untap-skipper'),
+      fact(support, 'is-global-upkeep-skipper'),
+    ],
+    steps: [
+      { card: lockpiece.id, action: 'players skip their untap steps, freezing ordinary permanent refresh' },
+      { card: support.id, action: 'players also skip upkeep steps, so the upkeep sacrifice/payment burden on the untap-skip lockpiece never triggers' },
+      { action: 'the table remains in the same turn-structure lock state each turn cycle' },
+    ],
+    limitingClauses: ['the family claims only lock coverage', 'it does not prove a win or any resource-positive loop'],
+    repeatability: { status: 'repeatable-lock', reason: 'skipped upkeep steps prevent the self-sacrifice burden from ever resolving while untap steps remain skipped' },
+  });
+}
+
+function proveGlobalUntapSkipEndStepUntapLock(cards) {
+  const lockpiece = find(cards, card => hasCap(card, 'is-global-untap-skipper'));
+  const support = find(cards, card => card !== lockpiece && hasCap(card, 'is-self-end-step-nonland-untapper'));
+  if (!lockpiece || !support) return null;
+  return success('proof:global-untap-skip-end-step-untap-lock:' + sorted([lockpiece.id, support.id]).join('|'), 'global-untap-skip→end-step-untap-lock', [lockpiece, support], {
+    requiredFacts: [
+      fact(lockpiece, 'is-global-untap-skipper'),
+      fact(support, 'is-self-end-step-nonland-untapper'),
+    ],
+    steps: [
+      { card: support.id, action: 'at your end step, your nonland permanents untap before the next upkeep arrives' },
+      { card: lockpiece.id, action: 'players still skip their untap steps, but your refreshed nonland mana survives into upkeep to preserve the lockpiece' },
+      { action: 'opponents remain frozen by the global untap skip while your upkeep payment window stays live' },
+    ],
+    assumptions: ['you control at least one nonland mana source that remains available through upkeep and can pay the lockpiece upkeep'],
+    limitingClauses: ['the support must refresh your mana before upkeep, not merely later in turn', 'the family claims only lock coverage'],
+    repeatability: { status: 'repeatable-lock', reason: 'end-step untapping refreshes the upkeep payment infrastructure every turn while the untap lock remains global' },
+  });
+}
+
+function proveGlobalUntapSkipUpkeepLandLock(cards) {
+  const lockpiece = find(cards, card => hasCap(card, 'is-global-untap-skipper'));
+  const support = find(cards, card => card !== lockpiece && hasCap(card, 'is-upkeep-self-untap-mana-land'));
+  if (!lockpiece || !support) return null;
+  return success('proof:global-untap-skip-upkeep-land-lock:' + sorted([lockpiece.id, support.id]).join('|'), 'global-untap-skip→upkeep-untap-land-lock', [lockpiece, support], {
+    requiredFacts: [
+      fact(lockpiece, 'is-global-untap-skipper'),
+      fact(support, 'is-upkeep-self-untap-mana-land'),
+      fact(support, 'upkeep-self-untap-mana-land-produces:any'),
+    ],
+    steps: [
+      { card: support.id, action: 'during your upkeep, the support land refreshes itself even though untap steps are skipped' },
+      { card: lockpiece.id, action: 'that refreshed land pays the upkeep that keeps the global untap-skip lock active' },
+      { action: 'the table remains under the untap-skip lock on each turn cycle' },
+    ],
+    assumptions: ['you have one disposable or exilable card available each upkeep to satisfy the support land refresh clause'],
+    limitingClauses: ['the family claims only lock coverage', 'self-refreshing upkeep lands must explicitly refresh before the lockpiece upkeep resolves'],
+    repeatability: { status: 'repeatable-lock', reason: 'the upkeep-refresh land reopens the exact mana window needed to preserve the global untap lock every turn' },
+  });
+}
+
+function selfBounceCanTargetUntapLockpiece(support, lockpiece) {
+  if (!lockpiece || !hasCap(lockpiece, 'is-global-untap-skipper')) return false;
+  if (hasCap(support, 'self-bounce-target:permanent-you-control')) return true;
+  if (hasCap(support, 'self-bounce-target:any-permanent')) return true;
+  return hasCap(support, 'self-bounce-target:any-permanent-not-enchanted');
+}
+
+function proveGlobalUntapSkipSelfBounceLock(cards) {
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-global-untap-skipper'));
+  const supports = (cards || []).filter(card => hasCap(card, 'is-repeatable-self-bounce-support'));
+  if (!lockpieces.length || !supports.length) return null;
+  let firstRejected = null;
+  for (const lockpiece of lockpieces) {
+    for (const support of supports) {
+      if (hasCap(support, 'self-bounce-window:your-turn')) {
+        firstRejected ||= { lockpiece, support, reason: 'timing' };
+        continue;
+      }
+      if (!selfBounceCanTargetUntapLockpiece(support, lockpiece)) {
+        firstRejected ||= { lockpiece, support, reason: 'target' };
+        continue;
+      }
+      const proofCards = uniqueCards([lockpiece, support]);
+      const supportCost = selfBounceCostProfile(support);
+      const assumptions = [
+        `you can reserve ${supportCost.total || 0} mana for the bounce activation during the opponents’ end step each turn cycle`,
+      ];
+      if (hasCap(support, 'self-bounce-additional-cost:discard')) assumptions.push('you have one spare discardable card each turn cycle for the bounce activation');
+      const creatureTap = firstCap(support, capSuffixes(support, 'self-bounce-additional-tap-creatures:').map(v => 'self-bounce-additional-tap-creatures:' + v));
+      const birdTap = firstCap(support, capSuffixes(support, 'self-bounce-additional-tap-birds:').map(v => 'self-bounce-additional-tap-birds:' + v));
+      const snowReq = capSuffixes(support, 'self-bounce-requires-snow-permanents:')[0];
+      if (creatureTap) assumptions.push(`you control ${creatureTap.split(':').pop()} other untapped creatures each turn for the bounce activation`);
+      if (birdTap) assumptions.push(`you control ${birdTap.split(':').pop()} other untapped Birds each turn for the bounce activation`);
+      if (snowReq) assumptions.push(`you control at least ${snowReq} snow permanents whenever the bounce support is activated`);
+      return success('proof:global-untap-skip-self-bounce-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'global-untap-skip→self-bounce-lock', proofCards, {
+        requiredFacts: [
+          fact(lockpiece, 'is-global-untap-skipper'),
+          fact(support, 'is-repeatable-self-bounce-support'),
+          fact(support,
+            hasCap(support, 'self-bounce-target:permanent-you-control') ? 'self-bounce-target:permanent-you-control'
+              : hasCap(support, 'self-bounce-target:any-permanent-not-enchanted') ? 'self-bounce-target:any-permanent-not-enchanted'
+                : 'self-bounce-target:any-permanent'),
+          ...(hasCap(support, 'self-bounce-additional-cost:discard') ? [fact(support, 'self-bounce-additional-cost:discard')] : []),
+          ...(creatureTap ? [fact(support, creatureTap)] : []),
+          ...(birdTap ? [fact(support, birdTap)] : []),
+          ...(snowReq ? [fact(support, 'self-bounce-requires-snow-permanents:' + snowReq)] : []),
+        ],
+        steps: [
+          { card: support.id, action: 'during the opponents’ end step, return the global untap-skip lockpiece to your hand' },
+          { action: 'your next untap step happens normally because the untap-skip piece is no longer on the battlefield' },
+          { card: lockpiece.id, action: 'recast the untap-skip lockpiece on your turn before opponents reach another untap step' },
+          { action: 'the same table-wide untap freeze is restored for the next full turn cycle' },
+        ],
+        assumptions,
+        limitingClauses: ['your-turn-only bounce timing is excluded', 'the family claims only lock coverage', 'the proof does not count one-shot reset effects or non-repeatable tutors/copies'],
+        repeatability: { status: 'repeatable-lock', reason: 'bouncing the untap-skip piece before your untap step lets you reset and replay the same lock every turn cycle' },
+      });
+    }
+  }
+  if (!firstRejected) return null;
+  if (firstRejected.reason === 'timing') {
+    return failure(
+      'proof:global-untap-skip-self-bounce-lock-timing:' + sorted([firstRejected.lockpiece.id, firstRejected.support.id]).join('|'),
+      [firstRejected.lockpiece, firstRejected.support],
+      'self-bounce support only works during your turn, so it cannot remove the untap-skip lockpiece before your next untap step',
+      { supportCaps: (firstRejected.support.caps || []).filter(cap => cap.startsWith('self-bounce-')) },
+    );
+  }
+  return failure(
+    'proof:global-untap-skip-self-bounce-lock-target:' + sorted([firstRejected.lockpiece.id, firstRejected.support.id]).join('|'),
+    [firstRejected.lockpiece, firstRejected.support],
+    'self-bounce support cannot legally return the untap-skip lockpiece you control to hand',
+    { supportCaps: (firstRejected.support.caps || []).filter(cap => cap.startsWith('self-bounce-target:')) },
+  );
+}
+
+function selfBounceCostProfile(card) {
+  return manaCostProfileFromCaps(card, 'self-bounce');
+}
+
+function faceUpCostProfile(card) {
+  return manaCostProfileFromCaps(card, 'face-up');
+}
+
+function extraLandDropCount(card) {
+  const values = capSuffixes(card, 'extra-land-drops:').map(value => parseInt(value, 10)).filter(Number.isFinite);
+  return values.length ? Math.max(...values) : 0;
+}
+
+function drawLimitScopes(card) {
+  return capSuffixes(card, 'draw-limit-scope:');
+}
+
+function searchLockScopes(card) {
+  return capSuffixes(card, 'search-lock-scope:');
+}
+
+function attackLockAxes(card) {
+  return capSuffixes(card, 'attack-lock-axis:');
+}
+
+function artifactActivationLockScopes(card) {
+  return capSuffixes(card, 'artifact-activation-lock-scope:');
+}
+
+function attackLockScopes(card) {
+  return capSuffixes(card, 'attack-lock-scope:');
+}
+
+function evasionRemovalKinds(card) {
+  return capSuffixes(card, 'evasion-removal:');
+}
+
+function evasionRemovalScopes(card) {
+  return capSuffixes(card, 'evasion-removal-scope:');
+}
+
+function selfBounceCanTargetProtectionSource(support, source) {
+  if (hasCap(support, 'self-bounce-target:permanent-you-control')) return true;
+  if (hasCap(support, 'self-bounce-target:any-permanent')) return true;
+  if (hasCap(support, 'self-bounce-target:any-permanent-not-enchanted')) return true;
+  return hasCap(source, 'protection-source-type:artifact') && hasCap(support, 'self-bounce-target:artifact-you-control');
+}
+
+function graveyardCastSupportCanReplayProtectionSource(support, source) {
+  if (!hasCap(source, 'protection-source-type:artifact')) return false;
+  if (hasCap(support, 'graveyard-cast-support-requires-combat-damage')) return false;
+  return hasCap(support, 'is-graveyard-artifact-cast-support')
+    || hasCap(support, 'is-graveyard-permanent-cast-support');
+}
+
+function proveCastProtectionSelfBounceLock(cards) {
+  const sources = (cards || []).filter(card => hasCap(card, 'is-cast-gated-opponent-turn-protection-source') && hasCap(card, 'protection-source-type:artifact'));
+  const supports = (cards || []).filter(card => hasCap(card, 'is-repeatable-self-bounce-support'));
+  if (!sources.length || !supports.length) return null;
+  let firstRejected = null;
+  for (const source of sources) {
+    for (const support of supports) {
+      if (!selfBounceCanTargetProtectionSource(support, source)) {
+        firstRejected ||= { source, support };
+        continue;
+      }
+      const proofCards = uniqueCards([source, support]);
+      const supportCost = selfBounceCostProfile(support);
+      const assumptions = [
+        `you can pay the recast cost for ${source.id} and the self-bounce activation cost of ${supportCost.total || 0} mana on each of your turns`,
+      ];
+      if (hasCap(support, 'self-bounce-additional-cost:discard')) assumptions.push('you have one spare discardable card each turn cycle for the self-bounce support');
+      const creatureTap = firstCap(support, capSuffixes(support, 'self-bounce-additional-tap-creatures:').map(v => 'self-bounce-additional-tap-creatures:' + v));
+      const birdTap = firstCap(support, capSuffixes(support, 'self-bounce-additional-tap-birds:').map(v => 'self-bounce-additional-tap-birds:' + v));
+      const snowReq = capSuffixes(support, 'self-bounce-requires-snow-permanents:')[0];
+      if (creatureTap) assumptions.push(`you control ${creatureTap.split(':').pop()} other untapped creatures each turn for the bounce activation`);
+      if (birdTap) assumptions.push(`you control ${birdTap.split(':').pop()} other untapped Birds each turn for the bounce activation`);
+      if (snowReq) assumptions.push(`you control at least ${snowReq} snow permanents whenever the bounce support is activated`);
+      return success('proof:cast-protection-self-bounce-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'cast-protection→self-bounce-lock', proofCards, {
+        requiredFacts: [
+          fact(source, 'is-cast-gated-opponent-turn-protection-source'),
+          fact(source, 'protection-source-type:artifact'),
+          fact(support, 'is-repeatable-self-bounce-support'),
+          fact(support,
+            hasCap(support, 'self-bounce-target:artifact-you-control') ? 'self-bounce-target:artifact-you-control'
+              : hasCap(support, 'self-bounce-target:permanent-you-control') ? 'self-bounce-target:permanent-you-control'
+                : hasCap(support, 'self-bounce-target:any-permanent-not-enchanted') ? 'self-bounce-target:any-permanent-not-enchanted'
+                  : 'self-bounce-target:any-permanent'),
+          ...(hasCap(support, 'self-bounce-window:your-turn') ? [fact(support, 'self-bounce-window:your-turn')] : []),
+          ...(hasCap(support, 'self-bounce-additional-cost:discard') ? [fact(support, 'self-bounce-additional-cost:discard')] : []),
+          ...(creatureTap ? [fact(support, creatureTap)] : []),
+          ...(birdTap ? [fact(support, birdTap)] : []),
+          ...(snowReq ? [fact(support, 'self-bounce-requires-snow-permanents:' + snowReq)] : []),
+        ],
+        steps: [
+          { card: support.id, action: 'on your turn, the support returns the protection source artifact to your hand' },
+          { card: source.id, action: 'you recast the protection source and its cast-gated trigger grants protection from everything until your next turn' },
+          { action: 'the same protected opponent-turn state is restored for the next full turn cycle' },
+        ],
+        assumptions,
+        limitingClauses: ['the family defers creature-tap bounce shells, snow-count gates, and non-self-contained blink resets', 'the family claims only lock coverage'],
+        repeatability: { status: 'repeatable-lock', reason: 'recasting the same protection artifact every turn cycle renews the opponent-turn protection lock' },
+      });
+    }
+  }
+  if (!firstRejected) return null;
+  return failure(
+    'proof:cast-protection-self-bounce-target:' + sorted([firstRejected.source.id, firstRejected.support.id]).join('|'),
+    [firstRejected.source, firstRejected.support],
+    'self-bounce support cannot legally return the cast-gated protection source to hand',
+    {
+      sourceCaps: capSuffixes(firstRejected.source, 'protection-source-type:'),
+      supportTargets: capSuffixes(firstRejected.support, 'self-bounce-target:'),
+    },
+  );
+}
+
+function proveCastProtectionGraveyardRecastLock(cards) {
+  const sources = (cards || []).filter(card => hasCap(card, 'is-cast-gated-opponent-turn-protection-source') && hasCap(card, 'protection-source-type:artifact'));
+  const outlets = (cards || []).filter(card => hasCap(card, 'is-artifact-sac-outlet'));
+  const supports = (cards || []).filter(card => hasCap(card, 'is-graveyard-artifact-cast-support') || hasCap(card, 'is-graveyard-permanent-cast-support'));
+  if (!sources.length || !outlets.length || !supports.length) return null;
+  let firstRejected = null;
+  for (const source of sources) {
+    for (const outlet of outlets) {
+      for (const support of supports) {
+        if (!graveyardCastSupportCanReplayProtectionSource(support, source)) {
+          firstRejected ||= { source, outlet, support };
+          continue;
+        }
+        const proofCards = uniqueCards([source, outlet, support]);
+        const supportCost = manaCostProfileFromCaps(support, 'graveyard-cast-support');
+        const assumptions = [
+          `you can pay the recast cost for ${source.id} and any activation costs required by ${support.id} on each of your turns`,
+        ];
+        if (hasCap(support, 'graveyard-cast-support-activation-taps-source')) assumptions.push(`${support.id} is able to tap on your turn to enable the recast line`);
+        if (hasCap(support, 'graveyard-cast-support-precondition:no-spell-yet')) assumptions.push(`you activate ${support.id} before casting any other spell that turn`);
+        return success('proof:cast-protection-graveyard-recast-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'cast-protection→graveyard-recast-lock', proofCards, {
+          requiredFacts: [
+            fact(source, 'is-cast-gated-opponent-turn-protection-source'),
+            fact(source, 'protection-source-type:artifact'),
+            fact(outlet, 'is-artifact-sac-outlet'),
+            fact(support, hasCap(support, 'is-graveyard-artifact-cast-support') ? 'is-graveyard-artifact-cast-support' : 'is-graveyard-permanent-cast-support'),
+            fact(support, hasCap(support, 'graveyard-cast-support-target:artifact') ? 'graveyard-cast-support-target:artifact' : 'graveyard-cast-support-target:permanent'),
+            ...(hasCap(support, 'graveyard-cast-support-window:your-turn') ? [fact(support, 'graveyard-cast-support-window:your-turn')] : []),
+            ...(hasCap(support, 'graveyard-cast-support-precondition:no-spell-yet') ? [fact(support, 'graveyard-cast-support-precondition:no-spell-yet')] : []),
+            ...(hasCap(support, 'graveyard-cast-support-postcondition:no-more-spells') ? [fact(support, 'graveyard-cast-support-postcondition:no-more-spells')] : []),
+            ...(supportCost.total > 0 ? [{ card: support.id, kind: 'precondition', predicate: 'graveyard-cast-support-cost', value: supportCost }] : []),
+          ],
+          steps: [
+            { card: outlet.id, action: 'on your turn, sacrifice the protection artifact so it moves to your graveyard' },
+            { card: support.id, action: 'use the support to authorize casting that artifact from your graveyard during the same turn' },
+            { card: source.id, action: 'recast the protection artifact from graveyard, renewing protection from everything until your next turn' },
+            { action: 'the same protected opponent-turn state is restored for the next full turn cycle' },
+          ],
+          assumptions,
+          limitingClauses: [
+            'combat-damage-gated graveyard recast supports are intentionally excluded from this strict family',
+            'the family claims only lock coverage and does not infer any surplus value from sacrificing the artifact',
+          ],
+          repeatability: { status: 'repeatable-lock', reason: 'the artifact can be sacrificed and recast from graveyard on each of your turns, refreshing the same cast-gated protection window each cycle' },
+        });
+      }
+    }
+  }
+  if (!firstRejected) return null;
+  return failure(
+    'proof:cast-protection-graveyard-recast-support:' + sorted([firstRejected.source.id, firstRejected.outlet.id, firstRejected.support.id]).join('|'),
+    [firstRejected.source, firstRejected.outlet, firstRejected.support],
+    'graveyard-cast support cannot strictly recast the protection artifact each turn without combat or wrong target scope',
+    {
+      supportTargets: capSuffixes(firstRejected.support, 'graveyard-cast-support-target:'),
+      supportFlags: (firstRejected.support.caps || []).filter(cap => String(cap).startsWith('graveyard-cast-support-')),
+    },
+  );
+}
+
+function proveFaceUpUntapSkipResetLock(cards) {
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-face-up-opponent-next-untap-skipper'));
+  const supports = (cards || []).filter(card =>
+    hasCap(card, 'is-upkeep-face-down-resetter')
+    && hasCap(card, 'is-face-up-copy-creature')
+  );
+  if (!lockpieces.length || !supports.length) return null;
+  for (const lockpiece of lockpieces) {
+    for (const support of supports) {
+      const faceUpCost = faceUpCostProfile(support);
+      return success('proof:face-up-untap-skip-face-down-reset-lock:' + sorted([lockpiece.id, support.id]).join('|'), 'face-up-untap-skip→face-down-reset-lock', [lockpiece, support], {
+        requiredFacts: [
+          fact(lockpiece, 'is-face-up-opponent-next-untap-skipper'),
+          fact(support, 'is-upkeep-face-down-resetter'),
+          fact(support, 'is-face-up-copy-creature'),
+          fact(support, 'face-up-copy-target:another-creature'),
+          ...(faceUpCost.total > 0 ? [{ card: support.id, kind: 'precondition', predicate: 'face-up-cost', value: faceUpCost }] : []),
+        ],
+        steps: [
+          { card: support.id, action: 'during your upkeep, turn the support creature face down using its built-in reset ability' },
+          { card: support.id, action: `turn the support creature face up${faceUpCost.total > 0 ? ` by paying ${faceUpCost.total} mana` : ''} and choose the untap-skip creature to copy` },
+          { card: lockpiece.id, action: 'the copied turned-face-up trigger makes each opponent skip their next untap step' },
+          { action: 'on the next upkeep, the support resets face down again and repeats the same face-up copy trigger' },
+        ],
+        assumptions: [
+          `you can pay the support creature's turn-face-up cost of ${faceUpCost.total || 0} mana on each of your upkeeps`,
+          'the untap-skip creature remains on the battlefield so the support can copy it each time it is turned face up',
+        ],
+        limitingClauses: [
+          'the family claims only lock coverage and does not infer surplus mana or extra morph activations',
+          'one-shot clone effects or copy shells that do not copy as they are turned face up are excluded',
+        ],
+        repeatability: { status: 'repeatable-lock', reason: 'the support creature can reset face down every upkeep and re-copy the untap-skip trigger on the same turn cycle' },
+      });
+    }
+  }
+  return null;
+}
+
+function proveReplayablePreventionLandLock(cards) {
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-replayable-prevention-land-lockpiece'));
+  const recursors = (cards || []).filter(card => hasCap(card, 'is-land-recursion'));
+  const extraLandSupports = (cards || []).filter(card => hasCap(card, 'is-extra-land-drop'));
+  if (!lockpieces.length || !recursors.length || !extraLandSupports.length) return null;
+  const failures = [];
+  for (const lockpiece of lockpieces) {
+    for (const recursor of recursors) {
+      for (const support of extraLandSupports) {
+        const extraLandCount = extraLandDropCount(support);
+        if (extraLandCount < 1) {
+          failures.push(failure(
+            'proof:prevention-land-extra-land-threshold:' + sorted(uniqueCards([lockpiece, recursor, support]).map(card => card.id)).join('|'),
+            uniqueCards([lockpiece, recursor, support]),
+            'the extra-land support does not explicitly add at least one extra land play',
+            { extraLandCount },
+          ));
+          continue;
+        }
+        const proofCards = uniqueCards([lockpiece, recursor, support]);
+        return success('proof:prevention-land-graveyard-extra-land-lock:' + sorted(proofCards.map(card => card.id)).join('|'), 'prevention-land→graveyard-extra-land-lock', proofCards, {
+          requiredFacts: [
+            fact(lockpiece, 'is-replayable-prevention-land-lockpiece'),
+            fact(recursor, 'is-land-recursion'),
+            fact(support, 'is-extra-land-drop'),
+            { card: support.id, kind: 'precondition', predicate: 'extra-land-drops', value: extraLandCount },
+          ],
+          steps: [
+            { card: lockpiece.id, action: 'during upkeep, let the prevention land be sacrificed instead of paying the cumulative upkeep' },
+            { card: recursor.id, action: 'replay the prevention land from the graveyard during your turn' },
+            { card: lockpiece.id, action: 'when the prevention land enters, sacrifice another land you control to satisfy its ETB burden' },
+            { card: support.id, action: `use the extra land-play allowance (${extraLandCount} extra land${extraLandCount === 1 ? '' : 's'}) to replay the sacrificed land or another land that restores your land count` },
+            { action: 'the prevention land remains on the battlefield preventing all damage to you until the next upkeep, where the same replay line repeats' },
+          ],
+          assumptions: [
+            'you can choose not to pay the cumulative upkeep so the prevention land reaches the graveyard for replay',
+            'you have another land available to sacrifice when the prevention land reenters',
+          ],
+          limitingClauses: [
+            'the family does not cover graveyard-to-hand land recovery shells such as dredge-only lines',
+            'graveyard replay without an extra land play is intentionally excluded from strict lock proof',
+          ],
+          repeatability: { status: 'repeatable-lock', reason: 'each upkeep cycle replays the same prevention land from the graveyard and restores the sacrificed land slot with the extra land play' },
+        });
+      }
+    }
+  }
+  if (failures.length === 1) return failures[0];
+  return failure(
+    'proof:prevention-land-graveyard-extra-land-lock-all-rejected:' + sorted(cards.map(card => card.id)).join('|'),
+    cards,
+    'no prevention-land / graveyard replay / extra-land support package satisfied the strict maintenance gates',
+    { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
+  );
+}
+
+function proveDrawStepHandCycleDrawLimitLock(cards) {
+  const engines = (cards || []).filter(card => hasCap(card, 'is-draw-step-hand-cycler'));
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-draw-limit-lockpiece'));
+  if (!engines.length || !lockpieces.length) return null;
+  for (const engine of engines) {
+    for (const lockpiece of lockpieces) {
+      const scopes = drawLimitScopes(lockpiece);
+      const proofScope = scopes.includes('opponents') ? 'opponents' : 'players';
+      return success('proof:draw-step-hand-cycle-draw-limit-lock:' + sorted([engine.id, lockpiece.id]).join('|'), 'draw-step-hand-cycle→draw-limit-lock', [engine, lockpiece], {
+        requiredFacts: [
+          fact(engine, 'is-draw-step-hand-cycler'),
+          fact(lockpiece, 'is-draw-limit-lockpiece'),
+          fact(lockpiece, scopes.includes('opponents') ? 'draw-limit-scope:opponents' : 'draw-limit-scope:players'),
+          fact(lockpiece, 'draw-limit-count:1'),
+          ...(hasCap(lockpiece, 'draw-limit-replacement:skip') ? [fact(lockpiece, 'draw-limit-replacement:skip')] : []),
+        ],
+        steps: [
+          { card: engine.id, action: `${proofScope === 'opponents' ? 'on each opponent draw step' : 'on each draw step'}, the engine moves that player's whole hand away before the redraw` },
+          { card: lockpiece.id, action: `the lockpiece limits the redraw to at most one card for ${proofScope}` },
+          { action: 'the affected player starts each turn with no meaningful hand rebuild, reproducing the same hand-denial lock state every draw step' },
+        ],
+        assumptions: [
+          proofScope === 'opponents'
+            ? 'the proof is evaluated for locking opponents, not your own optional card flow'
+            : 'the table accepts the symmetric draw-limit lock state',
+        ],
+        limitingClauses: [
+          'the family claims hand-denial lock coverage only, not card-advantage or win conversion',
+          'ordinary wheel effects without a repeated draw-step trigger are excluded',
+        ],
+        repeatability: { status: 'repeatable-lock', reason: 'the draw-step hand cycler repeats every turn and the draw limit prevents the hand from being restored' },
+      });
+    }
+  }
+  return null;
+}
+
+function proveNoDrawSearchStepSearchLock(cards) {
+  const engines = (cards || []).filter(card => hasCap(card, 'is-no-draw-search-step-engine'));
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-search-lockpiece'));
+  if (!engines.length || !lockpieces.length) return null;
+  for (const engine of engines) {
+    for (const lockpiece of lockpieces) {
+      const scopes = searchLockScopes(lockpiece);
+      const proofScope = scopes.includes('opponents') ? 'opponents' : 'players';
+      return success('proof:no-draw-search-step-search-lock:' + sorted([engine.id, lockpiece.id]).join('|'), 'no-draw-search-step→search-lock', [engine, lockpiece], {
+        requiredFacts: [
+          fact(engine, 'is-no-draw-search-step-engine'),
+          fact(lockpiece, 'is-search-lockpiece'),
+          fact(lockpiece, scopes.includes('opponents') ? 'search-lock-scope:opponents' : 'search-lock-scope:players'),
+          ...(hasCap(lockpiece, 'search-lock-mode:controlled-search-exile') ? [fact(lockpiece, 'search-lock-mode:controlled-search-exile')] : []),
+        ],
+        steps: [
+          { card: engine.id, action: `${proofScope === 'opponents' ? 'on each opponent draw step' : 'on each draw step'}, normal card draw is prohibited and replaced by a search-for-a-card instruction` },
+          { card: lockpiece.id, action: `the lockpiece prevents that search from giving the affected ${proofScope === 'opponents' ? 'opponent' : 'player'} a real card in hand` },
+          { action: 'the affected draw step yields neither a draw nor a successful search, recreating the same locked card-flow state each turn' },
+        ],
+        assumptions: [
+          proofScope === 'opponents'
+            ? 'the proof is scoped to locking opponents while your own search/draw constraints are outside this family'
+            : 'the table-wide search denial is acceptable as a symmetric lock state',
+        ],
+        limitingClauses: [
+          'the family does not claim theft/value conversion from exiled searched cards beyond the lock itself',
+          'search taxes or optional search replacement effects that still let the player find a card are excluded',
+        ],
+        repeatability: { status: 'repeatable-lock', reason: 'the draw-step replacement search recurs every turn and the search denial prevents it from restoring the affected player hand' },
+      });
+    }
+  }
+  return null;
+}
+
+function proveNoFlyingAttackFlyingRemovalLock(cards) {
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-attack-lockpiece') && hasCap(card, 'attack-lock-axis:no-flying'));
+  const supports = (cards || []).filter(card => hasCap(card, 'is-evasion-removal-lock-support') && hasCap(card, 'evasion-removal:flying'));
+  if (!lockpieces.length || !supports.length) return null;
+  for (const lockpiece of lockpieces) {
+    for (const support of supports) {
+      const lockScopes = attackLockScopes(lockpiece);
+      const supportScopes = evasionRemovalScopes(support);
+      const compatible = lockScopes.includes('players') || (lockScopes.includes('you') && (supportScopes.includes('players') || supportScopes.includes('opponents')));
+      if (!compatible) continue;
+      return success('proof:no-flying-attack-flying-removal-lock:' + sorted([lockpiece.id, support.id]).join('|'), 'no-flying-attack→flying-removal-lock', [lockpiece, support], {
+        requiredFacts: [
+          fact(lockpiece, 'is-attack-lockpiece'),
+          fact(lockpiece, 'attack-lock-axis:no-flying'),
+          fact(lockpiece, lockScopes.includes('players') ? 'attack-lock-scope:players' : 'attack-lock-scope:you'),
+          fact(support, 'is-evasion-removal-lock-support'),
+          fact(support, 'evasion-removal:flying'),
+          fact(support, supportScopes.includes('players') ? 'evasion-removal-scope:players' : 'evasion-removal-scope:opponents'),
+        ],
+        steps: [
+          { card: support.id, action: 'the support continuously strips flying from the relevant opposing or global creature set' },
+          { card: lockpiece.id, action: 'the attack prison forbids every creature without flying from attacking on the protected scope' },
+          { action: 'because the relevant attackers no longer have flying, no legal attack line remains on that scope' },
+        ],
+        assumptions: [
+          lockScopes.includes('you') ? 'the proof is scoped to preventing attacks against you, not necessarily against every player at the table' : 'the table accepts the global no-attack state',
+        ],
+        limitingClauses: [
+          'partial rows that still leave islandwalk or other alternate evasion lines are excluded from this family',
+          'the family claims combat-denial lock coverage only',
+        ],
+        repeatability: { status: 'repeatable-lock', reason: 'the flying-removal support is static and the no-flying prison remains continuously active' },
+      });
+    }
+  }
+  return null;
+}
+
+function proveFlyingOnlyAttackGroundLock(cards) {
+  const flyingOnly = (cards || []).filter(card => hasCap(card, 'is-attack-lockpiece') && hasCap(card, 'attack-lock-axis:flying-only') && hasCap(card, 'attack-lock-scope:you'));
+  const noFlying = (cards || []).filter(card => hasCap(card, 'is-attack-lockpiece') && hasCap(card, 'attack-lock-axis:no-flying'));
+  if (!flyingOnly.length || !noFlying.length) return null;
+  for (const flyerLock of flyingOnly) {
+    for (const groundLock of noFlying) {
+      if (groundLock === flyerLock) continue;
+      const groundScopes = attackLockScopes(groundLock);
+      if (!groundScopes.includes('players') && !groundScopes.includes('you')) continue;
+      return success('proof:flying-only-attack-ground-lock:' + sorted([flyerLock.id, groundLock.id]).join('|'), 'flying-only-attack→ground-lock', [flyerLock, groundLock], {
+        requiredFacts: [
+          fact(flyerLock, 'is-attack-lockpiece'),
+          fact(flyerLock, 'attack-lock-axis:flying-only'),
+          fact(flyerLock, 'attack-lock-scope:you'),
+          fact(groundLock, 'is-attack-lockpiece'),
+          fact(groundLock, 'attack-lock-axis:no-flying'),
+          fact(groundLock, groundScopes.includes('players') ? 'attack-lock-scope:players' : 'attack-lock-scope:you'),
+        ],
+        steps: [
+          { card: groundLock.id, action: 'the ground prison forbids every nonflying creature from attacking on the protected scope' },
+          { card: flyerLock.id, action: 'the flying-only prison forbids every flying creature from attacking you' },
+          { action: 'between the two prisons, neither fliers nor nonfliers can attack you' },
+        ],
+        assumptions: ['the proof is scoped to protecting you from combat, not to globally freezing combat for every player'],
+        limitingClauses: ['the family does not cover alternate evasions like islandwalk unless another family proves they are removed'],
+        repeatability: { status: 'repeatable-lock', reason: 'both attack restrictions are static and jointly partition all creatures into forbidden attacker classes' },
+      });
+    }
+  }
+  return null;
+}
+
+function proveFlyingOrIslandwalkAttackEvasionRemovalLock(cards) {
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-attack-lockpiece') && hasCap(card, 'attack-lock-axis:flying-or-islandwalk-only'));
+  const supports = (cards || []).filter(card =>
+    hasCap(card, 'is-evasion-removal-lock-support')
+    && hasCap(card, 'evasion-removal:flying')
+    && hasCap(card, 'evasion-removal:islandwalk')
+  );
+  if (!lockpieces.length || !supports.length) return null;
+  for (const lockpiece of lockpieces) {
+    for (const support of supports) {
+      const lockScopes = attackLockScopes(lockpiece);
+      const supportScopes = evasionRemovalScopes(support);
+      const compatible = lockScopes.includes('players') || (lockScopes.includes('you') && supportScopes.includes('players'));
+      if (!compatible) continue;
+      return success('proof:flying-or-islandwalk-attack-evasion-removal-lock:' + sorted([lockpiece.id, support.id]).join('|'), 'flying-or-islandwalk-attack→evasion-removal-lock', [lockpiece, support], {
+        requiredFacts: [
+          fact(lockpiece, 'is-attack-lockpiece'),
+          fact(lockpiece, 'attack-lock-axis:flying-or-islandwalk-only'),
+          fact(lockpiece, lockScopes.includes('players') ? 'attack-lock-scope:players' : 'attack-lock-scope:you'),
+          fact(support, 'is-evasion-removal-lock-support'),
+          fact(support, 'evasion-removal:flying'),
+          fact(support, 'evasion-removal:islandwalk'),
+          fact(support, 'evasion-removal-scope:players'),
+        ],
+        steps: [
+          { card: support.id, action: 'the support strips both flying and islandwalk from all creatures' },
+          { card: lockpiece.id, action: 'the prison allows attacks only from creatures with flying and/or islandwalk on the protected scope' },
+          { action: 'because all creatures lose both qualifying evasions, no legal attackers remain on that scope' },
+        ],
+        assumptions: [
+          lockScopes.includes('you') ? 'the proof is scoped to preventing attacks against you' : 'the table accepts the global no-attack state',
+        ],
+        limitingClauses: ['support that removes only flying but not islandwalk is excluded', 'the family claims combat-denial lock coverage only'],
+        repeatability: { status: 'repeatable-lock', reason: 'the evasion-removal support is static and continuously invalidates every attacker the prison would otherwise permit' },
+      });
+    }
+  }
+  return null;
+}
+
+function proveAllLandsIslandsUntapLock(cards) {
+  const engines = (cards || []).filter(card => hasCap(card, 'is-all-lands-are-islands'));
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-island-untap-lockpiece'));
+  if (!engines.length || !lockpieces.length) return null;
+  for (const engine of engines) {
+    for (const lockpiece of lockpieces) {
+      return success('proof:all-lands-islands-island-untap-lock:' + sorted([engine.id, lockpiece.id]).join('|'), 'all-lands-islands→island-untap-lock', [engine, lockpiece], {
+        requiredFacts: [
+          fact(engine, 'is-all-lands-are-islands'),
+          fact(lockpiece, 'is-island-untap-lockpiece'),
+          ...(hasCap(lockpiece, 'island-untap-lockpiece-taps-islands-on-entry') ? [fact(lockpiece, 'island-untap-lockpiece-taps-islands-on-entry')] : []),
+        ],
+        steps: [
+          { card: engine.id, action: 'the engine continuously makes every land an Island in addition to its other land types' },
+          { card: lockpiece.id, action: 'the lockpiece prevents Islands from untapping during their controllers’ untap steps' },
+          ...(hasCap(lockpiece, 'island-untap-lockpiece-taps-islands-on-entry')
+            ? [{ card: lockpiece.id, action: 'its enter-the-battlefield rider taps the affected Islands immediately, accelerating the land freeze' }]
+            : []),
+          { action: 'because every land is an Island, ordinary land mana stops refreshing through untap steps for every player' },
+        ],
+        assumptions: [
+          'the family proves a mana-denial lock only and does not distinguish which player can still operate through nonland mana or preexisting untapped lands',
+        ],
+        limitingClauses: [
+          'nonbasic-only Island conversion is intentionally excluded from this strict family',
+          'the family claims lock coverage only, not a deterministic win or an asymmetrical resource proof',
+        ],
+        repeatability: { status: 'repeatable-lock', reason: 'the land-type change and Island untap denial are static and recreate the same frozen land-refresh state every turn cycle' },
+      });
+    }
+  }
+  return null;
+}
+
+function proveAllPermanentsArtifactsActivationLock(cards) {
+  const engines = (cards || []).filter(card => hasCap(card, 'is-all-permanents-artifacts'));
+  const lockpieces = (cards || []).filter(card => hasCap(card, 'is-artifact-activation-lockpiece'));
+  if (!engines.length || !lockpieces.length) return null;
+  for (const engine of engines) {
+    for (const lockpiece of lockpieces) {
+      const scopes = artifactActivationLockScopes(lockpiece);
+      if (!scopes.length) continue;
+      return success('proof:all-permanents-artifacts-artifact-activation-lock:' + sorted([engine.id, lockpiece.id]).join('|'), 'all-permanents-artifacts→artifact-activation-lock', [engine, lockpiece], {
+        requiredFacts: [
+          fact(engine, 'is-all-permanents-artifacts'),
+          fact(lockpiece, 'is-artifact-activation-lockpiece'),
+          fact(lockpiece, scopes.includes('opponents') ? 'artifact-activation-lock-scope:opponents' : 'artifact-activation-lock-scope:players'),
+        ],
+        steps: [
+          { card: engine.id, action: 'the engine continuously makes every permanent an artifact in addition to its other types' },
+          { card: lockpiece.id, action: scopes.includes('opponents')
+            ? 'the lockpiece prevents activated abilities of artifacts your opponents control from being activated'
+            : 'the lockpiece prevents activated abilities of artifacts from being activated' },
+          { action: scopes.includes('opponents')
+            ? 'because opposing permanents are artifacts, opponents lose access to activated abilities across those permanents under the static lock'
+            : 'because every permanent is an artifact, activated abilities across the battlefield are statically shut off under the lock' },
+        ],
+        assumptions: [
+          scopes.includes('opponents')
+            ? 'the proof is scoped to locking opponents’ activated permanent abilities and does not model your own surviving lines'
+            : 'the family proves activation-denial lock coverage only and does not require asymmetry',
+        ],
+        limitingClauses: [
+          'the family claims lock coverage only, not land-destruction, resource-deprivation, or deterministic win proof',
+          'artifact taxes or cost increases that still allow activation are intentionally excluded',
+        ],
+        repeatability: { status: 'repeatable-lock', reason: 'the type-changing engine and artifact activation denial are both static, so the activation lock reasserts continuously without spending additional resources' },
+      });
+    }
+  }
+  return null;
+}
+
 function cardsById(cards) {
   return Object.fromEntries((cards || []).map(card => [card.id, card]));
 }
@@ -2970,6 +4080,8 @@ function provePackage(rawCards, options = {}) {
     proveCombatResourceExtraCombatLoop(cards),
     proveCombatSacrificeAuraExtraCombatLoop(cards),
     proveArtifactTokenExtraTurnLoop(cards),
+    proveCounterThresholdDoublerExtraTurnLoop(cards),
+    proveCounterThresholdProliferateExtraTurnLoop(cards),
     proveBuybackCopyRitualLoop(cards),
     proveLifelinkCounterDamageLoop(cards),
     proveLifePaidDamageRecoveryLoop(cards),
@@ -2999,6 +4111,26 @@ function provePackage(rawCards, options = {}) {
     proveMinusCounterDeathTokenLoop(cards),
     proveLifegainCounterTokenEtbLoop(cards),
     proveDeathUntapDeathtouchPingerLock(cards),
+    proveForcedCastLock(cards),
+    proveCounterSuppressionPreventionLock(cards),
+    proveCounterSuppressionDepletionLock(cards),
+    proveCounterSuppressionPoisonLossLock(cards),
+    proveCounterSuppressionCumulativePreventionLock(cards),
+    proveFaceUpUntapSkipResetLock(cards),
+    proveReplayablePreventionLandLock(cards),
+    proveDrawStepHandCycleDrawLimitLock(cards),
+    proveNoDrawSearchStepSearchLock(cards),
+    proveNoFlyingAttackFlyingRemovalLock(cards),
+    proveFlyingOnlyAttackGroundLock(cards),
+    proveFlyingOrIslandwalkAttackEvasionRemovalLock(cards),
+    proveAllPermanentsArtifactsActivationLock(cards),
+    proveAllLandsIslandsUntapLock(cards),
+    proveGlobalUntapSkipUpkeepSkipLock(cards),
+    proveGlobalUntapSkipEndStepUntapLock(cards),
+    proveGlobalUntapSkipUpkeepLandLock(cards),
+    proveGlobalUntapSkipSelfBounceLock(cards),
+    proveCastProtectionSelfBounceLock(cards),
+    proveCastProtectionGraveyardRecastLock(cards),
   ].filter(Boolean);
   const indexedCards = cardsById(cards);
   const faceRejections = results

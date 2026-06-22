@@ -99,6 +99,56 @@ const fixtures = [
   { id: 'Upkeep Artifact Token Engine', type_line: 'Artifact Creature — Thopter', oracle_text: 'At the beginning of your upkeep, create five 1/1 colorless Thopter artifact creature tokens.', cmc: 6, mana_cost: '{6}' },
   { id: 'Four Artifact Token Engine', type_line: 'Artifact', oracle_text: 'At the beginning of your upkeep, create four Clue tokens.', cmc: 4, mana_cost: '{4}' },
   { id: 'Artifact Sacrifice Extra-Turn Engine', type_line: 'Artifact', oracle_text: '{T}, Sacrifice five artifacts: Take an extra turn after this one.', cmc: 2, mana_cost: '{2}' },
+  { id: 'Counter Threshold Extra-Turn Engine', type_line: 'Artifact', oracle_text: '{T}, Remove three charge counters from this artifact: Take an extra turn after this one.', cmc: 3 },
+  { id: 'Free Counter Doubler', type_line: 'Artifact', oracle_text: '{T}: Double the number of each kind of counter on target artifact.', cmc: 2 },
+  { id: 'Mana-Paid Counter Doubler', type_line: 'Artifact', oracle_text: '{2}, {T}: Double the number of each kind of counter on target artifact.', cmc: 3 },
+  { id: 'Free Proliferator', type_line: 'Artifact', oracle_text: '{T}: Proliferate three times.', cmc: 4 },
+  { id: 'Single Proliferator', type_line: 'Artifact', oracle_text: 'At the beginning of your end step, proliferate.', cmc: 4 },
+  { id: 'Proliferate Doubler', type_line: 'Creature — Phyrexian Wizard', oracle_text: 'If you would proliferate, proliferate twice instead.', cmc: 4 },
+  { id: 'Forced Exile Cast Engine', type_line: 'Artifact', oracle_text: 'Whenever a player casts a spell from their hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with this artifact without paying its mana cost.', cmc: 6 },
+  { id: 'Forced Draw Replacement Cast Engine', type_line: 'Artifact', oracle_text: "Players can't draw cards. At the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.", cmc: 5 },
+  { id: 'Nonhand Cast Lockpiece', type_line: 'Creature — Human Wizard', oracle_text: "Your opponents can't cast spells from anywhere other than their hands.", cmc: 2 },
+  { id: 'Spell Count Lockpiece', type_line: 'Enchantment', oracle_text: "Each player can't cast more than one spell each turn.", cmc: 3 },
+  { id: 'Sorcery Timing Lockpiece', type_line: 'Legendary Planeswalker', oracle_text: 'Each opponent can cast spells only any time they could cast a sorcery.', cmc: 3 },
+  { id: 'Free Cast Counter Lockpiece', type_line: 'Artifact', oracle_text: 'Whenever a player casts a spell, if no mana was spent to cast it, counter that spell.', cmc: 1 },
+  { id: 'Opponent Free Cast Counter Lockpiece', type_line: 'Creature — Human Soldier', oracle_text: 'Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell.', cmc: 2 },
+  { id: 'Noncreature Exile Lockpiece', type_line: 'Artifact Creature — Phyrexian Golem', oracle_text: "Players can't cast noncreature spells from graveyards or exile.", cmc: 2 },
+  { id: 'Counter Suppression Static', type_line: 'Enchantment', oracle_text: "Players can't get counters. Counters can't be put on artifacts, creatures, enchantments, or lands.", cmc: 3 },
+  { id: 'Counter Burden Prevention Shield', type_line: 'Enchantment', oracle_text: 'If a source would deal damage to you, prevent that damage and put an incarnation counter on this enchantment. When there are nine or more incarnation counters on this enchantment, exile it.', cmc: 3 },
+  { id: 'Delayed Counter Shield', type_line: 'Enchantment', oracle_text: 'If damage would be dealt to you, put that many delay counters on this enchantment instead. At the beginning of your upkeep, remove all delay counters from this enchantment. For each delay counter removed this way, you lose 1 life unless you pay {1}{W}.', cmc: 4 },
+  { id: 'Depletion Counterspell Lockpiece', type_line: 'Enchantment', oracle_text: 'Whenever an opponent casts a spell, counter that spell and put a depletion counter on this enchantment. If there are three or more depletion counters on this enchantment, sacrifice it.', cmc: 8 },
+  { id: 'Zero Life Poison Shield', type_line: 'Enchantment', oracle_text: "You don't lose the game for having 0 or less life. As long as you have 0 or less life, all damage is dealt to you as though its source had infect.", cmc: 3 },
+  { id: 'All-Permanents Are Artifacts Engine', type_line: 'Artifact', oracle_text: 'All permanents are artifacts in addition to their other types.', cmc: 6 },
+  { id: 'Artifact Activation Lockpiece', type_line: 'Artifact', oracle_text: "Activated abilities of artifacts can't be activated.", cmc: 2 },
+  { id: 'Opponent Artifact Activation Lockpiece', type_line: 'Planeswalker', oracle_text: "Activated abilities of artifacts your opponents control can't be activated.", cmc: 4 },
+  { id: 'All-Lands Are Islands Engine', type_line: 'Creature — Leviathan', oracle_text: "All lands are Islands in addition to their other types. Creatures without flying or islandwalk can't attack.", cmc: 8 },
+  { id: 'Island Untap Lockpiece', type_line: 'Enchantment', oracle_text: "Islands don't untap during their controllers' untap steps.", cmc: 3 },
+  { id: 'Age Counter Prevention Source', type_line: 'Land', oracle_text: 'Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) Creatures you control can\'t attack. Prevent all damage that would be dealt to you.', cmc: 0 },
+  { id: 'Replayable Prevention Land', type_line: 'Land', oracle_text: 'Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) When this land enters, sacrifice a land. Creatures you control can\'t attack. Prevent all damage that would be dealt to you.', cmc: 0 },
+  { id: 'Land Replay Support', type_line: 'Artifact', oracle_text: 'You may play lands from your graveyard.', cmc: 3 },
+  { id: 'Extra Land Support', type_line: 'Enchantment', oracle_text: 'You may play an additional land on each of your turns.', cmc: 1 },
+  { id: 'Draw-Step Hand Cycler', type_line: 'Artifact', oracle_text: "At the beginning of each player's draw step, that player puts the cards in their hand on the bottom of their library in any order, then draws that many cards.", cmc: 4 },
+  { id: 'Opponent Draw Limit', type_line: 'Planeswalker', oracle_text: "Each opponent can't draw more than one card each turn.", cmc: 3 },
+  { id: 'No-Draw Search-Step Engine', type_line: 'Creature — Elf Wizard', oracle_text: "Players can't draw cards. At the beginning of each player's draw step, that player loses 3 life, searches their library for a card, puts it into their hand, then shuffles.", cmc: 3 },
+  { id: 'Opponent Search Lockpiece', type_line: 'Creature — Human Rogue', oracle_text: "You control your opponents while they're searching their libraries. While an opponent is searching their library, they exile each card they find.", cmc: 3 },
+  { id: 'No-Flying Attack All Lockpiece', type_line: 'Enchantment', oracle_text: "Creatures without flying can't attack.", cmc: 4 },
+  { id: 'Flyers Cant Attack You Lockpiece', type_line: 'Enchantment', oracle_text: "Creatures with flying can't attack you.", cmc: 8 },
+  { id: 'Flying Islandwalk Only Attack You Lockpiece', type_line: 'Enchantment', oracle_text: "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.", cmc: 2 },
+  { id: 'Opponent Flying Removal Support', type_line: 'Enchantment Creature — Human Wizard', oracle_text: "Creatures you control have flying. Creatures your opponents control lose flying and can't have or gain flying.", cmc: 6 },
+  { id: 'Global Flying Islandwalk Removal Support', type_line: 'World Enchantment', oracle_text: 'All creatures lose flying and islandwalk.', cmc: 4 },
+  { id: 'Face-Up Untap Skipper', type_line: 'Creature — Elemental', oracle_text: 'Morph {5}{U}{U} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.) When this creature is turned face up, each opponent skips their next untap step.', cmc: 6 },
+  { id: 'Upkeep Reset Copier', type_line: 'Creature — Shapeshifter', oracle_text: 'As this creature enters or is turned face up, you may choose another creature on the battlefield. If you do, until this creature is turned face down, it becomes a copy of that creature, except it has "At the beginning of your upkeep, you may turn this creature face down." Morph {1}{U}', cmc: 5 },
+  { id: 'Global Untap Skipper', type_line: 'Enchantment', oracle_text: "Players skip their untap steps. At the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.", cmc: 2 },
+  { id: 'Global Upkeep Skipper', type_line: 'Artifact', oracle_text: 'Players skip their upkeep steps.', cmc: 5 },
+  { id: 'Self End Step Nonland Untapper', type_line: 'Enchantment', oracle_text: 'At the beginning of your end step, untap all nonland permanents you control.', cmc: 3 },
+  { id: 'Upkeep Untap Mana Land', type_line: 'Land', oracle_text: "This land doesn't untap during your untap step. At the beginning of your upkeep, you may exile a card from your hand. If you do, untap this land. {T}: Add one mana of any color.", cmc: 0 },
+  { id: 'Cast Protection Source', type_line: 'Legendary Artifact', oracle_text: 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', cmc: 4 },
+  { id: 'Artifact Sac Outlet', type_line: 'Artifact', oracle_text: 'Sacrifice an artifact: Add {C}{C}.', cmc: 4 },
+  { id: 'Graveyard Artifact Cast Support', type_line: 'Legendary Creature — Merfolk Wizard', oracle_text: '{T}: Choose target artifact card in your graveyard. You may cast that card this turn.', cmc: 2 },
+  { id: 'Graveyard Permanent Cast Support', type_line: 'Legendary Creature — Elemental Avatar', oracle_text: 'During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.', cmc: 6 },
+  { id: 'Artifact Self Bounce Support', type_line: 'Legendary Creature — Human Advisor', oracle_text: "{1}{U}: Return target artifact you control to its owner's hand.", cmc: 2 },
+  { id: 'Permanent Self Bounce Support', type_line: 'Creature — Vedalken Wizard', oracle_text: "{U}, {T}: Return target permanent you control to its owner's hand.", cmc: 2 },
+  { id: 'Discard Self Bounce Support', type_line: 'Creature — Human Spellshaper', oracle_text: "Flying {U}, {T}, Discard a card: Return target permanent you control to its owner's hand.", cmc: 4 },
   { id: 'Creature Token Engine', type_line: 'Creature', oracle_text: 'At the beginning of your upkeep, create five 1/1 white Soldier creature tokens.', cmc: 5, mana_cost: '{5}' },
   { id: 'Once Per Turn Upkeep Artifact Token Engine', type_line: 'Artifact Creature — Thopter', oracle_text: 'At the beginning of your upkeep, create five 1/1 colorless Thopter artifact creature tokens. This ability triggers only once each turn.', cmc: 6, mana_cost: '{6}' },
   { id: 'Once Per Turn Artifact Sacrifice Extra-Turn Engine', type_line: 'Artifact', oracle_text: '{T}, Sacrifice five artifacts: Take an extra turn after this one. Activate only once each turn.', cmc: 2, mana_cost: '{2}' },
@@ -191,6 +241,35 @@ assert.equal(seeded.some(candidate => candidate.cards.join('|') === 'Artifact Sa
 assert.equal(seeded.some(candidate => candidate.cards.includes('Artifact Sacrifice Extra-Turn Engine') && candidate.cards.includes('Creature Token Engine')), false, 'nonartifact token sources must not seed artifact-token extra-turn packages');
 assert.equal(seeded.some(candidate => candidate.cards.includes('Artifact Sacrifice Extra-Turn Engine') && candidate.cards.includes('Once Per Turn Upkeep Artifact Token Engine')), false, 'once-per-turn artifact token sources must not seed strict repeatable packages');
 assert.equal(seeded.some(candidate => candidate.cards.includes('Upkeep Artifact Token Engine') && candidate.cards.includes('Once Per Turn Artifact Sacrifice Extra-Turn Engine')), false, 'once-per-turn extra-turn engines must not seed strict artifact-token extra-turn packages');
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Counter Threshold Extra-Turn Engine|Free Counter Doubler'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Counter Threshold Extra-Turn Engine|Single Proliferator'));
+assert.ok(seeded.some(candidate => candidate.cards.includes('Counter Threshold Extra-Turn Engine') && candidate.cards.includes('Free Proliferator') && candidate.cards.includes('Proliferate Doubler')));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Forced Exile Cast Engine|Nonhand Cast Lockpiece'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Forced Exile Cast Engine|Spell Count Lockpiece'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Forced Draw Replacement Cast Engine|Sorcery Timing Lockpiece'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Forced Draw Replacement Cast Engine|Free Cast Counter Lockpiece'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Forced Exile Cast Engine|Opponent Free Cast Counter Lockpiece'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Forced Draw Replacement Cast Engine|Noncreature Exile Lockpiece'), 'near-miss lockpieces may seed but must fail strict proof');
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Counter Burden Prevention Shield|Counter Suppression Static'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Counter Suppression Static|Delayed Counter Shield'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Counter Suppression Static|Depletion Counterspell Lockpiece'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Counter Suppression Static|Zero Life Poison Shield'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Age Counter Prevention Source|Counter Suppression Static'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Extra Land Support|Land Replay Support|Replayable Prevention Land'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Draw-Step Hand Cycler|Opponent Draw Limit'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'No-Draw Search-Step Engine|Opponent Search Lockpiece'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'No-Flying Attack All Lockpiece|Opponent Flying Removal Support'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Flyers Cant Attack You Lockpiece|No-Flying Attack All Lockpiece'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Flying Islandwalk Only Attack You Lockpiece|Global Flying Islandwalk Removal Support'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Face-Up Untap Skipper|Upkeep Reset Copier'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Global Untap Skipper|Global Upkeep Skipper'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Global Untap Skipper|Self End Step Nonland Untapper'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Global Untap Skipper|Upkeep Untap Mana Land'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Artifact Self Bounce Support|Cast Protection Source'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Cast Protection Source|Permanent Self Bounce Support'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Cast Protection Source|Discard Self Bounce Support'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Artifact Sac Outlet|Cast Protection Source|Graveyard Artifact Cast Support'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Artifact Sac Outlet|Cast Protection Source|Graveyard Permanent Cast Support'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Life Loss To Mill Payoff|Mill To Life Loss Payoff'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Opponent Draw Punisher|Opponent Half-Library Draw'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Half-Library Mill|Mill Multiplier'));
@@ -199,7 +278,7 @@ assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'ETB Creature B
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Creature-Token Replacement Outlet|Death Mana Payoff'));
 assert.ok(seeded.some(candidate => candidate.cards.includes('Artifact Top Caster') && candidate.cards.includes('Artifact Spell Reducer') && candidate.cards.includes('Self Top Draw Artifact')));
 
-const packages = buildInteractionProofPackages(fixtures, { maxProofPackages: 192 });
+const packages = buildInteractionProofPackages(fixtures, { maxProofPackages: 512 });
 const byFamily = new Map(packages.map(pkg => [pkg.family, pkg]));
 
 assert.ok(byFamily.has('self-untap-mana-loop'));
@@ -208,6 +287,26 @@ assert.ok(byFamily.has('lifegain-lifeloss-loop'));
 assert.ok(byFamily.has('draw-damage-feedback-loop'));
 assert.ok(byFamily.has('lifelink-counter-damage-loop'));
 assert.ok(byFamily.has('life-paid-damage-lifeloss-recovery-loop'));
+assert.ok(byFamily.has('forced-cast→cast-lock'));
+assert.ok(byFamily.has('counter-suppression→prevention-lock'));
+assert.ok(byFamily.has('counter-suppression→depletion-lock'));
+assert.ok(byFamily.has('counter-suppression→poison-loss-lock'));
+assert.ok(byFamily.has('counter-suppression→cumulative-upkeep-prevention-lock'));
+assert.ok(byFamily.has('prevention-land→graveyard-extra-land-lock'));
+assert.ok(byFamily.has('draw-step-hand-cycle→draw-limit-lock'));
+assert.ok(byFamily.has('no-draw-search-step→search-lock'));
+assert.ok(byFamily.has('no-flying-attack→flying-removal-lock'));
+assert.ok(byFamily.has('flying-only-attack→ground-lock'));
+assert.ok(byFamily.has('flying-or-islandwalk-attack→evasion-removal-lock'));
+assert.ok(byFamily.has('all-permanents-artifacts→artifact-activation-lock'));
+assert.ok(byFamily.has('all-lands-islands→island-untap-lock'));
+assert.ok(byFamily.has('face-up-untap-skip→face-down-reset-lock'));
+assert.ok(byFamily.has('global-untap-skip→upkeep-skip-lock'));
+assert.ok(byFamily.has('global-untap-skip→end-step-untap-lock'));
+assert.ok(byFamily.has('global-untap-skip→upkeep-untap-land-lock'));
+assert.ok(byFamily.has('global-untap-skip→self-bounce-lock'));
+assert.ok(byFamily.has('cast-protection→self-bounce-lock'));
+assert.ok(byFamily.has('cast-protection→graveyard-recast-lock'));
 assert.ok(byFamily.has('counter-token→etb-counter-loop'));
 assert.ok(byFamily.has('minus-counter-death→token-loop'));
 assert.ok(byFamily.has('lifegain-counter-token-etb-loop'));
@@ -240,6 +339,8 @@ assert.ok(byFamily.has('token-replacement-sacrifice-mana-loop'));
 assert.ok(byFamily.has('variable-board-count-mana-loop'));
 assert.ok(byFamily.has('combat-resource→extra-combat-loop'));
 assert.ok(byFamily.has('artifact-token→extra-turn-loop'));
+assert.ok(byFamily.has('counter-threshold-doubler→extra-turn-loop'));
+assert.ok(byFamily.has('counter-threshold-proliferate→extra-turn-loop'));
 assert.equal(packages.some(pkg => pkg.cards.includes('Ephemerate')), false, 'one-shot blink should not surface as a proven package');
 
 const artifactLoop = byFamily.get('artifact-top-cost-reduction-loop');
@@ -418,6 +519,32 @@ assert.equal(
   'broad token replacement must not turn a below-threshold artifact-token refill into a strict extra-turn proof package',
 );
 
+const counterThresholdDoublerPackage = byFamily.get('counter-threshold-doubler→extra-turn-loop');
+assert.equal(counterThresholdDoublerPackage.cardCount, 2);
+assert.ok(counterThresholdDoublerPackage.result.includes('turns'));
+assert.equal(/counters|mana/.test(counterThresholdDoublerPackage.result), false, 'threshold-only counter-doubler extra-turn package should not claim surplus counters or mana');
+assert.ok(counterThresholdDoublerPackage.resourceDeltas.some(delta => delta.resource === 'turns'));
+assert.ok(counterThresholdDoublerPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'counter-threshold-extra-turn-threshold' && item.value === 3));
+assert.ok(counterThresholdDoublerPackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'established-counters-at-loop-entry' && item.value === 3));
+assert.ok(counterThresholdDoublerPackage.contributions.some(contribution => contribution.facts.includes('is-repeatable-counter-doubler')));
+
+const counterThresholdProliferatePackage = packages.find(pkg => pkg.family === 'counter-threshold-proliferate→extra-turn-loop'
+  && pkg.cards.includes('Free Proliferator')
+  && pkg.cards.includes('Proliferate Doubler'));
+assert.equal(counterThresholdProliferatePackage.cardCount, 3);
+assert.ok(counterThresholdProliferatePackage.result.includes('turns'));
+assert.equal(/counters|mana/.test(counterThresholdProliferatePackage.result), false, 'threshold-only proliferate extra-turn package should not claim surplus counters or mana');
+assert.ok(counterThresholdProliferatePackage.resourceDeltas.some(delta => delta.resource === 'turns'));
+assert.ok(counterThresholdProliferatePackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'established-counters-at-loop-entry' && item.value === 1));
+assert.ok(counterThresholdProliferatePackage.evidence.some(item => item.kind === 'precondition' && item.predicate === 'proliferate-count-per-turn' && item.value === 3));
+assert.ok(counterThresholdProliferatePackage.contributions.some(contribution => contribution.facts.includes('proliferate-multiplier')));
+
+assert.equal(
+  packages.some(pkg => pkg.family === 'counter-threshold-doubler→extra-turn-loop' && pkg.cards.includes('Mana-Paid Counter Doubler')),
+  false,
+  'mana-paid counter doublers must not surface as strict counter-threshold extra-turn packages',
+);
+
 const millLifeLossPackage = byFamily.get('mill-lifeloss-feedback-loop');
 assert.equal(millLifeLossPackage.cardCount, 2);
 assert.ok(millLifeLossPackage.result.includes('mill'));
@@ -539,7 +666,9 @@ const selfCopyMagecraftPackage = byFamily.get('self-copy-spell→magecraft-drain
 assert.equal(selfCopyMagecraftPackage.cardCount, 2);
 assert.ok(selfCopyMagecraftPackage.resourceDeltas.some(delta => delta.resource === 'magecraftTriggers'));
 
-const pingerLockPackage = byFamily.get('death-untap-deathtouch-pinger-lock');
+const pingerLockPackage = packages
+  .filter(pkg => pkg.family === 'death-untap-deathtouch-pinger-lock')
+  .sort((a, b) => a.cardCount - b.cardCount)[0];
 assert.equal(pingerLockPackage.cardCount, 2);
 assert.equal(pingerLockPackage.repeatability.status, 'repeatable-lock');
 assert.ok(pingerLockPackage.result.includes('deathtouch ping kills a creature'));

@@ -106,6 +106,61 @@ const idx = {
   'end step artifact token engine': card('End Step Artifact Token Engine', 'Artifact', 'At the beginning of your end step, create five Treasure tokens.', 5, '{5}'),
   'artifact sacrifice extra-turn engine': card('Artifact Sacrifice Extra-Turn Engine', 'Artifact', '{T}, Sacrifice five artifacts: Take an extra turn after this one.', 2, '{2}'),
   'once per turn artifact sacrifice extra-turn engine': card('Once Per Turn Artifact Sacrifice Extra-Turn Engine', 'Artifact', '{T}, Sacrifice five artifacts: Take an extra turn after this one. Activate only once each turn.', 2, '{2}'),
+  'counter threshold extra-turn engine': card('Counter Threshold Extra-Turn Engine', 'Artifact', '{T}, Remove three charge counters from this artifact: Take an extra turn after this one.', 3),
+  'free counter doubler': card('Free Counter Doubler', 'Artifact', '{T}: Double the number of each kind of counter on target artifact.', 2),
+  'mana-paid counter doubler': card('Mana-Paid Counter Doubler', 'Artifact', '{2}, {T}: Double the number of each kind of counter on target artifact.', 3),
+  'free proliferator': card('Free Proliferator', 'Artifact', '{T}: Proliferate three times.', 4),
+  'single proliferator': card('Single Proliferator', 'Artifact', 'At the beginning of your end step, proliferate.', 4),
+  'proliferate doubler': card('Proliferate Doubler', 'Creature — Phyrexian Wizard', 'If you would proliferate, proliferate twice instead.', 4),
+  'forced exile cast engine': card('Forced Exile Cast Engine', 'Artifact', 'Whenever a player casts a spell from their hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with this artifact without paying its mana cost.', 6),
+  'forced draw replacement cast engine': card('Forced Draw Replacement Cast Engine', 'Artifact', "Players can't draw cards. At the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.", 5),
+  'nonhand cast lockpiece': card('Nonhand Cast Lockpiece', 'Creature — Human Wizard', "Your opponents can't cast spells from anywhere other than their hands.", 2),
+  'spell count lockpiece': card('Spell Count Lockpiece', 'Enchantment', "Each player can't cast more than one spell each turn.", 3),
+  'sorcery timing lockpiece': card('Sorcery Timing Lockpiece', 'Legendary Planeswalker', 'Each opponent can cast spells only any time they could cast a sorcery.', 3),
+  'free cast counter lockpiece': card('Free Cast Counter Lockpiece', 'Artifact', 'Whenever a player casts a spell, if no mana was spent to cast it, counter that spell.', 1),
+  'opponent free cast counter lockpiece': card('Opponent Free Cast Counter Lockpiece', 'Creature — Human Soldier', 'Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell.', 2),
+  'noncreature exile lockpiece': card('Noncreature Exile Lockpiece', 'Artifact Creature — Phyrexian Golem', "Players can't cast noncreature spells from graveyards or exile.", 2),
+  'counter suppression static': card('Counter Suppression Static', 'Enchantment', "Players can't get counters. Counters can't be put on artifacts, creatures, enchantments, or lands.", 3),
+  'counter burden prevention shield': card('Counter Burden Prevention Shield', 'Enchantment', 'If a source would deal damage to you, prevent that damage and put an incarnation counter on this enchantment. When there are nine or more incarnation counters on this enchantment, exile it.', 3),
+  'delayed counter shield': card('Delayed Counter Shield', 'Enchantment', 'If damage would be dealt to you, put that many delay counters on this enchantment instead. At the beginning of your upkeep, remove all delay counters from this enchantment. For each delay counter removed this way, you lose 1 life unless you pay {1}{W}.', 4),
+  'depletion counterspell lockpiece': card('Depletion Counterspell Lockpiece', 'Enchantment', 'Whenever an opponent casts a spell, counter that spell and put a depletion counter on this enchantment. If there are three or more depletion counters on this enchantment, sacrifice it.', 8),
+  'zero life poison shield': card('Zero Life Poison Shield', 'Enchantment', "You don't lose the game for having 0 or less life. As long as you have 0 or less life, all damage is dealt to you as though its source had infect.", 3),
+  'all-permanents are artifacts engine': card('All-Permanents Are Artifacts Engine', 'Artifact', 'All permanents are artifacts in addition to their other types.', 6),
+  'artifact activation lockpiece': card('Artifact Activation Lockpiece', 'Artifact', "Activated abilities of artifacts can't be activated.", 2),
+  'opponent artifact activation lockpiece': card('Opponent Artifact Activation Lockpiece', 'Planeswalker', "Activated abilities of artifacts your opponents control can't be activated.", 4),
+  'age counter prevention source': card('Age Counter Prevention Source', 'Land', 'Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) Creatures you control can\'t attack. Prevent all damage that would be dealt to you.', 0),
+  'permanent only counter suppression': card('Permanent Only Counter Suppression', 'Enchantment', "Counters can't be put on artifacts, creatures, enchantments, or lands.", 3),
+  'replayable prevention land': card('Replayable Prevention Land', 'Land', 'Cumulative upkeep—Pay 2 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.) When this land enters, sacrifice a land. Creatures you control can\'t attack. Prevent all damage that would be dealt to you.', 0),
+  'land replay support': card('Land Replay Support', 'Artifact', 'You may play lands from your graveyard.', 3),
+  'extra land support': card('Extra Land Support', 'Enchantment', 'You may play an additional land on each of your turns.', 1),
+  'draw-step hand cycler': card('Draw-Step Hand Cycler', 'Artifact', "At the beginning of each player's draw step, that player puts the cards in their hand on the bottom of their library in any order, then draws that many cards.", 4),
+  'opponent draw limit': card('Opponent Draw Limit', 'Planeswalker', "Each opponent can't draw more than one card each turn.", 3),
+  'player draw limit': card('Player Draw Limit', 'Creature — Spirit', "Each player can't draw more than one card each turn.", 2),
+  'opponent draw replacement limit': card('Opponent Draw Replacement Limit', 'Creature — Rogue', 'If an opponent would draw a card except the first one they draw in each of their draw steps, instead that player skips that draw and you draw a card.', 4),
+  'no-draw search-step engine': card('No-Draw Search-Step Engine', 'Creature — Elf Wizard', "Players can't draw cards. At the beginning of each player's draw step, that player loses 3 life, searches their library for a card, puts it into their hand, then shuffles.", 3),
+  'opponent search lockpiece': card('Opponent Search Lockpiece', 'Creature — Human Rogue', "You control your opponents while they're searching their libraries. While an opponent is searching their library, they exile each card they find.", 3),
+  'player search lockpiece': card('Player Search Lockpiece', 'Artifact', "Players can't search libraries.", 4),
+  'no-flying attack all lockpiece': card('No-Flying Attack All Lockpiece', 'Enchantment', "Creatures without flying can't attack.", 4),
+  'flyers cant attack you lockpiece': card('Flyers Cant Attack You Lockpiece', 'Enchantment', "Creatures with flying can't attack you.", 8),
+  'flying islandwalk only attack you lockpiece': card('Flying Islandwalk Only Attack You Lockpiece', 'Enchantment', "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.", 2),
+  'opponent flying removal support': card('Opponent Flying Removal Support', 'Enchantment Creature — Human Wizard', "Creatures you control have flying. Creatures your opponents control lose flying and can't have or gain flying.", 6),
+  'global flying islandwalk removal support': card('Global Flying Islandwalk Removal Support', 'World Enchantment', 'All creatures lose flying and islandwalk.', 4),
+  'all-lands are islands engine': card('All-Lands Are Islands Engine', 'Creature — Leviathan', "All lands are Islands in addition to their other types. Creatures without flying or islandwalk can't attack.", 8),
+  'island untap lockpiece': card('Island Untap Lockpiece', 'Enchantment', "Islands don't untap during their controllers' untap steps.", 3),
+  'face-up untap skipper': card('Face-Up Untap Skipper', 'Creature — Elemental', 'Morph {5}{U}{U} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.) When this creature is turned face up, each opponent skips their next untap step.', 6),
+  'upkeep reset copier': card('Upkeep Reset Copier', 'Creature — Shapeshifter', 'As this creature enters or is turned face up, you may choose another creature on the battlefield. If you do, until this creature is turned face down, it becomes a copy of that creature, except it has "At the beginning of your upkeep, you may turn this creature face down." Morph {1}{U}', 5),
+  'global untap skipper': card('Global Untap Skipper', 'Enchantment', "Players skip their untap steps. At the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.", 2),
+  'global upkeep skipper': card('Global Upkeep Skipper', 'Artifact', 'Players skip their upkeep steps.', 5),
+  'self end step nonland untapper': card('Self End Step Nonland Untapper', 'Enchantment', 'At the beginning of your end step, untap all nonland permanents you control.', 3),
+  'upkeep untap mana land': card('Upkeep Untap Mana Land', 'Land', "This land doesn't untap during your untap step. At the beginning of your upkeep, you may exile a card from your hand. If you do, untap this land. {T}: Add one mana of any color.", 0),
+  'cast protection source': card('Cast Protection Source', 'Legendary Artifact', 'Indestructible When this artifact enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on this artifact.', 4),
+  'artifact self bounce support': card('Artifact Self Bounce Support', 'Legendary Creature — Human Advisor', "{1}{U}: Return target artifact you control to its owner's hand.", 2),
+  'permanent self bounce support': card('Permanent Self Bounce Support', 'Creature — Vedalken Wizard', "{U}, {T}: Return target permanent you control to its owner's hand.", 2),
+  'discard self bounce support': card('Discard Self Bounce Support', 'Creature — Human Spellshaper', "Flying {U}, {T}, Discard a card: Return target permanent you control to its owner's hand.", 4),
+  'artifact sac outlet': card('Artifact Sac Outlet', 'Artifact', 'Sacrifice an artifact: Add {C}{C}.', 4),
+  'graveyard artifact cast support': card('Graveyard Artifact Cast Support', 'Legendary Creature — Merfolk Wizard', '{T}: Choose target artifact card in your graveyard. You may cast that card this turn.', 2),
+  'graveyard permanent cast support': card('Graveyard Permanent Cast Support', 'Legendary Creature — Elemental Avatar', 'During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.', 6),
+  'constrained graveyard permanent cast support': card('Constrained Graveyard Permanent Cast Support', 'Artifact', "{T}: Choose target nonland permanent card in your graveyard. If you haven't cast a spell this turn, you may cast that card. If you do, you can't cast additional spells this turn. Activate only as a sorcery.", 4),
   'token doubler': card('Token Doubler', 'Enchantment', 'If an effect would create one or more tokens under your control, it creates twice that many of those tokens instead.', 4, '{4}'),
   'mill to life loss payoff': card('Mill To Life Loss Payoff', 'Enchantment', "Whenever a card is put into an opponent's graveyard from anywhere, that player loses 1 life and you gain 1 life.", 1),
   'life loss to mill payoff': card('Life Loss To Mill Payoff', 'Enchantment', 'Whenever an opponent loses life, that player mills that many cards.', 3),
@@ -1213,6 +1268,450 @@ assert.notEqual(endStepArtifactTokenExtraTurnNearMiss.bucket, 'proved');
 assert.ok(!endStepArtifactTokenExtraTurnNearMiss.familySignals.includes('artifact-token→extra-turn-loop'));
 assert.ok(!endStepArtifactTokenExtraTurnNearMiss.modelClasses.includes('infinite-turns'));
 assert.equal(endStepArtifactTokenExtraTurnNearMiss.resultCoverage.coveredAny, false);
+
+const counterThresholdDoublerExtraTurnLoop = evaluateCombo({
+  id: 'counter-threshold-doubler-extra-turn-loop',
+  detailPath: '/combos/test/counter-threshold-doubler-extra-turn-loop',
+  url: 'https://example.test/counter-threshold-doubler-extra-turn-loop',
+  cards: ['Counter Threshold Extra-Turn Engine', 'Free Counter Doubler'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(counterThresholdDoublerExtraTurnLoop.bucket, 'proved');
+assert.ok(counterThresholdDoublerExtraTurnLoop.familySignals.includes('counter-threshold-doubler→extra-turn-loop'));
+assert.deepEqual(counterThresholdDoublerExtraTurnLoop.proofDeltaClasses, ['infinite-turns']);
+assert.deepEqual(counterThresholdDoublerExtraTurnLoop.modelClasses, ['infinite-turns']);
+assert.equal(counterThresholdDoublerExtraTurnLoop.resultCoverage.coveredAny, true);
+
+const manaPaidCounterThresholdNearMiss = evaluateCombo({
+  id: 'mana-paid-counter-threshold-near-miss',
+  detailPath: '/combos/test/mana-paid-counter-threshold-near-miss',
+  url: 'https://example.test/mana-paid-counter-threshold-near-miss',
+  cards: ['Counter Threshold Extra-Turn Engine', 'Mana-Paid Counter Doubler'],
+  cardCount: 2,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(manaPaidCounterThresholdNearMiss.bucket, 'proved');
+assert.ok(!manaPaidCounterThresholdNearMiss.familySignals.includes('counter-threshold-doubler→extra-turn-loop'));
+assert.ok(!manaPaidCounterThresholdNearMiss.modelClasses.includes('infinite-turns'));
+assert.equal(manaPaidCounterThresholdNearMiss.resultCoverage.coveredAny, false);
+
+const strongCounterThresholdProliferateLoop = evaluateCombo({
+  id: 'strong-counter-threshold-proliferate-loop',
+  detailPath: '/combos/test/strong-counter-threshold-proliferate-loop',
+  url: 'https://example.test/strong-counter-threshold-proliferate-loop',
+  cards: ['Counter Threshold Extra-Turn Engine', 'Free Proliferator', 'Proliferate Doubler'],
+  cardCount: 3,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(strongCounterThresholdProliferateLoop.bucket, 'proved');
+assert.ok(strongCounterThresholdProliferateLoop.familySignals.includes('counter-threshold-proliferate→extra-turn-loop'));
+assert.deepEqual(strongCounterThresholdProliferateLoop.proofDeltaClasses, ['infinite-turns']);
+assert.deepEqual(strongCounterThresholdProliferateLoop.modelClasses, ['infinite-turns']);
+assert.equal(strongCounterThresholdProliferateLoop.resultCoverage.coveredAny, true);
+
+const weakCounterThresholdProliferateNearMiss = evaluateCombo({
+  id: 'weak-counter-threshold-proliferate-near-miss',
+  detailPath: '/combos/test/weak-counter-threshold-proliferate-near-miss',
+  url: 'https://example.test/weak-counter-threshold-proliferate-near-miss',
+  cards: ['Counter Threshold Extra-Turn Engine', 'Single Proliferator', 'Proliferate Doubler'],
+  cardCount: 3,
+  results: ['Infinite turns'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(weakCounterThresholdProliferateNearMiss.bucket, 'proved');
+assert.ok(!weakCounterThresholdProliferateNearMiss.familySignals.includes('counter-threshold-proliferate→extra-turn-loop'));
+assert.ok(!weakCounterThresholdProliferateNearMiss.modelClasses.includes('infinite-turns'));
+assert.equal(weakCounterThresholdProliferateNearMiss.resultCoverage.coveredAny, false);
+
+const forcedOriginCastLock = evaluateCombo({
+  id: 'forced-origin-cast-lock',
+  detailPath: '/combos/test/forced-origin-cast-lock',
+  url: 'https://example.test/forced-origin-cast-lock',
+  cards: ['Forced Exile Cast Engine', 'Nonhand Cast Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(forcedOriginCastLock.bucket, 'proved');
+assert.ok(forcedOriginCastLock.familySignals.includes('forced-cast→cast-lock'));
+assert.deepEqual(forcedOriginCastLock.modelClasses, ['lock']);
+assert.equal(forcedOriginCastLock.resultCoverage.coveredAny, true);
+
+const forcedTimingCastLock = evaluateCombo({
+  id: 'forced-timing-cast-lock',
+  detailPath: '/combos/test/forced-timing-cast-lock',
+  url: 'https://example.test/forced-timing-cast-lock',
+  cards: ['Forced Draw Replacement Cast Engine', 'Sorcery Timing Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(forcedTimingCastLock.bucket, 'proved');
+assert.ok(forcedTimingCastLock.familySignals.includes('forced-cast→cast-lock'));
+assert.deepEqual(forcedTimingCastLock.modelClasses, ['lock']);
+assert.equal(forcedTimingCastLock.resultCoverage.coveredAny, true);
+
+const forcedOpponentFreeCastLock = evaluateCombo({
+  id: 'forced-opponent-free-cast-lock',
+  detailPath: '/combos/test/forced-opponent-free-cast-lock',
+  url: 'https://example.test/forced-opponent-free-cast-lock',
+  cards: ['Forced Exile Cast Engine', 'Opponent Free Cast Counter Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(forcedOpponentFreeCastLock.bucket, 'proved');
+assert.ok(forcedOpponentFreeCastLock.familySignals.includes('forced-cast→cast-lock'));
+assert.deepEqual(forcedOpponentFreeCastLock.modelClasses, ['lock']);
+assert.equal(forcedOpponentFreeCastLock.resultCoverage.coveredAny, true);
+
+const forcedNoncreatureOnlyCastNearMiss = evaluateCombo({
+  id: 'forced-noncreature-only-cast-near-miss',
+  detailPath: '/combos/test/forced-noncreature-only-cast-near-miss',
+  url: 'https://example.test/forced-noncreature-only-cast-near-miss',
+  cards: ['Forced Draw Replacement Cast Engine', 'Noncreature Exile Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(forcedNoncreatureOnlyCastNearMiss.bucket, 'proved');
+assert.ok(!forcedNoncreatureOnlyCastNearMiss.familySignals.includes('forced-cast→cast-lock'));
+assert.ok(!forcedNoncreatureOnlyCastNearMiss.modelClasses.includes('lock'));
+assert.equal(forcedNoncreatureOnlyCastNearMiss.resultCoverage.coveredAny, false);
+
+const counterSuppressionPreventionLock = evaluateCombo({
+  id: 'counter-suppression-prevention-lock',
+  detailPath: '/combos/test/counter-suppression-prevention-lock',
+  url: 'https://example.test/counter-suppression-prevention-lock',
+  cards: ['Counter Suppression Static', 'Counter Burden Prevention Shield'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(counterSuppressionPreventionLock.bucket, 'proved');
+assert.ok(counterSuppressionPreventionLock.familySignals.includes('counter-suppression→prevention-lock'));
+assert.deepEqual(counterSuppressionPreventionLock.modelClasses, ['lock']);
+
+const counterSuppressionDelayedShieldLock = evaluateCombo({
+  id: 'counter-suppression-delayed-shield-lock',
+  detailPath: '/combos/test/counter-suppression-delayed-shield-lock',
+  url: 'https://example.test/counter-suppression-delayed-shield-lock',
+  cards: ['Counter Suppression Static', 'Delayed Counter Shield'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(counterSuppressionDelayedShieldLock.bucket, 'proved');
+assert.ok(counterSuppressionDelayedShieldLock.familySignals.includes('counter-suppression→prevention-lock'));
+assert.deepEqual(counterSuppressionDelayedShieldLock.modelClasses, ['lock']);
+
+const counterSuppressionDepletionLock = evaluateCombo({
+  id: 'counter-suppression-depletion-lock',
+  detailPath: '/combos/test/counter-suppression-depletion-lock',
+  url: 'https://example.test/counter-suppression-depletion-lock',
+  cards: ['Counter Suppression Static', 'Depletion Counterspell Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(counterSuppressionDepletionLock.bucket, 'proved');
+assert.ok(counterSuppressionDepletionLock.familySignals.includes('counter-suppression→depletion-lock'));
+assert.deepEqual(counterSuppressionDepletionLock.modelClasses, ['lock']);
+
+const counterSuppressionPoisonLock = evaluateCombo({
+  id: 'counter-suppression-poison-lock',
+  detailPath: '/combos/test/counter-suppression-poison-lock',
+  url: 'https://example.test/counter-suppression-poison-lock',
+  cards: ['Counter Suppression Static', 'Zero Life Poison Shield'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(counterSuppressionPoisonLock.bucket, 'proved');
+assert.ok(counterSuppressionPoisonLock.familySignals.includes('counter-suppression→poison-loss-lock'));
+assert.deepEqual(counterSuppressionPoisonLock.modelClasses, ['lock']);
+
+const counterSuppressionAgeLock = evaluateCombo({
+  id: 'counter-suppression-age-lock',
+  detailPath: '/combos/test/counter-suppression-age-lock',
+  url: 'https://example.test/counter-suppression-age-lock',
+  cards: ['Counter Suppression Static', 'Age Counter Prevention Source'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(counterSuppressionAgeLock.bucket, 'proved');
+assert.ok(counterSuppressionAgeLock.familySignals.includes('counter-suppression→cumulative-upkeep-prevention-lock'));
+assert.deepEqual(counterSuppressionAgeLock.modelClasses, ['lock']);
+
+const permanentOnlyPoisonNearMiss = evaluateCombo({
+  id: 'permanent-only-poison-near-miss',
+  detailPath: '/combos/test/permanent-only-poison-near-miss',
+  url: 'https://example.test/permanent-only-poison-near-miss',
+  cards: ['Permanent Only Counter Suppression', 'Zero Life Poison Shield'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(permanentOnlyPoisonNearMiss.bucket, 'proved');
+assert.ok(!permanentOnlyPoisonNearMiss.familySignals.includes('counter-suppression→poison-loss-lock'));
+assert.ok(!permanentOnlyPoisonNearMiss.modelClasses.includes('lock'));
+
+const faceUpUntapSkipResetLock = evaluateCombo({
+  id: 'face-up-untap-skip-reset-lock',
+  detailPath: '/combos/test/face-up-untap-skip-reset-lock',
+  url: 'https://example.test/face-up-untap-skip-reset-lock',
+  cards: ['Face-Up Untap Skipper', 'Upkeep Reset Copier'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(faceUpUntapSkipResetLock.bucket, 'proved');
+assert.ok(faceUpUntapSkipResetLock.familySignals.includes('face-up-untap-skip→face-down-reset-lock'));
+assert.deepEqual(faceUpUntapSkipResetLock.modelClasses, ['lock']);
+
+const replayablePreventionLandLock = evaluateCombo({
+  id: 'replayable-prevention-land-lock',
+  detailPath: '/combos/test/replayable-prevention-land-lock',
+  url: 'https://example.test/replayable-prevention-land-lock',
+  cards: ['Replayable Prevention Land', 'Land Replay Support', 'Extra Land Support'],
+  cardCount: 3,
+  results: ['Prevent all damage that would be dealt to you', 'Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(replayablePreventionLandLock.bucket, 'proved');
+assert.ok(replayablePreventionLandLock.familySignals.includes('prevention-land→graveyard-extra-land-lock'));
+assert.deepEqual(replayablePreventionLandLock.modelClasses, ['lock']);
+
+const drawStepHandCycleDrawLimitLock = evaluateCombo({
+  id: 'draw-step-hand-cycle-draw-limit-lock',
+  detailPath: '/combos/test/draw-step-hand-cycle-draw-limit-lock',
+  url: 'https://example.test/draw-step-hand-cycle-draw-limit-lock',
+  cards: ['Draw-Step Hand Cycler', 'Opponent Draw Limit'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(drawStepHandCycleDrawLimitLock.bucket, 'proved');
+assert.ok(drawStepHandCycleDrawLimitLock.familySignals.includes('draw-step-hand-cycle→draw-limit-lock'));
+assert.deepEqual(drawStepHandCycleDrawLimitLock.modelClasses, ['lock']);
+
+const noDrawSearchStepSearchLock = evaluateCombo({
+  id: 'no-draw-search-step-search-lock',
+  detailPath: '/combos/test/no-draw-search-step-search-lock',
+  url: 'https://example.test/no-draw-search-step-search-lock',
+  cards: ['No-Draw Search-Step Engine', 'Opponent Search Lockpiece'],
+  cardCount: 2,
+  results: ['Players can\'t draw cards', 'Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(noDrawSearchStepSearchLock.bucket, 'proved');
+assert.ok(noDrawSearchStepSearchLock.familySignals.includes('no-draw-search-step→search-lock'));
+assert.deepEqual(noDrawSearchStepSearchLock.modelClasses, ['lock']);
+
+const noFlyingAttackFlyingRemovalLock = evaluateCombo({
+  id: 'no-flying-attack-flying-removal-lock',
+  detailPath: '/combos/test/no-flying-attack-flying-removal-lock',
+  url: 'https://example.test/no-flying-attack-flying-removal-lock',
+  cards: ['No-Flying Attack All Lockpiece', 'Opponent Flying Removal Support'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(noFlyingAttackFlyingRemovalLock.bucket, 'proved');
+assert.ok(noFlyingAttackFlyingRemovalLock.familySignals.includes('no-flying-attack→flying-removal-lock'));
+assert.deepEqual(noFlyingAttackFlyingRemovalLock.modelClasses, ['lock']);
+
+const flyingOnlyAttackGroundLock = evaluateCombo({
+  id: 'flying-only-attack-ground-lock',
+  detailPath: '/combos/test/flying-only-attack-ground-lock',
+  url: 'https://example.test/flying-only-attack-ground-lock',
+  cards: ['Flyers Cant Attack You Lockpiece', 'No-Flying Attack All Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(flyingOnlyAttackGroundLock.bucket, 'proved');
+assert.ok(flyingOnlyAttackGroundLock.familySignals.includes('flying-only-attack→ground-lock'));
+assert.deepEqual(flyingOnlyAttackGroundLock.modelClasses, ['lock']);
+
+const flyingIslandwalkAttackRemovalLock = evaluateCombo({
+  id: 'flying-islandwalk-attack-removal-lock',
+  detailPath: '/combos/test/flying-islandwalk-attack-removal-lock',
+  url: 'https://example.test/flying-islandwalk-attack-removal-lock',
+  cards: ['Flying Islandwalk Only Attack You Lockpiece', 'Global Flying Islandwalk Removal Support'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(flyingIslandwalkAttackRemovalLock.bucket, 'proved');
+assert.ok(flyingIslandwalkAttackRemovalLock.familySignals.includes('flying-or-islandwalk-attack→evasion-removal-lock'));
+assert.deepEqual(flyingIslandwalkAttackRemovalLock.modelClasses, ['lock']);
+
+const allPermanentsArtifactActivationLock = evaluateCombo({
+  id: 'all-permanents-artifact-activation-lock',
+  detailPath: '/combos/test/all-permanents-artifact-activation-lock',
+  url: 'https://example.test/all-permanents-artifact-activation-lock',
+  cards: ['All-Permanents Are Artifacts Engine', 'Artifact Activation Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(allPermanentsArtifactActivationLock.bucket, 'proved');
+assert.ok(allPermanentsArtifactActivationLock.familySignals.includes('all-permanents-artifacts→artifact-activation-lock'));
+assert.deepEqual(allPermanentsArtifactActivationLock.modelClasses, ['lock']);
+
+const opponentArtifactActivationLock = evaluateCombo({
+  id: 'opponent-artifact-activation-lock',
+  detailPath: '/combos/test/opponent-artifact-activation-lock',
+  url: 'https://example.test/opponent-artifact-activation-lock',
+  cards: ['All-Permanents Are Artifacts Engine', 'Opponent Artifact Activation Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(opponentArtifactActivationLock.bucket, 'proved');
+assert.ok(opponentArtifactActivationLock.familySignals.includes('all-permanents-artifacts→artifact-activation-lock'));
+assert.deepEqual(opponentArtifactActivationLock.modelClasses, ['lock']);
+
+const allLandsIslandUntapLock = evaluateCombo({
+  id: 'all-lands-island-untap-lock',
+  detailPath: '/combos/test/all-lands-island-untap-lock',
+  url: 'https://example.test/all-lands-island-untap-lock',
+  cards: ['All-Lands Are Islands Engine', 'Island Untap Lockpiece'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(allLandsIslandUntapLock.bucket, 'proved');
+assert.ok(allLandsIslandUntapLock.familySignals.includes('all-lands-islands→island-untap-lock'));
+assert.deepEqual(allLandsIslandUntapLock.modelClasses, ['lock']);
+
+const globalUntapUpkeepSkipLock = evaluateCombo({
+  id: 'global-untap-upkeep-skip-lock',
+  detailPath: '/combos/test/global-untap-upkeep-skip-lock',
+  url: 'https://example.test/global-untap-upkeep-skip-lock',
+  cards: ['Global Untap Skipper', 'Global Upkeep Skipper'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(globalUntapUpkeepSkipLock.bucket, 'proved');
+assert.ok(globalUntapUpkeepSkipLock.familySignals.includes('global-untap-skip→upkeep-skip-lock'));
+assert.deepEqual(globalUntapUpkeepSkipLock.modelClasses, ['lock']);
+
+const globalUntapEndStepUntapLock = evaluateCombo({
+  id: 'global-untap-end-step-untap-lock',
+  detailPath: '/combos/test/global-untap-end-step-untap-lock',
+  url: 'https://example.test/global-untap-end-step-untap-lock',
+  cards: ['Global Untap Skipper', 'Self End Step Nonland Untapper'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(globalUntapEndStepUntapLock.bucket, 'proved');
+assert.ok(globalUntapEndStepUntapLock.familySignals.includes('global-untap-skip→end-step-untap-lock'));
+assert.deepEqual(globalUntapEndStepUntapLock.modelClasses, ['lock']);
+
+const globalUntapUpkeepLandLock = evaluateCombo({
+  id: 'global-untap-upkeep-land-lock',
+  detailPath: '/combos/test/global-untap-upkeep-land-lock',
+  url: 'https://example.test/global-untap-upkeep-land-lock',
+  cards: ['Global Untap Skipper', 'Upkeep Untap Mana Land'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(globalUntapUpkeepLandLock.bucket, 'proved');
+assert.ok(globalUntapUpkeepLandLock.familySignals.includes('global-untap-skip→upkeep-untap-land-lock'));
+assert.deepEqual(globalUntapUpkeepLandLock.modelClasses, ['lock']);
+
+const globalUntapSelfBounceLock = evaluateCombo({
+  id: 'global-untap-self-bounce-lock',
+  detailPath: '/combos/test/global-untap-self-bounce-lock',
+  url: 'https://example.test/global-untap-self-bounce-lock',
+  cards: ['Global Untap Skipper', 'Permanent Self Bounce Support'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(globalUntapSelfBounceLock.bucket, 'proved');
+assert.ok(globalUntapSelfBounceLock.familySignals.includes('global-untap-skip→self-bounce-lock'));
+assert.deepEqual(globalUntapSelfBounceLock.modelClasses, ['lock']);
+
+const castProtectionArtifactBounceLock = evaluateCombo({
+  id: 'cast-protection-artifact-bounce-lock',
+  detailPath: '/combos/test/cast-protection-artifact-bounce-lock',
+  url: 'https://example.test/cast-protection-artifact-bounce-lock',
+  cards: ['Cast Protection Source', 'Artifact Self Bounce Support'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(castProtectionArtifactBounceLock.bucket, 'proved');
+assert.ok(castProtectionArtifactBounceLock.familySignals.includes('cast-protection→self-bounce-lock'));
+assert.deepEqual(castProtectionArtifactBounceLock.modelClasses, ['lock']);
+
+const castProtectionPermanentBounceLock = evaluateCombo({
+  id: 'cast-protection-permanent-bounce-lock',
+  detailPath: '/combos/test/cast-protection-permanent-bounce-lock',
+  url: 'https://example.test/cast-protection-permanent-bounce-lock',
+  cards: ['Cast Protection Source', 'Permanent Self Bounce Support'],
+  cardCount: 2,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(castProtectionPermanentBounceLock.bucket, 'proved');
+assert.ok(castProtectionPermanentBounceLock.familySignals.includes('cast-protection→self-bounce-lock'));
+assert.deepEqual(castProtectionPermanentBounceLock.modelClasses, ['lock']);
+
+const castProtectionGraveyardRecastLock = evaluateCombo({
+  id: 'cast-protection-graveyard-recast-lock',
+  detailPath: '/combos/test/cast-protection-graveyard-recast-lock',
+  url: 'https://example.test/cast-protection-graveyard-recast-lock',
+  cards: ['Cast Protection Source', 'Artifact Sac Outlet', 'Graveyard Artifact Cast Support'],
+  cardCount: 3,
+  results: ['Lock'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(castProtectionGraveyardRecastLock.bucket, 'proved');
+assert.ok(castProtectionGraveyardRecastLock.familySignals.includes('cast-protection→graveyard-recast-lock'));
+assert.ok(castProtectionGraveyardRecastLock.modelClasses.includes('lock'));
 
 const millLifeLossLoop = evaluateCombo({
   id: 'mill-lifeloss-loop',

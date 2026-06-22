@@ -142,20 +142,20 @@ Remaining G007 replacement stories after G014:
 ## 2026-06-20 G015 split update
 
 The third replacement slice (`G015`) added strict proof support for fresh hasty
-copy-token extra-combat loops. The implementation is proof/package-only: the
-old capability-only evaluator path for `combat-copy-token→extra-combat-loop`
-was removed, and the old/new fresh-copy combat families are not mapped through
-raw graph-edge result classes.
+copy-token extra-combat and extra-turn loops. The implementation is
+proof/package-only: the old capability-only evaluator path for
+`combat-copy-token→extra-combat-loop` was removed, and the fresh-copy
+combat/turn families are not mapped through raw graph-edge result classes.
 
-Fresh evaluator after G015 (`2026-06-20T16:03:32.690Z`):
+Fresh evaluator after G015 (`2026-06-20T16:58:11.637Z`):
 
 - detailed combos evaluated: **54,710**;
 - local card resolution: **54,367 / 54,710**;
-- strict proved bucket: **1,096**;
-- proof-status `proven`: **1,088**;
+- strict proved bucket: **1,097**;
+- proof-status `proven`: **1,089**;
 - combo-family detected: **65.4%**;
-- expected result-class coverage: **31,672 / 54,161 (58.5%)**;
-- proof-only expected coverage: **2,312 / 54,161 (4.3%)**.
+- expected result-class coverage: **31,673 / 54,161 (58.5%)**;
+- proof-only expected coverage: **2,313 / 54,161 (4.3%)**.
 
 The strict proof slice covers:
 
@@ -167,14 +167,24 @@ The strict proof slice covers:
   plus combat-damage-to-player extra combat;
 - `hasty-copy→connect-extra-combat-loop`: activated/attached hasty creature
   copy plus combat-damage-to-player extra combat.
+- `combat-copy-token→attack-extra-turn-loop`: precombat hasty creature copy
+  plus attack-trigger extra turn.
+- `combat-copy-token→connect-extra-turn-loop`: precombat hasty creature copy
+  plus combat-damage-to-player extra turn.
+- `hasty-copy→attack-extra-turn-loop`: activated/attached hasty creature copy
+  plus attack-trigger extra turn.
+- `hasty-copy→connect-extra-turn-loop`: activated/attached hasty creature copy
+  plus combat-damage-to-player extra turn.
 
-Together these families prove eleven real EDHREC rows, including the
+Together the extra-combat families prove twelve real EDHREC rows, including the
 Helm/Aurelia/Godo/Combat Celebrant rows, Kiki-Jiki or Splinter Twin plus
 Combat Celebrant/Port Razer rows, Rionya plus Port Razer or Bloodthirster, and
-Feldon plus Combat Celebrant plus Determined Iteration. The proof requires
+Rionya plus Combat Celebrant, and Feldon plus Combat Celebrant plus Determined
+Iteration. The proof requires
 legal copy targets, haste, legend safety, pre-attack timing, unused fresh-token
 attack/connect triggers, attacker declaration, source reset for tapping copy
 sources, and explicit player/opponent connect preconditions where applicable.
+Extra-turn result coverage is constrained to `infinite-turns` only.
 
 Remaining G007 replacement stories after G015:
 
@@ -184,10 +194,32 @@ Remaining G007 replacement stories after G015:
 
 Residual/deferred from G015:
 
-- Attacker extra-turn copy loops remain unresolved until the turn-cycle model
-  can prove repeatability safely.
+- Fresh-copy extra-turn proof support now exists, but the current EDHREC corpus
+  contributes zero real proof rows for those families.
 - Medomai-style “can't attack during extra turns”, Wanderwine-style optional
   sacrifice/fodder dependencies, tapped-and-attacking copy tokens,
   first-combat-only engines, random copy counts, non-player combat damage, and
   next-combat attacker restrictions stay rejected or human-review residuals
   instead of being counted through unsafe graph signals.
+
+## G016 status update
+
+G016 is now implemented as a conservative strict-proof slice:
+
+- `counter-threshold-doubler→extra-turn-loop`
+- `counter-threshold-proliferate→extra-turn-loop`
+
+The new slice requires explicit threshold/seed-counter preconditions and
+package-local zero-mana counter-doubling or proliferate support. It
+deliberately does **not** count mana-paid or ambient-board-state Scepter rows.
+
+Fresh evaluator impact (`2026-06-22T07:09:13.653Z`):
+
+- strict proved bucket unchanged at **1,097**;
+- proof-status `proven` unchanged at **1,089**;
+- expected result-class coverage unchanged at **31,673 / 54,161 (58.5%)**;
+- proof-only expected coverage unchanged at **2,313 / 54,161 (4.3%)**.
+
+So G016 now has generalized proof infrastructure and regressions, but the
+current EDHREC corpus still contributes **zero** real rows that satisfy the new
+strict seeded/zero-cost threshold rules.

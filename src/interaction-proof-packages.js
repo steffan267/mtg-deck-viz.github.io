@@ -185,6 +185,104 @@ function seedCandidates(indexes, options) {
 
   pairCandidates(
     candidates,
+    capabilityIds(indexes, 'is-forced-nonhand-cast-engine'),
+    capabilityIds(indexes, 'is-cast-origin-lockpiece'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-counter-suppression-static'),
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-damage-prevention-counter-burden'),
+      ...capabilityIds(indexes, 'is-spell-counter-depletion-lockpiece'),
+      ...capabilityIds(indexes, 'is-zero-life-poison-shield'),
+      ...capabilityIds(indexes, 'is-cumulative-upkeep-counter-burden'),
+    ]),
+  );
+
+  for (const lockpiece of capabilityIds(indexes, 'is-replayable-prevention-land-lockpiece')) {
+    for (const recursion of capabilityIds(indexes, 'is-land-recursion')) {
+      for (const support of capabilityIds(indexes, 'is-extra-land-drop')) {
+        addCandidate(candidates, [lockpiece, recursion, support]);
+      }
+    }
+  }
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-draw-step-hand-cycler'),
+    capabilityIds(indexes, 'is-draw-limit-lockpiece'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-no-draw-search-step-engine'),
+    capabilityIds(indexes, 'is-search-lockpiece'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-attack-lockpiece'),
+    capabilityIds(indexes, 'is-evasion-removal-lock-support'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-all-permanents-artifacts'),
+    capabilityIds(indexes, 'is-artifact-activation-lockpiece'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-all-lands-are-islands'),
+    capabilityIds(indexes, 'is-island-untap-lockpiece'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIdsStartingWith(indexes, 'attack-lock-axis:flying-only'),
+    capabilityIdsStartingWith(indexes, 'attack-lock-axis:no-flying'),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-face-up-opponent-next-untap-skipper'),
+    intersectIds(
+      capabilityIds(indexes, 'is-upkeep-face-down-resetter'),
+      capabilityIds(indexes, 'is-face-up-copy-creature'),
+    ),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-global-untap-skipper'),
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-global-upkeep-skipper'),
+      ...capabilityIds(indexes, 'is-self-end-step-nonland-untapper'),
+      ...capabilityIds(indexes, 'is-upkeep-self-untap-mana-land'),
+      ...capabilityIds(indexes, 'is-repeatable-self-bounce-support'),
+    ]),
+  );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-cast-gated-opponent-turn-protection-source'),
+    capabilityIds(indexes, 'is-repeatable-self-bounce-support'),
+  );
+
+  for (const source of capabilityIds(indexes, 'is-cast-gated-opponent-turn-protection-source')) {
+    for (const outlet of capabilityIds(indexes, 'is-artifact-sac-outlet')) {
+      for (const support of sortedUnique([
+        ...capabilityIds(indexes, 'is-graveyard-artifact-cast-support'),
+        ...capabilityIds(indexes, 'is-graveyard-permanent-cast-support'),
+      ])) {
+        addCandidate(candidates, [source, outlet, support]);
+      }
+    }
+  }
+
+  pairCandidates(
+    candidates,
     capabilityIds(indexes, 'is-mass-opponent-draw-source'),
     capabilityIds(indexes, 'is-opponent-draw-punisher'),
   );
@@ -337,6 +435,32 @@ function seedCandidates(indexes, options) {
     capabilityIds(indexes, 'is-turn-cycle-artifact-token-engine'),
     capabilityIds(indexes, 'is-artifact-sacrifice-extra-turn-engine'),
   );
+
+  pairCandidates(
+    candidates,
+    capabilityIds(indexes, 'is-repeatable-counter-doubler'),
+    capabilityIds(indexes, 'is-counter-threshold-extra-turn-engine'),
+  );
+
+  pairCandidates(
+    candidates,
+    sortedUnique([
+      ...capabilityIds(indexes, 'is-repeatable-proliferator'),
+      ...capabilityIds(indexes, 'is-turn-cycle-proliferator'),
+    ]),
+    capabilityIds(indexes, 'is-counter-threshold-extra-turn-engine'),
+  );
+
+  for (const proliferator of sortedUnique([
+    ...capabilityIds(indexes, 'is-repeatable-proliferator'),
+    ...capabilityIds(indexes, 'is-turn-cycle-proliferator'),
+  ])) {
+    for (const multiplier of capabilityIds(indexes, 'is-proliferate-multiplier')) {
+      for (const engine of capabilityIds(indexes, 'is-counter-threshold-extra-turn-engine')) {
+        addCandidate(candidates, [proliferator, multiplier, engine]);
+      }
+    }
+  }
 
   pairCandidates(
     candidates,

@@ -1302,6 +1302,49 @@
         caps.add("is-artifact-sac-outlet");
         caps.add("artifact-extra-turn-sac-count:" + sacCount);
       }
+      const counterThresholdExtraTurnMatch = c.match(/\bremove (one|two|three|four|five|six|seven|eight|nine|ten|\d+) charge counters? from (?:this artifact|this permanent|it)\b/);
+      if (s.kind === "activated"
+          && counterThresholdExtraTurnMatch
+          && /\btake an extra turn\b/.test(e)
+          && !/activate only once (each|per) turn/.test(effectAndRaw)) {
+        const threshold = numberWordValue(counterThresholdExtraTurnMatch[1]);
+        caps.add("is-counter-threshold-extra-turn-engine");
+        caps.add("counter-threshold-extra-turn-threshold:" + threshold);
+        caps.add("counter-threshold-extra-turn-type:charge");
+        caps.add("counter-threshold-extra-turn-target:self-artifact");
+        if (/\{t\}/.test(c)) caps.add("counter-threshold-extra-turn-activation-taps-source");
+      }
+      if (s.kind === "activated"
+          && /\bdouble the number of each kind of counter on target (artifact|creature|land|permanent)\b/.test(e)
+          && !/activate only once (each|per) turn/.test(effectAndRaw)) {
+        const target = e.match(/\bdouble the number of each kind of counter on target (artifact|creature|land|permanent)\b/)[1];
+        caps.add("is-repeatable-counter-doubler");
+        caps.add(target === "permanent" ? "counter-doubler-target:any-permanent" : "counter-doubler-target:" + target);
+        addManaCostCaps(caps, "counter-doubler", manaCostProfile(c));
+        if (/\{t\}/.test(c)) caps.add("counter-doubler-activation-taps-source");
+      }
+      if (/\bproliferate\b/.test(e)) {
+        const proliferateCount =
+          /\bproliferate twice\b/.test(e) ? 2
+            : /\bproliferate three times\b/.test(e) ? 3
+              : 1;
+        if (s.kind === "activated" && !/activate only once (each|per) turn/.test(effectAndRaw)) {
+          caps.add("is-repeatable-proliferator");
+          caps.add("proliferate-count-per-turn:" + proliferateCount);
+          addManaCostCaps(caps, "proliferate", manaCostProfile(c));
+          if (/\{t\}/.test(c)) caps.add("proliferate-activation-taps-source");
+        }
+        if ((s.kind === "triggered" || s.kind === "etb")
+            && /\bat the beginning of (?:your|each) (?:upkeep|combat|end step)\b/.test(s.trigger)
+            && !/only once (each|per) turn|triggers? only once/.test(effectAndRaw)) {
+          caps.add("is-turn-cycle-proliferator");
+          caps.add("proliferate-count-per-turn:" + proliferateCount);
+        }
+      }
+      if (/\bif you would proliferate, proliferate twice instead\b|\bproliferate an additional time\b/.test(effectAndRaw)) {
+        caps.add("is-proliferate-multiplier");
+        caps.add("proliferate-multiplier:2");
+      }
       // cost reducer (Round-3 gate): only a reducer of ACTIVATED ABILITIES is
       // relevant to the cost-reduction→ability family. Scope-specific reducers
       // (creatures, Foods, etc.) must not fan out to all tap abilities.
@@ -1715,6 +1758,327 @@
       } else if (/\bcreature\b/.test(typeText) && castFromExileText) {
         caps.add("is-origin-bound-exile-cast-body");
       }
+      if (s.kind === "activated"
+          && /\bchoose target artifact card in your graveyard\b/.test(effectAndRaw)
+          && /\byou may cast that card this turn\b/.test(effectAndRaw)) {
+        caps.add("is-graveyard-artifact-cast-support");
+        caps.add("graveyard-cast-support-target:artifact");
+        caps.add("graveyard-cast-support-window:your-turn");
+        addManaCostCaps(caps, "graveyard-cast-support", manaCostProfile(c));
+        if (/\{t\}/.test(c)) caps.add("graveyard-cast-support-activation-taps-source");
+      }
+      if (s.kind === "triggered"
+          && /\bdeals combat damage to a player\b/.test(triggerAndEffect)
+          && /\bchoose target artifact card in your graveyard\b/.test(effectAndRaw)
+          && /\byou may cast that card this turn\b/.test(effectAndRaw)) {
+        caps.add("is-graveyard-artifact-cast-support");
+        caps.add("graveyard-cast-support-target:artifact");
+        caps.add("graveyard-cast-support-requires-combat-damage");
+      }
+      if (/\bduring each of your turns, you may\b[^.]{0,120}\bcast a permanent spell of each permanent type from your graveyard\b/.test(effectAndRaw)) {
+        caps.add("is-graveyard-permanent-cast-support");
+        caps.add("graveyard-cast-support-target:permanent");
+        caps.add("graveyard-cast-support-window:your-turn");
+      }
+      if (s.kind === "activated"
+          && /\bchoose target nonland permanent card in your graveyard\b/.test(effectAndRaw)
+          && /\byou may cast that card\b/.test(effectAndRaw)) {
+        caps.add("is-graveyard-permanent-cast-support");
+        caps.add("graveyard-cast-support-target:permanent");
+        caps.add("graveyard-cast-support-window:your-turn");
+        if (/\bif you haven'?t cast a spell this turn\b/.test(effectAndRaw)) caps.add("graveyard-cast-support-precondition:no-spell-yet");
+        if (/\byou can'?t cast additional spells this turn\b/.test(effectAndRaw)) caps.add("graveyard-cast-support-postcondition:no-more-spells");
+        addManaCostCaps(caps, "graveyard-cast-support", manaCostProfile(c));
+        if (/\{t\}/.test(c)) caps.add("graveyard-cast-support-activation-taps-source");
+      }
+      const forcedCastFromExile =
+        /\bwhenever a player casts a spell from (?:their|his or her|your) hand\b/.test(effectAndRaw)
+        && /\bexiles? it\b/.test(effectAndRaw)
+        && /\bmay cast\b[^.]{0,180}\bfrom among\b[^.]{0,180}\bexiled\b/.test(effectAndRaw)
+        && /\bwithout paying its mana cost\b/.test(effectAndRaw);
+      const forcedDrawStepCast =
+        /\bat the beginning of each player'?s draw step\b/.test(effectAndRaw)
+        && /\bexiles? the top card of (?:their|that player'?s|his or her|your) library\b/.test(effectAndRaw)
+        && /\bcasts? it without paying its mana cost if able\b/.test(effectAndRaw);
+      if (forcedCastFromExile || forcedDrawStepCast) {
+        caps.add("is-forced-nonhand-cast-engine");
+        caps.add("forced-cast-payment:free");
+        caps.add("forced-cast-window:trigger-resolution");
+        caps.add("forced-cast-origin:exile");
+        if (forcedCastFromExile) caps.add("forced-cast-trigger:spell-from-hand");
+        if (forcedDrawStepCast) {
+          caps.add("forced-cast-trigger:draw-step");
+          caps.add("forced-cast-origin:library-top");
+        }
+      }
+      if (/\bat the beginning of each player'?s draw step\b/.test(allText)
+          && /\bputs? the cards? in (?:their|his or her|that player'?s) hand on the (?:bottom of|bottom into) (?:their|his or her|that player'?s) library\b/.test(allText)
+          && /\bdraws? that many cards\b/.test(allText)) {
+        caps.add("is-draw-step-hand-cycler");
+      }
+      if (/\beach opponent can'?t draw more than one card each turn\b/.test(allText)
+          || /\bopponents? can'?t draw more than one card each turn\b/.test(allText)) {
+        caps.add("is-draw-limit-lockpiece");
+        caps.add("draw-limit-scope:opponents");
+        caps.add("draw-limit-count:1");
+      }
+      if (/\beach player can'?t draw more than one card each turn\b/.test(allText)
+          || /\bplayers can'?t draw more than one card each turn\b/.test(allText)) {
+        caps.add("is-draw-limit-lockpiece");
+        caps.add("draw-limit-scope:players");
+        caps.add("draw-limit-count:1");
+      }
+      if (/\bif an opponent would draw a card except the first one they draw in each of their draw steps\b/.test(allText)
+          && /\binstead\b/.test(allText)
+          && /\bskips? that draw\b/.test(allText)) {
+        caps.add("is-draw-limit-lockpiece");
+        caps.add("draw-limit-scope:opponents");
+        caps.add("draw-limit-count:1");
+        caps.add("draw-limit-replacement:skip");
+      }
+      if (/\bplayers can'?t draw cards\b/.test(allText)
+          && /\bat the beginning of each player'?s draw step\b/.test(allText)
+          && /\bsearches? (?:their|his or her|that player'?s) library for a card\b/.test(allText)
+          && /\bputs? it into (?:their|his or her|that player'?s) hand\b/.test(allText)) {
+        caps.add("is-no-draw-search-step-engine");
+      }
+      if (/\b(players?|opponents?) can'?t search libraries\b/.test(allText)) {
+        caps.add("is-search-lockpiece");
+        caps.add(/\bopponents?\b/.test(allText) ? "search-lock-scope:opponents" : "search-lock-scope:players");
+      }
+      if (/\byou control your opponents while they'?re searching their libraries\b/.test(allText)
+          && /\bthey exile each card they find\b/.test(allText)) {
+        caps.add("is-search-lockpiece");
+        caps.add("search-lock-scope:opponents");
+        caps.add("search-lock-mode:controlled-search-exile");
+      }
+      if (/\bcreatures without flying can'?t attack you\b/.test(allText)) {
+        caps.add("is-attack-lockpiece");
+        caps.add("attack-lock-axis:no-flying");
+        caps.add("attack-lock-scope:you");
+      }
+      if (/\bcreatures without flying can'?t attack\b/.test(allText)) {
+        caps.add("is-attack-lockpiece");
+        caps.add("attack-lock-axis:no-flying");
+        caps.add("attack-lock-scope:players");
+      }
+      if (/\bcreatures with flying can'?t attack you\b/.test(allText)) {
+        caps.add("is-attack-lockpiece");
+        caps.add("attack-lock-axis:flying-only");
+        caps.add("attack-lock-scope:you");
+      }
+      if (/\bexcept by creatures with flying and\/or islandwalk\b/.test(allText)) {
+        caps.add("is-attack-lockpiece");
+        caps.add("attack-lock-axis:flying-or-islandwalk-only");
+        caps.add("attack-lock-scope:you");
+      }
+      if (/\bcreatures without flying or islandwalk can'?t attack\b/.test(allText)) {
+        caps.add("is-attack-lockpiece");
+        caps.add("attack-lock-axis:flying-or-islandwalk-only");
+        caps.add("attack-lock-scope:players");
+      }
+      if (/\bcreatures your opponents control lose flying\b/.test(allText)
+          && /\bcan'?t have or gain flying\b/.test(allText)) {
+        caps.add("is-evasion-removal-lock-support");
+        caps.add("evasion-removal:flying");
+        caps.add("evasion-removal-scope:opponents");
+      }
+      if (/\ball creatures lose flying and islandwalk\b/.test(allText)) {
+        caps.add("is-evasion-removal-lock-support");
+        caps.add("evasion-removal:flying");
+        caps.add("evasion-removal:islandwalk");
+        caps.add("evasion-removal-scope:players");
+      } else if (/\ball creatures lose flying\b/.test(allText)) {
+        caps.add("is-evasion-removal-lock-support");
+        caps.add("evasion-removal:flying");
+        caps.add("evasion-removal-scope:players");
+      }
+      if (/\b(opponents?|players?) can'?t cast spells? from anywhere other than their hands\b/.test(effectAndRaw)) {
+        caps.add("is-cast-origin-lockpiece");
+        caps.add("cast-lock-origin:non-hand");
+        caps.add(/\bopponents?\b/.test(effectAndRaw) ? "cast-lock-scope:opponents" : "cast-lock-scope:players");
+      }
+      if (/\b(players?|opponents?) can'?t cast(?: noncreature)? spells? from (?:graveyards? or )?exile\b/.test(effectAndRaw)) {
+        caps.add("is-cast-origin-lockpiece");
+        caps.add("cast-lock-origin:exile");
+        caps.add(/\bnoncreature spells?\b/.test(effectAndRaw) ? "cast-lock-origin-exile-noncreature-only" : "cast-lock-origin-exile-any");
+        caps.add(/\bopponents?\b/.test(effectAndRaw) ? "cast-lock-scope:opponents" : "cast-lock-scope:players");
+      }
+      if (/\beach player can'?t cast more than one spell each turn\b/.test(effectAndRaw)
+          || /\bplayers can'?t cast more than one spell each turn\b/.test(effectAndRaw)) {
+        caps.add("is-cast-origin-lockpiece");
+        caps.add("cast-lock-axis:spell-count");
+        caps.add("cast-lock-spell-count:1");
+        caps.add("cast-lock-scope:players");
+      }
+      if (/\beach opponent can cast spells only any time they could cast a sorcery\b/.test(effectAndRaw)
+          || /\byour opponents can cast spells only any time they could cast a sorcery\b/.test(effectAndRaw)) {
+        caps.add("is-cast-origin-lockpiece");
+        caps.add("cast-lock-axis:timing-sorcery");
+        caps.add("cast-lock-scope:opponents");
+      }
+      if (/\bwhenever a player casts a spell, if no mana was spent to cast it, counter that spell\b/.test(effectAndRaw)) {
+        caps.add("is-cast-origin-lockpiece");
+        caps.add("cast-lock-axis:free-cast");
+        caps.add("cast-lock-scope:players");
+      }
+      if (/\bwhenever an opponent casts a spell, if no mana was spent to cast it, counter that spell\b/.test(effectAndRaw)) {
+        caps.add("is-cast-origin-lockpiece");
+        caps.add("cast-lock-axis:free-cast");
+        caps.add("cast-lock-scope:opponents");
+      }
+      if (/\bwhenever a player casts a spell, if no colored mana was spent to cast it, counter that spell\b/.test(effectAndRaw)) {
+        caps.add("is-cast-origin-lockpiece");
+        caps.add("cast-lock-axis:no-colored-mana");
+        caps.add("cast-lock-scope:players");
+      }
+      if (/\bplayers can'?t get counters\b/.test(effectAndRaw)
+          || /\bcounters can'?t be put on (artifacts|creatures|enchantments|lands)/.test(effectAndRaw)) {
+        caps.add("is-counter-suppression-static");
+        if (/\bplayers can'?t get counters\b/.test(effectAndRaw)) caps.add("counter-suppression:players");
+        if (/\bartifacts\b/.test(effectAndRaw)) caps.add("counter-suppression:artifacts");
+        if (/\bcreatures\b/.test(effectAndRaw)) caps.add("counter-suppression:creatures");
+        if (/\benchantments\b/.test(effectAndRaw)) caps.add("counter-suppression:enchantments");
+        if (/\blands\b/.test(effectAndRaw)) caps.add("counter-suppression:lands");
+      }
+      if ((/\bprevent that damage and put\b[^.]{0,100}\bcounters? on (this|that|[a-z][a-z' -]{1,60})\b/.test(effectAndRaw)
+          || /\bif damage would be dealt to you, put that many [a-z]+ counters? on (this|that|[a-z][a-z' -]{1,60}) instead\b/.test(effectAndRaw)
+          || /\bif a source would deal damage to you, put that many [a-z]+ counters? on (this|that|[a-z][a-z' -]{1,60}) instead\b/.test(effectAndRaw))) {
+        caps.add("is-damage-prevention-counter-burden");
+        if (/\bprevent all damage that would be dealt to you\b/.test(effectAndRaw)) caps.add("damage-prevention-scope:self-all");
+        if (/\bif a source would deal damage to you, prevent that damage\b/.test(effectAndRaw)
+            || /\bif damage would be dealt to you, prevent that damage\b/.test(effectAndRaw)
+            || /\bif damage would be dealt to you, put that many [a-z]+ counters? on (this|that|[a-z][a-z' -]{1,60}) instead\b/.test(effectAndRaw)
+            || /\bif a source would deal damage to you, put that many [a-z]+ counters? on (this|that|[a-z][a-z' -]{1,60}) instead\b/.test(effectAndRaw)) caps.add("damage-prevention-scope:self-any-damage");
+        if (/\bincarnation counters?\b/.test(effectAndRaw)) caps.add("counter-burden-type:incarnation");
+        if (/\bdelay counters?\b/.test(effectAndRaw)) caps.add("counter-burden-type:delay");
+        if (/\bwhen there are [^.]{0,80} counters? on (?:this|that|[a-z][a-z' -]{1,60})\b/.test(effectAndRaw)
+            || /\bwhen there are [^.]{0,80} [a-z]+ counters? on (?:this|that|[a-z][a-z' -]{1,60})\b/.test(effectAndRaw))
+          caps.add("counter-burden-threshold-failure");
+        if (/\bat the beginning of your upkeep\b/.test(effectAndRaw)
+            && /\bfor each [a-z]+ counter removed this way, you lose 1 life unless you pay\b/.test(effectAndRaw))
+          caps.add("counter-burden-upkeep-loss");
+      }
+      if (/\bwhenever an opponent casts a spell, counter that spell and put\b[^.]{0,100}\bcounters? on (this|that|[a-z][a-z' -]{1,60})\b/.test(effectAndRaw)
+          && /\bif there are [^.]{0,80} counters? on (this|that|[a-z][a-z' -]{1,60}), sacrifice\b/.test(effectAndRaw)) {
+        caps.add("is-spell-counter-depletion-lockpiece");
+        if (/\bdepletion counters?\b/.test(effectAndRaw)) caps.add("counter-burden-type:depletion");
+      }
+      if (/\byou don'?t lose the game for having 0 or less life\b/.test(effectAndRaw)
+          && /\ball damage is dealt to you as though its source had infect\b/.test(effectAndRaw)) {
+        caps.add("is-zero-life-poison-shield");
+      }
+      if (/\bcumulative upkeep\b/.test(allText)
+          && /\bput an age counter on this permanent\b/.test(allText)) {
+        caps.add("is-cumulative-upkeep-counter-burden");
+        caps.add("counter-burden-type:age");
+        if (/\bprevent all damage that would be dealt to you\b/.test(allText)) {
+          caps.add("is-full-self-damage-prevention-source");
+          caps.add("damage-prevention-scope:self-all");
+        }
+      }
+      if (/\bland\b/.test(typeText)
+          && /\bcumulative upkeep\b/.test(allText)
+          && /\bwhen this (?:land|permanent) enters, sacrifice a land\b/.test(allText)
+          && /\bprevent all damage that would be dealt to you\b/.test(allText)) {
+        caps.add("is-replayable-prevention-land-lockpiece");
+      }
+      if (/\bplayers skip their untap steps\b/.test(allText)) {
+        caps.add("is-global-untap-skipper");
+      }
+      if (/\ball permanents are artifacts in addition to their other types\b/.test(allText)) {
+        caps.add("is-all-permanents-artifacts");
+      }
+      if (/\bactivated abilities of [^.]{0,120}\bartifacts?\b[^.]{0,120}can'?t be activated\b/.test(allText)) {
+        caps.add("is-artifact-activation-lockpiece");
+        caps.add(/\byour opponents control\b/.test(allText)
+          ? "artifact-activation-lock-scope:opponents"
+          : "artifact-activation-lock-scope:players");
+      }
+      if (/\ball lands are islands in addition to their other types\b/.test(allText)) {
+        caps.add("is-all-lands-are-islands");
+      }
+      if (/\bnonbasic lands are islands\b/.test(allText)) {
+        caps.add("is-nonbasic-lands-are-islands");
+      }
+      if (/\bislands don'?t untap during their controllers'? untap steps\b/.test(allText)) {
+        caps.add("is-island-untap-lockpiece");
+      }
+      if (/\bwhen this enchantment enters, tap all islands\b/.test(allText)) {
+        caps.add("island-untap-lockpiece-taps-islands-on-entry");
+      }
+      const morphText = [allText, effectAndRaw, c].filter(Boolean).join(' ');
+      const morphMatch = morphText.match(/\bmorph ((?:\{[^}]+\})+)/);
+      if (/\bwhen (?:this creature|this permanent|it) is turned face up, each opponent skips? their next untap step\b/.test(allText)) {
+        caps.add("is-face-up-opponent-next-untap-skipper");
+        if (morphMatch) addManaCostCaps(caps, "face-up", manaCostProfile(morphMatch[1]));
+      }
+      if (/\bat the beginning of your upkeep, you may turn (?:this creature|this permanent|it) face down\b/.test(allText)) {
+        caps.add("is-upkeep-face-down-resetter");
+        if (morphMatch) addManaCostCaps(caps, "face-up", manaCostProfile(morphMatch[1]));
+      }
+      if (/\bas (?:this creature|this permanent|it) enters or is turned face up, you may choose another creature on the battlefield\b/.test(allText)
+          && /\buntil (?:this creature|this permanent|it) is turned face down, (?:it|this creature|this permanent) becomes a copy of that creature\b/.test(allText)) {
+        caps.add("is-face-up-copy-creature");
+        caps.add("face-up-copy-target:another-creature");
+        if (morphMatch) addManaCostCaps(caps, "face-up", manaCostProfile(morphMatch[1]));
+      }
+      if (/\bplayers skip their upkeep steps\b/.test(allText)) {
+        caps.add("is-global-upkeep-skipper");
+      }
+      if (/\bat the beginning of your end step, untap all nonland permanents you control\b/.test(allText)) {
+        caps.add("is-self-end-step-nonland-untapper");
+      }
+      if (/\bthis land doesn'?t untap during your untap step\b/.test(allText)
+          && /\bat the beginning of your upkeep, you may exile a card from your hand\.\s*if you do, untap this land\b/.test(allText)
+          && /\{t\}: add one mana of any color\b/.test(allText)) {
+        caps.add("is-upkeep-self-untap-mana-land");
+        caps.add("upkeep-self-untap-mana-land-produces:any");
+        caps.add("upkeep-self-untap-mana-land-requires-hand-card");
+      }
+      if (/\bwhen\b[^.]{0,80}\benters\b[^.]{0,160}\bif you cast\b[^.]{0,120}\byou gain protection from everything until your next turn\b/.test(allText)) {
+        caps.add("is-cast-gated-opponent-turn-protection-source");
+        if (/\bartifact\b/.test(typeText)) caps.add("protection-source-type:artifact");
+      }
+      if (s.kind === "activated"
+          && /\breturn target artifact you control to its owner'?s hand\b/.test(effectAndRaw)) {
+        caps.add("is-repeatable-self-bounce-support");
+        caps.add("self-bounce-target:artifact-you-control");
+        addManaCostCaps(caps, "self-bounce", manaCostProfile(c));
+        if (/\{t\}/.test(c)) caps.add("self-bounce-activation-taps-source");
+      }
+      if (s.kind === "activated"
+          && /\breturn target permanent you control to its owner'?s hand\b/.test(effectAndRaw)) {
+        caps.add("is-repeatable-self-bounce-support");
+        caps.add("self-bounce-target:permanent-you-control");
+        addManaCostCaps(caps, "self-bounce", manaCostProfile(c));
+        if (/\{t\}/.test(c)) caps.add("self-bounce-activation-taps-source");
+        if (/activate only during your turn/.test(effectAndRaw)) caps.add("self-bounce-window:your-turn");
+      }
+      if (s.kind === "activated"
+          && /\breturn target permanent(?: that isn'?t enchanted)? to its owner'?s hand\b/.test(effectAndRaw)) {
+        caps.add("is-repeatable-self-bounce-support");
+        caps.add(/\breturn target permanent that isn'?t enchanted to its owner'?s hand\b/.test(effectAndRaw)
+          ? "self-bounce-target:any-permanent-not-enchanted"
+          : "self-bounce-target:any-permanent");
+        addManaCostCaps(caps, "self-bounce", manaCostProfile(c));
+        if (/\{t\}/.test(c)) caps.add("self-bounce-activation-taps-source");
+        const extraTapMatch = c.match(/\btap (\d+) untapped (creatures|birds)\b/);
+        if (extraTapMatch) caps.add("self-bounce-additional-tap-" + extraTapMatch[2] + ":" + extraTapMatch[1]);
+        if (/\bdiscard a card\b/.test(c)) caps.add("self-bounce-additional-cost:discard");
+        const snowMatch = effectAndRaw.match(/activate only if you control (\d+) or more snow permanents/);
+        if (snowMatch) caps.add("self-bounce-requires-snow-permanents:" + snowMatch[1]);
+      }
+      if (s.kind === "activated"
+          && /\breturn target permanent you control to its owner'?s hand\b/.test(effectAndRaw)
+          && /\bdiscard a card\b/.test(c)) {
+        caps.add("self-bounce-additional-cost:discard");
+      }
+      if (/\bprevent all damage that would be dealt to you\b/.test(effectAndRaw)
+          && !caps.has("is-damage-prevention-counter-burden")) {
+        caps.add("is-full-self-damage-prevention-source");
+        caps.add("damage-prevention-scope:self-all");
+      }
       if (/\bcreature\b/.test(typeText)
           && s.kind === "activated"
           && /\breturn (this card|this creature|[^.,:]{1,60}) from your graveyard to (the )?battlefield\b/.test(effectAndRaw)
@@ -1874,6 +2238,15 @@
       // generic graveyard family.
       if (/play lands? from your graveyard|land cards? from your graveyard|return .* land cards? .* graveyard .* battlefield/.test(effectAndRaw))
         caps.add("is-land-recursion");
+      if (/\byou may play an additional land on each of your turns\b/.test(effectAndRaw)) {
+        caps.add("is-extra-land-drop");
+        caps.add("extra-land-drops:1");
+      }
+      const extraLandMatch = effectAndRaw.match(/\byou may play (one|two|three|four|five|\d+) additional lands on each of your turns\b/);
+      if (extraLandMatch) {
+        caps.add("is-extra-land-drop");
+        caps.add("extra-land-drops:" + numberWordValue(extraLandMatch[1]));
+      }
       if (/\blandfall\b|whenever a land (you control )?enters/.test(triggerAndEffect)) {
         caps.add("is-landfall-payoff");
         if (/\badd\b/.test(e)) {
@@ -2034,6 +2407,21 @@
     if (/\bequipped creature has [^.]*whenever a creature dies, untap this creature/.test(allText)
         && !/\bonly once (each|per) turn\b|\btriggers? only once (each|per) turn\b/.test(allText))
       caps.add("grants-death-untap-to-equipped-creature");
+    if (caps.has("is-damage-prevention-counter-burden")
+        && /\bwhen there are [^.]{0,120} counters? on (?:this|that|[a-z][a-z' -]{1,60})\b/.test(allText))
+      caps.add("counter-burden-threshold-failure");
+    if (caps.has("is-damage-prevention-counter-burden")
+        && /\bat the beginning of your upkeep\b/.test(allText)
+        && /\bfor each [a-z]+ counter removed this way, you lose 1 life unless you pay\b/.test(allText))
+      caps.add("counter-burden-upkeep-loss");
+    if (/\bcumulative upkeep\b/.test(allText)) {
+      caps.add("is-cumulative-upkeep-counter-burden");
+      caps.add("counter-burden-type:age");
+      if (/\bprevent all damage that would be dealt to you\b/.test(allText)) {
+        caps.add("is-full-self-damage-prevention-source");
+        caps.add("damage-prevention-scope:self-all");
+      }
+    }
     // sac fodder / blink target: real creatures and produced creature tokens
     // are bodies; noncreature tokens such as Treasure are not attackers/deaths.
     if (!isLand && (caps.has("is-creature-token-producer") || /creature/.test((classified._type || "")))) caps.add("is-body");
@@ -2313,6 +2701,13 @@
     if (!target?.faceFacts?.length && hasCap(copier, "hasty-copy-target-requires-nonlegendary") && isLegendaryPermanent(target)) return false;
     return copyTokenLegendSafe(copier, target, "hasty-copy-token-nonlegendary", targetCaps);
   };
+  const canPrecombatCopyTarget = (copier, target, extraTargetCaps = []) => {
+    if (!hasCap(copier, "is-precombat-hasty-creature-copy-source")) return false;
+    const targetCaps = ["is-creature-permanent", ...extraTargetCaps];
+    if (!faceCompatibleCaps(target, targetCaps)) return false;
+    if (!target?.faceFacts?.length && !isCreaturePermanent(target)) return false;
+    return copyTokenLegendSafe(copier, target, "precombat-copy-token-nonlegendary", targetCaps);
+  };
   const canHastyCopySpellTarget = (copySpell, target, extraTargetCaps = []) => {
     if (!hasCap(copySpell, "hasty-copy-spell-target-creature")) return false;
     const targetCaps = ["is-creature-permanent", "is-nonlegendary-permanent", ...extraTargetCaps];
@@ -2476,10 +2871,11 @@
               from: f.from,
               to: f.to,
               targetIsCreature: isCreaturePermanent(dst),
+              copyTargetLegal: canPrecombatCopyTarget(src, dst, ["is-attack-extra-combat-source"]),
               createsNonlegendaryHastyToken: hasCap(src, "combat-copy-token-haste") && hasCap(src, "combat-copy-token-nonlegendary"),
               freshTokenRepeatsExtraCombat: hasCap(dst, "extra-combat-repeatable-with-fresh-token"),
             };
-            if (!evidence.targetIsCreature || !evidence.createsNonlegendaryHastyToken || !evidence.freshTokenRepeatsExtraCombat) continue;
+            if (!evidence.targetIsCreature || !evidence.copyTargetLegal || !evidence.createsNonlegendaryHastyToken || !evidence.freshTokenRepeatsExtraCombat) continue;
           }
           if (f.family === "combat-sacrifice-aura→extra-combat-loop") {
             const freshCarrierCount = maxCapNumber(dst, "fresh-carrier-tokens-created:");
