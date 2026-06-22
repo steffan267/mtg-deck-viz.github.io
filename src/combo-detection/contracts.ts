@@ -1,16 +1,12 @@
+import type { ComboFamilyId, ComboResource } from '../domain/interaction-constants.js'
+
+export type { ComboFamilyId, ComboResource } from '../domain/interaction-constants.js'
+
 export type ComboDetectionStrategyId =
   | 'brute-force-combinations'
   | 'rule-template-search'
   | 'graph-resource-search'
 
-export type ComboResource =
-  | 'mana'
-  | 'untap'
-  | 'blink'
-  | 'lifegain'
-  | 'lifeloss'
-  | 'damage'
-  | 'draw'
 
 export interface ComboCardInput {
   readonly id?: string
@@ -35,7 +31,7 @@ export interface ComboCandidate {
 
 export interface ComboProof {
   readonly id: string
-  readonly family: string
+  readonly family: ComboFamilyId
   readonly cardIds: readonly string[]
   readonly resources: readonly ComboResource[]
   readonly explanation: string
@@ -62,7 +58,7 @@ export interface ComboStrategyBenchmarkRow {
   readonly strategyId: ComboDetectionStrategyId
   readonly candidateCount: number
   readonly proofCount: number
-  readonly proofFamilies: readonly string[]
+  readonly proofFamilies: readonly ComboFamilyId[]
 }
 
 export interface ComboStrategyBenchmarkCaseResult {

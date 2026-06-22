@@ -1,3 +1,4 @@
+import type { ProofStatus } from '../../../domain/interaction-constants.js'
 import type {
   CandidateCard,
   DeckGraph,
@@ -145,6 +146,8 @@ function normalizeProofDelta(value: unknown): InteractionProofDelta {
   }
 }
 
+const DEFAULT_PROOF_STATUS: ProofStatus = 'proven'
+
 function normalizeProofEvidence(value: unknown): InteractionProofEvidence {
   const input = asRecord(value)
   return {
@@ -165,7 +168,7 @@ export function normalizeInteractionProof(value: unknown): InteractionProofPacka
     familyTitle: asString(input.familyTitle ?? input.family),
     cards: asStringArray(input.cards),
     cardCount: asNumber(input.cardCount, asStringArray(input.cards).length),
-    status: asString(input.status, 'proven'),
+    status: asString(input.status, DEFAULT_PROOF_STATUS),
     confidence: asString(input.confidence, 'pattern'),
     strength: asString(input.strength, 'strong'),
     result: asString(input.result),

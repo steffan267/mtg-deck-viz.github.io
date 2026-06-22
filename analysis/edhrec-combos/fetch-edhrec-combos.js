@@ -285,7 +285,7 @@ function parseCategoryPageResult(html, category) {
       });
     }
   }
-  const details = parseCardlistEntries(embedded && embedded.cardlists, category);
+  const details = /** @type {any[]} */ (parseCardlistEntries(embedded && embedded.cardlists, category));
   const seen = new Set(details.map(detail => detail.detailPath));
   const re = /<a\s+[^>]*href="([^"]+)"[^>]*>\s*<button[^>]*>\s*View combo details\s*<\/button>\s*<\/a>/gi;
   let match;

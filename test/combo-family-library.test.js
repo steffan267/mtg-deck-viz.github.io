@@ -3,6 +3,8 @@ const {
   COMBO_FAMILIES,
   getComboFamily,
   validateComboFamilyLibrary,
+  ComboFamilyId,
+  ResultClass,
 } = require('../src/combo-family-library');
 
 const validation = validateComboFamilyLibrary();
@@ -12,7 +14,14 @@ assert.ok(COMBO_FAMILIES.length >= 9, 'library should cover direct, two-card, an
 
 const ids = COMBO_FAMILIES.map(family => family.id);
 assert.equal(new Set(ids).size, ids.length, 'family ids should be unique');
-assert.equal(ids[0], 'self-untap-mana-loop', 'family order should remain stable and reviewable');
+assert.equal(ids[0], ComboFamilyId.SelfUntapManaLoop, 'family order should remain stable and reviewable');
+
+for (const family of COMBO_FAMILIES) {
+  assert.ok(Object.values(ComboFamilyId).includes(family.id), `${family.id} must be a canonical ComboFamilyId`);
+  for (const cls of [...(family.resultClasses || []), ...(family.proofDeltaResultClasses || [])]) {
+    assert.ok(Object.values(ResultClass).includes(cls), `${family.id} uses non-canonical result class ${cls}`);
+  }
+}
 
 for (const family of COMBO_FAMILIES) {
   assert.equal(getComboFamily(family.id), family);
@@ -25,12 +34,12 @@ for (const family of COMBO_FAMILIES) {
   assert.ok(family.maxCards >= 1 && family.maxCards <= 3);
 }
 
-assert.ok(getComboFamily('artifact-top-cost-reduction-loop').requiredFacts.some(fact => fact.predicate === 'is-self-top-draw-artifact'));
-assert.ok(getComboFamily('blink-etb-land-untap-loop').negativeFixtures.some(fixture => fixture.cards.includes('Ephemerate')));
+assert.ok(getComboFamily(ComboFamilyId.ArtifactTopCostReductionLoop).requiredFacts.some(fact => fact.predicate === 'is-self-top-draw-artifact'));
+assert.ok(getComboFamily(ComboFamilyId.BlinkEtbLandUntapLoop).negativeFixtures.some(fixture => fixture.cards.includes('Ephemerate')));
 assert.ok(getComboFamily('cost-reducer-activated-output-payoff').knownFalsePositives.some(text => /scoped/i.test(text)));
 assert.ok(getComboFamily('token-source-modifier-payoff').requiredFacts.some(fact => fact.kind === 'event.consumes' && fact.event === 'tokens'));
-assert.deepEqual(getComboFamily('hasty-copy→etb-untap-loop').resultClasses, ['infinite-etb', 'infinite-ltb', 'infinite-tokens', 'infinite-untap']);
-assert.equal(getComboFamily('hasty-copy→etb-untap-loop').resultClasses.includes('infinite-mana'), false);
+assert.deepEqual(getComboFamily(ComboFamilyId.HastyCopyEtbUntapLoop).resultClasses, [ResultClass.InfiniteEtb, ResultClass.InfiniteLtb, ResultClass.InfiniteTokens, ResultClass.InfiniteUntap]);
+assert.equal(getComboFamily(ComboFamilyId.HastyCopyEtbUntapLoop).resultClasses.includes(ResultClass.InfiniteMana), false);
 assert.deepEqual(getComboFamily('combat-copy-token→extra-combat-loop').resultClasses, ['combat', 'infinite-etb', 'infinite-tokens']);
 assert.ok(getComboFamily('combat-copy-token→extra-combat-loop').requiredFacts.some(fact => fact.predicate === 'precombat-copy-created-before-attack'));
 assert.ok(getComboFamily('combat-copy-token→extra-combat-loop').requiredFacts.some(fact => fact.predicate === 'fresh-token-unused-attack-trigger'));

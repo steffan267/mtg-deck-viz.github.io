@@ -6,6 +6,7 @@
  * browser imports can share the same proof presentation model.
  */
 const { getComboFamily } = require('./combo-family-library');
+const { ProofStatus } = require('./domain/interaction-constants');
 const { buildInteractionIndexes, candidateTriples } = require('./interaction-indexes');
 const { provePackage } = require('./interaction-proof-search');
 const FACE_CLASSIFICATION = require('./face-classification');
@@ -610,7 +611,7 @@ function packageFromProof(result, proof, indexes) {
     familyTitle: (familyDef && familyDef.title) || titleCase(proof.family),
     cards: proof.cards.slice().sort(compareId),
     cardCount: proof.cards.length,
-    status: 'proven',
+    status: ProofStatus.Proven,
     confidence: (familyDef && familyDef.confidenceGate) || hyperedges[0]?.confidence || 'pattern',
     strength: hyperedges[0]?.strength || (proof.cards.length <= 2 ? 'combo-critical' : 'strong'),
     result: resultSummary(familyDef, proof, hyperedges),
@@ -639,7 +640,7 @@ function buildInteractionProofPackages(cards, options = {}) {
 
   for (const candidate of seedCandidates(indexes, opts)) {
     const result = provePackage(candidate.cards.map(id => indexes.cardsById[id]), options);
-    if (result.status !== 'proven') continue;
+    if (result.status !== ProofStatus.Proven) continue;
     for (const proof of result.proofs || []) {
       const key = proof.family + '\u0000' + packageKey(proof.cards);
       if (seen.has(key)) continue;

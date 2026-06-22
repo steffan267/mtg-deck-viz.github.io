@@ -20,7 +20,7 @@ function registerTypeScriptRequire() {
       },
       fileName: filename,
     });
-    module._compile(output.outputText, filename);
+    module.constructor.prototype._compile.call(module, output.outputText, filename);
   };
 }
 

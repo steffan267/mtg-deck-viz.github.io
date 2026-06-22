@@ -6,6 +6,7 @@
  * why near-misses are not repeatable, and enforces hard card/depth/branch caps.
  */
 const { buildInteractionHypergraph } = require('./interaction-hypergraph');
+const { ProofStatus } = require('./domain/interaction-constants');
 const { buildInteractionIndexes, normalizeCard } = require('./interaction-indexes');
 const FACE_CLASSIFICATION = require('./face-classification');
 const MODEL = require('./interaction-model.js');
@@ -500,7 +501,7 @@ function transitionForCard(card) {
 function failure(id, cards, reason, details = {}) {
   return {
     id,
-    status: 'not-repeatable',
+    status: ProofStatus.NotRepeatable,
     cards: sorted(cards.map(card => card.id || card)),
     reason,
     details,
@@ -510,7 +511,7 @@ function failure(id, cards, reason, details = {}) {
 function success(id, family, cards, proof, deltas = []) {
   return {
     id,
-    status: 'proven',
+    status: ProofStatus.Proven,
     family,
     cards: sorted(cards.map(card => card.id || card)),
     proof,
@@ -827,7 +828,7 @@ function proveCombatResourceExtraCombatLoop(cards) {
   for (const extraCombat of extraCombats) {
     for (const resourceEngine of resourceEngines) {
       const result = proveCombatResourceExtraCombatPair(resourceEngine, extraCombat);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
   }
@@ -970,7 +971,7 @@ function proveCombatSacrificeAuraExtraCombatLoop(cards) {
   for (const aura of auras) {
     for (const carrierSource of carrierSources) {
       const result = proveCombatSacrificeAuraExtraCombatPair(aura, carrierSource);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
   }
@@ -1035,7 +1036,7 @@ function proveArtifactTokenExtraTurnLoop(cards) {
   for (const extraTurn of extraTurns) {
     for (const source of sources) {
       const result = proveArtifactTokenExtraTurnPair(source, extraTurn);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
   }
@@ -1132,7 +1133,7 @@ function proveCounterThresholdDoublerExtraTurnLoop(cards) {
   for (const engine of engines) {
     for (const doubler of doublers) {
       const result = proveCounterThresholdDoublerExtraTurnPair(doubler, engine);
-      if (result && result.status === 'proven') return result;
+      if (result && result.status === ProofStatus.Proven) return result;
       if (result) failures.push(result);
     }
   }
@@ -2829,34 +2830,34 @@ function proveFreshCopyExtraCombatLoops(cards) {
   for (const attacker of attackers) {
     for (const copier of precombatCopiers.filter(c => c !== attacker && !hasCap(c, 'is-combat-copy-token-equipment'))) {
       const result = provePrecombatCopyAttackExtraCombatPair(copier, attacker);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
     for (const copier of activeCopiers.filter(c => c !== attacker)) {
       const result = proveHastyCopyExtraCombatPair(copier, attacker, false);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
     for (const copier of attachedCopiers.filter(c => c !== attacker)) {
       const result = proveAttachedSelfCopyExtraCombatPair(copier, attacker, false);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
   }
   for (const attacker of connectAttackers) {
     for (const copier of precombatCopiers.filter(c => c !== attacker)) {
       const result = provePrecombatCopyConnectExtraCombatPair(copier, attacker);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
     for (const copier of activeCopiers.filter(c => c !== attacker)) {
       const result = proveHastyCopyExtraCombatPair(copier, attacker, true);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
     for (const copier of attachedCopiers.filter(c => c !== attacker)) {
       const result = proveAttachedSelfCopyExtraCombatPair(copier, attacker, true);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
   }
@@ -2882,34 +2883,34 @@ function proveFreshCopyExtraTurnLoops(cards) {
   for (const attacker of attackTurners) {
     for (const copier of precombatCopiers.filter(c => c !== attacker)) {
       const result = provePrecombatCopyExtraTurnPair(copier, attacker, false);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
     for (const copier of activeCopiers.filter(c => c !== attacker)) {
       const result = proveHastyCopyExtraTurnPair(copier, attacker, false);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
     for (const copier of attachedCopiers.filter(c => c !== attacker)) {
       const result = proveAttachedSelfCopyExtraTurnPair(copier, attacker, false);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
   }
   for (const attacker of connectTurners) {
     for (const copier of precombatCopiers.filter(c => c !== attacker)) {
       const result = provePrecombatCopyExtraTurnPair(copier, attacker, true);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
     for (const copier of activeCopiers.filter(c => c !== attacker)) {
       const result = proveHastyCopyExtraTurnPair(copier, attacker, true);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
     for (const copier of attachedCopiers.filter(c => c !== attacker)) {
       const result = proveAttachedSelfCopyExtraTurnPair(copier, attacker, true);
-      if (result.status === 'proven') return result;
+      if (result.status === ProofStatus.Proven) return result;
       failures.push(result);
     }
   }
@@ -4058,7 +4059,7 @@ function provePackage(rawCards, options = {}) {
   const cards = (rawCards || []).map(normalizeCard);
   if (cards.length > limits.maxCards) {
     return {
-      status: 'bounded-out',
+      status: ProofStatus.BoundedOut,
       reason: `package has ${cards.length} cards; maxCards is ${limits.maxCards}`,
       limits,
       proofs: [],
@@ -4134,14 +4135,14 @@ function provePackage(rawCards, options = {}) {
   ].filter(Boolean);
   const indexedCards = cardsById(cards);
   const faceRejections = results
-    .filter(r => r.status === 'proven')
+    .filter(r => r.status === ProofStatus.Proven)
     .map(proof => faceIncompatibilityRejection(proof, indexedCards))
     .filter(Boolean);
   const rejectedProofIds = new Set(faceRejections.map(rejection => rejection.details && rejection.details.proof));
-  const proofs = results.filter(r => r.status === 'proven' && !rejectedProofIds.has(r.id));
-  const rejections = [...results.filter(r => r.status !== 'proven'), ...faceRejections];
+  const proofs = results.filter(r => r.status === ProofStatus.Proven && !rejectedProofIds.has(r.id));
+  const rejections = [...results.filter(r => r.status !== ProofStatus.Proven), ...faceRejections];
   return {
-    status: proofs.length ? 'proven' : rejections.length ? 'not-repeatable' : 'no-proof',
+    status: proofs.length ? ProofStatus.Proven : rejections.length ? ProofStatus.NotRepeatable : ProofStatus.NoProof,
     limits,
     state,
     transitions,

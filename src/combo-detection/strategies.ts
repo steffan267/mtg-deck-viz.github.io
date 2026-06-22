@@ -1,3 +1,4 @@
+import { ComboFamilyId, ComboResource as ComboResourceValue } from '../domain/interaction-constants.js'
 import type {
   ComboCandidate,
   ComboCardInput,
@@ -5,6 +6,7 @@ import type {
   ComboDetectionResult,
   ComboDetectionStrategy,
   ComboDetectionStrategyId,
+  ComboFamilyId as ComboFamilyIdType,
   ComboProof,
   ComboResource,
 } from './contracts'
@@ -23,7 +25,7 @@ type Feature = {
 }
 
 type Template = {
-  family: string
+  family: ComboFamilyIdType
   reason: string
   roles: readonly {
     name: string
@@ -120,20 +122,20 @@ function featuresForCards(cards: readonly ComboCardInput[]): Feature[] {
     const selfUntaps = /untap (this|it|target) (creature|permanent|artifact)/.test(text)
     const repeatableBlink = /exile another target .* you control.*return .* battlefield/.test(text) && /\{\d+\}|:/.test(text)
 
-    if (manaProduced > 0) produces.add('mana')
-    if (selfUntaps || landUntapCount > 0) produces.add('untap')
-    if (repeatableBlink || /exile target .* you control.*return .* battlefield/.test(text)) produces.add('blink')
-    if (/you gain .* life|gain (one|two|three|four|five|six|seven|\d+|x) life|\blifelink\b/.test(text)) produces.add('lifegain')
-    if (/opponent loses .* life|opponents lose .* life|deals? .* damage to (each )?opponent/.test(text)) produces.add('lifeloss')
-    if (/deals? .* damage/.test(text)) produces.add('damage')
-    if (/draw(s)? (a card|cards|that many|one|two|three|four|five|six|seven|\d+)/.test(text)) produces.add('draw')
+    if (manaProduced > 0) produces.add(ComboResourceValue.Mana)
+    if (selfUntaps || landUntapCount > 0) produces.add(ComboResourceValue.Untap)
+    if (repeatableBlink || /exile target .* you control.*return .* battlefield/.test(text)) produces.add(ComboResourceValue.Blink)
+    if (/you gain .* life|gain (one|two|three|four|five|six|seven|\d+|x) life|\blifelink\b/.test(text)) produces.add(ComboResourceValue.Lifegain)
+    if (/opponent loses .* life|opponents lose .* life|deals? .* damage to (each )?opponent/.test(text)) produces.add(ComboResourceValue.Lifeloss)
+    if (/deals? .* damage/.test(text)) produces.add(ComboResourceValue.Damage)
+    if (/draw(s)? (a card|cards|that many|one|two|three|four|five|six|seven|\d+)/.test(text)) produces.add(ComboResourceValue.Draw)
 
-    if (/\{\d+\}.*untap|pay \{\d+\}.*untap/.test(text) || selfUntaps) consumes.add('mana')
-    if (/whenever you gain life|if you gained life/.test(text)) consumes.add('lifegain')
-    if (/whenever an opponent loses life|whenever a player loses life/.test(text)) consumes.add('lifeloss')
-    if (/whenever .* deals? damage|damage .* draw/.test(text)) consumes.add('damage')
-    if (/whenever you draw|whenever a player draws/.test(text)) consumes.add('draw')
-    if (/exile another target .* you control.*return .* battlefield/.test(text)) consumes.add('mana')
+    if (/\{\d+\}.*untap|pay \{\d+\}.*untap/.test(text) || selfUntaps) consumes.add(ComboResourceValue.Mana)
+    if (/whenever you gain life|if you gained life/.test(text)) consumes.add(ComboResourceValue.Lifegain)
+    if (/whenever an opponent loses life|whenever a player loses life/.test(text)) consumes.add(ComboResourceValue.Lifeloss)
+    if (/whenever .* deals? damage|damage .* draw/.test(text)) consumes.add(ComboResourceValue.Damage)
+    if (/whenever you draw|whenever a player draws/.test(text)) consumes.add(ComboResourceValue.Draw)
+    if (/exile another target .* you control.*return .* battlefield/.test(text)) consumes.add(ComboResourceValue.Mana)
 
     return {
       id,
@@ -154,7 +156,7 @@ function candidateId(strategyId: ComboDetectionStrategyId, cardIds: readonly str
   return [strategyId, family, ...cardIds].filter(Boolean).join('|')
 }
 
-function proof(family: string, cards: readonly Feature[], resources: readonly ComboResource[], explanation: string): ComboProof {
+function proof(family: ComboFamilyIdType, cards: readonly Feature[], resources: readonly ComboResource[], explanation: string): ComboProof {
   const cardIds = cards.map(card => card.id).sort((a, b) => a.localeCompare(b))
   return {
     id: ['proof', family, ...cardIds].join('|'),
@@ -202,18 +204,18 @@ function combinations<T>(items: readonly T[], size: number): T[][] {
 
 const TEMPLATES: readonly Template[] = [
   {
-    family: 'self-untap-mana-loop',
+    family: ComboFamilyId.SelfUntapManaLoop,
     reason: 'single permanent both produces mana and untaps itself below the produced amount',
     roles: [{ name: 'engine', match: card => card.manaProduced > 0 && card.selfUntaps }],
     prove: cards => {
       const engine = cards[0]
       return engine && engine.manaProduced > engine.activationCost
-        ? proof('self-untap-mana-loop', cards, ['mana', 'untap'], 'mana produced exceeds the local untap cost')
+        ? proof(ComboFamilyId.SelfUntapManaLoop, cards, [ComboResourceValue.Mana, ComboResourceValue.Untap], 'mana produced exceeds the local untap cost')
         : null
     },
   },
   {
-    family: 'blink-etb-land-untap-loop',
+    family: ComboFamilyId.BlinkEtbLandUntapLoop,
     reason: 'repeatable blink reuses an enter-the-battlefield land untap trigger',
     roles: [
       { name: 'blink', match: card => card.repeatableBlink },
@@ -223,32 +225,32 @@ const TEMPLATES: readonly Template[] = [
       const blink = cards.find(card => card.repeatableBlink)
       const untapper = cards.find(card => card.landUntapCount > 0)
       return blink && untapper && untapper.landUntapCount >= Math.max(1, blink.activationCost)
-        ? proof('blink-etb-land-untap-loop', cards, ['blink', 'mana', 'untap'], 'land untaps can repay the repeatable blink activation')
+        ? proof(ComboFamilyId.BlinkEtbLandUntapLoop, cards, [ComboResourceValue.Blink, ComboResourceValue.Mana, ComboResourceValue.Untap], 'land untaps can repay the repeatable blink activation')
         : null
     },
   },
   {
-    family: 'lifegain-lifeloss-loop',
+    family: ComboFamilyId.LifegainLifelossLoop,
     reason: 'life gain and opponent life loss triggers feed each other',
     roles: [
-      { name: 'gain-to-loss', match: card => card.consumes.has('lifegain') && card.produces.has('lifeloss') },
-      { name: 'loss-to-gain', match: card => card.consumes.has('lifeloss') && card.produces.has('lifegain') },
+      { name: 'gain-to-loss', match: card => card.consumes.has(ComboResourceValue.Lifegain) && card.produces.has(ComboResourceValue.Lifeloss) },
+      { name: 'loss-to-gain', match: card => card.consumes.has(ComboResourceValue.Lifeloss) && card.produces.has(ComboResourceValue.Lifegain) },
     ],
-    prove: cards => cards.some(card => card.consumes.has('lifegain') && card.produces.has('lifeloss'))
-      && cards.some(card => card.consumes.has('lifeloss') && card.produces.has('lifegain'))
-      ? proof('lifegain-lifeloss-loop', cards, ['lifegain', 'lifeloss'], 'life gain causes life loss, and life loss causes life gain')
+    prove: cards => cards.some(card => card.consumes.has(ComboResourceValue.Lifegain) && card.produces.has(ComboResourceValue.Lifeloss))
+      && cards.some(card => card.consumes.has(ComboResourceValue.Lifeloss) && card.produces.has(ComboResourceValue.Lifegain))
+      ? proof(ComboFamilyId.LifegainLifelossLoop, cards, [ComboResourceValue.Lifegain, ComboResourceValue.Lifeloss], 'life gain causes life loss, and life loss causes life gain')
       : null,
   },
   {
-    family: 'draw-damage-feedback-loop',
+    family: ComboFamilyId.DrawDamageFeedbackLoop,
     reason: 'draw triggers damage and damage triggers draw',
     roles: [
-      { name: 'draw-to-damage', match: card => card.consumes.has('draw') && card.produces.has('damage') },
-      { name: 'damage-to-draw', match: card => card.consumes.has('damage') && card.produces.has('draw') },
+      { name: 'draw-to-damage', match: card => card.consumes.has(ComboResourceValue.Draw) && card.produces.has(ComboResourceValue.Damage) },
+      { name: 'damage-to-draw', match: card => card.consumes.has(ComboResourceValue.Damage) && card.produces.has(ComboResourceValue.Draw) },
     ],
-    prove: cards => cards.some(card => card.consumes.has('draw') && card.produces.has('damage'))
-      && cards.some(card => card.consumes.has('damage') && card.produces.has('draw'))
-      ? proof('draw-damage-feedback-loop', cards, ['damage', 'draw'], 'draw and damage triggers form a closed feedback cycle')
+    prove: cards => cards.some(card => card.consumes.has(ComboResourceValue.Draw) && card.produces.has(ComboResourceValue.Damage))
+      && cards.some(card => card.consumes.has(ComboResourceValue.Damage) && card.produces.has(ComboResourceValue.Draw))
+      ? proof(ComboFamilyId.DrawDamageFeedbackLoop, cards, [ComboResourceValue.Damage, ComboResourceValue.Draw], 'draw and damage triggers form a closed feedback cycle')
       : null,
   },
 ]

@@ -13,6 +13,7 @@ const { loadCards, build } = require('../../src/build-deck-viz');
 const { provePackage } = require('../../src/interaction-proof-search');
 const { buildInteractionIndexes } = require('../../src/interaction-indexes');
 const { COMBO_FAMILIES } = require('../../src/combo-family-library');
+const { ProofStatus } = require('../../src/domain/interaction-constants');
 const MODEL = require('../../src/interaction-model');
 const SEMANTICS = require('../../src/semantic-proof-utils');
 
@@ -511,11 +512,11 @@ function evaluateCombo(combo, idx) {
   const proofOnlyCoverage = resultCoverage(expectedClasses, proofOnlyModelClasses);
   const coverage = resultCoverage(expectedClasses, modelClasses);
   const resolvedAll = graph.missing.length === 0 && nodes.length === combo.cards.length;
-  const proofProven = proof.status === 'proven' || (graph.interactionProofs || []).length > 0;
+  const proofProven = proof.status === ProofStatus.Proven || (graph.interactionProofs || []).length > 0;
   const comboFamilyDetected = familySignals.length > 0;
   const genericEdgeDetected = (graph.edges || []).length > 0;
   const bucket = !resolvedAll ? 'missing-card'
-    : proof.status === 'bounded-out' ? 'bounded-out'
+    : proof.status === ProofStatus.BoundedOut ? ProofStatus.BoundedOut
     : proofProven ? 'proved'
     : comboFamilyDetected ? 'classified-not-proven'
     : genericEdgeDetected ? 'generic-edge-only'
@@ -633,17 +634,17 @@ function summarizeEvaluations(evaluations, cacheMeta = {}) {
 function coverageBlockerForItem(item) {
   if (!item.expectedClasses.length || item.resultCoverage.coveredAny !== false) return null;
   if (!item.resolvedAll) return 'missing-card-data';
-  if (item.proofStatus === 'bounded-out' || item.bucket === 'bounded-out') return 'proof-size-bound';
+  if (item.proofStatus === ProofStatus.BoundedOut || item.bucket === ProofStatus.BoundedOut) return 'proof-size-bound';
   if (item.bucket === 'proved') return 'proved-result-axis-mismatch';
-  if (item.familySignals.length && item.proofStatus !== 'proven') return 'semantic-system-needed-classified';
+  if (item.familySignals.length && item.proofStatus !== ProofStatus.Proven) return 'semantic-system-needed-classified';
   if (item.graphEdgeCount) return 'generic-edge-no-result-class';
   return 'no-current-signal';
 }
 
 function edgeCaseReason(item) {
   if (!item.resolvedAll) return `missing local card data: ${item.missing.join(', ')}`;
-  if (item.proofStatus === 'bounded-out') return 'outside current bounded proof size (>3 cards)';
-  if (item.familySignals.length && item.proofStatus !== 'proven') return 'classified as a combo-family signal but no bounded proof package yet';
+  if (item.proofStatus === ProofStatus.BoundedOut) return 'outside current bounded proof size (>3 cards)';
+  if (item.familySignals.length && item.proofStatus !== ProofStatus.Proven) return 'classified as a combo-family signal but no bounded proof package yet';
   if (item.graphEdgeCount) return 'generic pair edge(s) exist, but no known combo-family classification';
   if (!item.expectedClasses.length) return 'EDHREC result labels need richer result-class mapping';
   return 'no current family/capability/proof signal';

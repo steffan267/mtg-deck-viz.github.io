@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 const { getComboFamily } = require('../src/combo-family-library');
+const { ProofStatus } = require('../src/domain/interaction-constants');
 const { provePackage } = require('../src/interaction-proof-search');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -53,11 +54,11 @@ function proofFamilies(result) {
 }
 
 function expectedPositive(testCase) {
-  return testCase.expect && testCase.expect.status === 'proven';
+  return testCase.expect && testCase.expect.status === ProofStatus.Proven;
 }
 
 function casePassed(testCase, result) {
-  const actualProven = result.status === 'proven';
+  const actualProven = result.status === ProofStatus.Proven;
   if (!expectedPositive(testCase)) return !actualProven;
   const expectedFamilies = (testCase.expect.families || []).slice().sort();
   return actualProven && expectedFamilies.every(family => proofFamilies(result).includes(family));
@@ -176,14 +177,14 @@ function evaluateCorpus(corpus) {
     const result = provePackage(testCase.cards);
     const positive = expectedPositive(testCase);
     const pass = casePassed(testCase, result);
-    const rejectionReasons = pass && result.status === 'proven'
+    const rejectionReasons = pass && result.status === ProofStatus.Proven
       ? []
       : (result.rejections || []).map(rejection => rejection.reason).sort();
     rows.push({
       id: testCase.id,
       sourceType: testCase.sourceType,
       cardCount: testCase.cards.length,
-      expectedStatus: positive ? 'proven' : 'not-proven',
+      expectedStatus: positive ? ProofStatus.Proven : 'not-proven',
       expectedFamilies: (testCase.expect && testCase.expect.families) || [],
       actualStatus: result.status,
       actualFamilies: proofFamilies(result),
@@ -193,15 +194,15 @@ function evaluateCorpus(corpus) {
     });
   }
 
-  const positives = rows.filter(row => row.expectedStatus === 'proven');
-  const negatives = rows.filter(row => row.expectedStatus !== 'proven');
+  const positives = rows.filter(row => row.expectedStatus === ProofStatus.Proven);
+  const negatives = rows.filter(row => row.expectedStatus !== ProofStatus.Proven);
   const truePositives = positives.filter(row => row.pass).length;
   const falseNegatives = positives.length - truePositives;
   const falsePositives = negatives.filter(row => !row.pass).length;
   const twoCardPositives = positives.filter(row => row.cardCount === 2);
   const threeCardPositives = positives.filter(row => row.cardCount === 3);
-  const unexplained = rows.filter(row => row.actualStatus === 'no-proof' && row.expectedStatus === 'proven');
-  const confidenceRows = rows.filter(row => row.actualStatus === 'proven');
+  const unexplained = rows.filter(row => row.actualStatus === ProofStatus.NoProof && row.expectedStatus === ProofStatus.Proven);
+  const confidenceRows = rows.filter(row => row.actualStatus === ProofStatus.Proven);
   const deckSmoke = loadDeckSmoke(corpus);
 
   return {
@@ -227,10 +228,10 @@ function evaluateCorpus(corpus) {
     sourceCoverage: summarizeSourceCoverage(corpus),
     deckSmoke,
     manualAudit: {
-      topMissedCombos: rows.filter(row => row.expectedStatus === 'proven' && !row.pass).map(row => row.id),
-      topFalsePositives: rows.filter(row => row.expectedStatus !== 'proven' && !row.pass).map(row => row.id),
+      topMissedCombos: rows.filter(row => row.expectedStatus === ProofStatus.Proven && !row.pass).map(row => row.id),
+      topFalsePositives: rows.filter(row => row.expectedStatus !== ProofStatus.Proven && !row.pass).map(row => row.id),
       suspiciousHubs: deckSmoke.flatMap(deck => (deck.highFanoutFamilies || []).map(family => ({ deckId: deck.id, family: family.family, count: family.count }))),
-      lowConfidenceProofs: rows.filter(row => row.actualStatus === 'proven' && row.confidence < 0.6).map(row => row.id),
+      lowConfidenceProofs: rows.filter(row => row.actualStatus === ProofStatus.Proven && row.confidence < 0.6).map(row => row.id),
       cardsWithUnknownClauses: [],
     },
   };

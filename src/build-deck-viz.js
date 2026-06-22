@@ -227,6 +227,7 @@ function build(decklist, idx, options = {}) {
       cardKey: c.cardKey,
       canonicalName: c.canonicalName,
       produces: cls.produces, consumes: cls.consumes, zones: cls.zones,
+      degree: 0,
       myTypes: cls.myTypes, tribalRefs: cls.tribalRefs, caps: cls.caps,
     });
   }

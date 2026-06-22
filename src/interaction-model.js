@@ -746,15 +746,15 @@
   function capEvidence(cap, abilities) {
     const { predicate } = typedPredicateForCap(cap);
     const checks = [
-      [/trigger|etb/, a => a.kind === "triggered" || a.kind === "etb"],
-      [/tap|activated|mana-produced|mana-from|self-untap|ability-copy/, a => a.kind === "activated"],
-      [/untap/, a => /\buntap\b/.test(a.effect + " " + a.cost)],
-      [/blink/, a => /\bexile\b/.test(a.effect) && /\breturn\b/.test(a.effect) && /\bbattlefield\b/.test(a.effect)],
-      [/cost-reducer|cost-reduction|spell-cost/, a => /cost.*less|activated abilities|spells?.*cost/.test(a.effect)],
-      [/token/, a => /\btoken/.test(a.effect + " " + a.trigger)],
-      [/counter|proliferate/, a => /\bcounter|proliferate/.test(a.effect + " " + a.trigger)],
+      { re: /trigger|etb/, matches: a => a.kind === "triggered" || a.kind === "etb" },
+      { re: /tap|activated|mana-produced|mana-from|self-untap|ability-copy/, matches: a => a.kind === "activated" },
+      { re: /untap/, matches: a => /\buntap\b/.test(a.effect + " " + a.cost) },
+      { re: /blink/, matches: a => /\bexile\b/.test(a.effect) && /\breturn\b/.test(a.effect) && /\bbattlefield\b/.test(a.effect) },
+      { re: /cost-reducer|cost-reduction|spell-cost/, matches: a => /cost.*less|activated abilities|spells?.*cost/.test(a.effect) },
+      { re: /token/, matches: a => /\btoken/.test(a.effect + " " + a.trigger) },
+      { re: /counter|proliferate/, matches: a => /\bcounter|proliferate/.test(a.effect + " " + a.trigger) },
     ];
-    const matched = abilities.filter(ability => checks.some(([re, fn]) => re.test(predicate) && fn(ability)));
+    const matched = abilities.filter(ability => checks.some(check => check.re.test(predicate) && check.matches(ability)));
     return (matched.length ? matched : abilities.slice(0, 1)).map(ability => evidenceForSegment({ raw: ability.evidence[0] && ability.evidence[0].snippet }, ability.id));
   }
 

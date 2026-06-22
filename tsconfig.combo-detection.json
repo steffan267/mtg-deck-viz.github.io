@@ -6,10 +6,13 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "src/combo-detection/**/*.ts",
+    "src/domain/**/*.ts",
     "test/combo-detection-strategy-contracts.test.ts"
   ]
 }

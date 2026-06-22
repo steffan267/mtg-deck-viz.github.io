@@ -5,6 +5,8 @@
  * fixtures rather than spreading bespoke logic through unrelated modules.
  */
 
+const { ComboFamilyId, ConfidenceGate, ResultClass, hasDomainValue } = require('./domain/interaction-constants');
+
 const COMBO_FAMILIES = [
   {
     id: 'self-untap-mana-loop',
@@ -1736,18 +1738,19 @@ function validateComboFamilyLibrary(families = COMBO_FAMILIES) {
   const ids = new Set();
   for (const family of families) {
     if (!family.id) errors.push('family missing id');
+    else if (!hasDomainValue(ComboFamilyId, family.id)) errors.push(`${family.id} is not registered in ComboFamilyId`);
     if (ids.has(family.id)) errors.push(`duplicate family id ${family.id}`);
     ids.add(family.id);
     for (const field of ['title', 'confidenceGate', 'requiredFacts', 'repeatability', 'payoffCriteria', 'examples', 'negativeFixtures', 'knownFalsePositives', 'uiExplanation']) {
       if (family[field] == null || (Array.isArray(family[field]) && family[field].length === 0)) errors.push(`${family.id} missing ${field}`);
     }
     if (!Number.isInteger(family.maxCards) || family.maxCards < 1 || family.maxCards > 3) errors.push(`${family.id} maxCards must be 1-3`);
-    if (!['exact', 'pattern', 'heuristic'].includes(family.confidenceGate)) errors.push(`${family.id} invalid confidenceGate`);
-    if (family.resultClasses != null && (!Array.isArray(family.resultClasses) || family.resultClasses.some(cls => typeof cls !== 'string' || !cls))) {
-      errors.push(`${family.id} resultClasses must be non-empty strings when present`);
+    if (!hasDomainValue(ConfidenceGate, family.confidenceGate)) errors.push(`${family.id} invalid confidenceGate`);
+    if (family.resultClasses != null && (!Array.isArray(family.resultClasses) || family.resultClasses.some(cls => !hasDomainValue(ResultClass, cls)))) {
+      errors.push(`${family.id} resultClasses must be known ResultClass values when present`);
     }
-    if (family.proofDeltaResultClasses != null && (!Array.isArray(family.proofDeltaResultClasses) || family.proofDeltaResultClasses.some(cls => typeof cls !== 'string' || !cls))) {
-      errors.push(`${family.id} proofDeltaResultClasses must be non-empty strings when present`);
+    if (family.proofDeltaResultClasses != null && (!Array.isArray(family.proofDeltaResultClasses) || family.proofDeltaResultClasses.some(cls => !hasDomainValue(ResultClass, cls)))) {
+      errors.push(`${family.id} proofDeltaResultClasses must be known ResultClass values when present`);
     }
     for (const fact of family.requiredFacts || []) {
       if (!fact.role || !fact.kind) errors.push(`${family.id} required fact missing role/kind`);
@@ -1765,4 +1768,6 @@ module.exports = {
   COMBO_FAMILIES,
   getComboFamily,
   validateComboFamilyLibrary,
+  ComboFamilyId,
+  ResultClass,
 };
