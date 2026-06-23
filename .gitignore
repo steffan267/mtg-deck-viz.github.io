@@ -12,6 +12,11 @@ deck-viz.zip
 
 # generated GitHub Pages output (the deploy workflow rebuilds it from source)
 docs/
+/assets/
+/bootstrap-data.json
+/.nojekyll
+/index.html
+/recommendation.worker-*.js
 dist/
 src/web/generated/
 

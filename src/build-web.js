@@ -3,8 +3,7 @@
  * build-web.js — generate the Vue/Vite GitHub Pages site.
  *
  * Builds the bundled sample deck, writes browser bootstrap JSON, runs Vite,
- * then copies the static build to docs/ for GitHub Actions Pages deployment
- * and to the repository root for branch-root Pages publishing.
+ * then copies the static build to docs/ for GitHub Actions Pages deployment.
  */
 const fs = require("fs");
 const path = require("path");
@@ -118,6 +117,7 @@ async function writeBootstrap(options = {}) {
 }
 
 async function main() {
+  removeRootPagesArtifacts();
   const sources = buildSources();
   const bootstrap = await writeBootstrap({ sources });
   rmrf(DIST);
@@ -131,9 +131,7 @@ async function main() {
     if (/^recommendation\.worker-.*\.js$/.test(asset)) fs.copyFileSync(path.join(DOCS, "assets", asset), path.join(DOCS, asset));
   }
   fs.writeFileSync(path.join(DOCS, ".nojekyll"), "");
-  removeRootPagesArtifacts();
-  copyDir(DOCS, ROOT);
-  console.log(`✓ Vue site built to docs/ and repository root (${bootstrap.decks.length} deck${bootstrap.decks.length === 1 ? "" : "s"}, candidates: ${bootstrap.candidates.length})`);
+  console.log(`✓ Vue site built to docs/ (${bootstrap.decks.length} deck${bootstrap.decks.length === 1 ? "" : "s"}, candidates: ${bootstrap.candidates.length})`);
   console.log(`  Included decks: ${bootstrap.decks.map(deck => deck.title).join(", ")}`);
   console.log(`  Moxfield proxy: ${process.env.MOXFIELD_PROXY || "(none — file/paste import only)"}`);
 }
