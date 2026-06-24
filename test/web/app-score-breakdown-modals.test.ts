@@ -155,6 +155,7 @@ describe('App score breakdown drawers', () => {
     await wrapper.find('.category-card-drawer__cards button').trigger('click')
     await nextTick()
     expect((wrapper.vm as any).selectedNodeId).toBe('Sol Ring')
+    expect(wrapper.find('.category-card-drawer').exists()).toBe(false)
 
     await wrapper.find('[aria-label="Close score breakdown"]').trigger('click')
     await nextTick()
@@ -223,9 +224,7 @@ describe('App score breakdown drawers', () => {
     await flush()
     await nextTick()
 
-    const win = wrapper.findAll('details.score-card')[0]
-    win.element.setAttribute('open', '')
-    await win.findAll('button').find(button => button.text() === 'Compare to brackets')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === 'Deck breakdown')!.trigger('click')
     await nextTick()
 
     expect(document.body.textContent).toContain('Compare to bracket averages')
