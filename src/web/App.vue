@@ -44,12 +44,13 @@ const ROLE_LABELS: Record<string, string> = {
 
 const BRACKET_COMPARISON_WEIGHTS = Object.freeze({ win: 0.65, self: 0.25, cohesion: 0.10 })
 const BRACKET_SCORE_BENCHMARKS = [
-  { bracket: 1, label: 'B1', avgWeighted: 49.9, medianWeighted: 50, weightedRange: [7, 76] as const, avgWin: 51.1, medianWin: 51, avgCohesion: 39.4, avgSelf: 50.8, avgGameChangers: 0.2, sampleSize: 64 },
-  { bracket: 2, label: 'B2', avgWeighted: 55.5, medianWeighted: 56, weightedRange: [28, 74] as const, avgWin: 55.9, medianWin: 56, avgCohesion: 46.3, avgSelf: 58.1, avgGameChangers: 0.0, sampleSize: 100 },
-  { bracket: 3, label: 'B3', avgWeighted: 62.0, medianWeighted: 63, weightedRange: [37, 81] as const, avgWin: 64.2, medianWin: 66, avgCohesion: 43.4, avgSelf: 64.0, avgGameChangers: 1.6, sampleSize: 100 },
-  { bracket: 4, label: 'B4', avgWeighted: 70.4, medianWeighted: 71, weightedRange: [49, 88] as const, avgWin: 75.7, medianWin: 76, avgCohesion: 33.0, avgSelf: 71.3, avgGameChangers: 7.3, sampleSize: 100 },
-  { bracket: 5, label: 'B5', avgWeighted: 73.0, medianWeighted: 74, weightedRange: [42, 87] as const, avgWin: 79.7, medianWin: 80, avgCohesion: 26.3, avgSelf: 74.6, avgGameChangers: 13.3, sampleSize: 100 },
+  { bracket: 1, label: 'B1', sampleSize: 64, weighted: { avg: 49.9, median: 50, low: 7, high: 76, p95: 72 }, win: { avg: 51.1, median: 51, low: 11, high: 84, p95: 74 }, self: { avg: 50.8, median: 53, low: 0, high: 82, p95: 73 }, cohesion: { avg: 39.4, median: 40, low: 0, high: 89, p95: 83 }, gameChangers: { avg: 0.2, median: 0, low: 0, high: 9, p95: 0 } },
+  { bracket: 2, label: 'B2', sampleSize: 100, weighted: { avg: 55.5, median: 56, low: 28, high: 74, p95: 69 }, win: { avg: 55.9, median: 56, low: 27, high: 77, p95: 71 }, self: { avg: 58.1, median: 61, low: 28, high: 76, p95: 73 }, cohesion: { avg: 46.3, median: 51, low: 1, high: 86, p95: 76 }, gameChangers: { avg: 0.0, median: 0, low: 0, high: 1, p95: 0 } },
+  { bracket: 3, label: 'B3', sampleSize: 100, weighted: { avg: 62.0, median: 63, low: 37, high: 81, p95: 73 }, win: { avg: 64.2, median: 66, low: 40, high: 81, p95: 78 }, self: { avg: 64.0, median: 64, low: 30, high: 85, p95: 77 }, cohesion: { avg: 43.4, median: 47, low: 2, high: 93, p95: 78 }, gameChangers: { avg: 1.6, median: 2, low: 0, high: 4, p95: 3 } },
+  { bracket: 4, label: 'B4', sampleSize: 100, weighted: { avg: 70.4, median: 71, low: 49, high: 88, p95: 84 }, win: { avg: 75.7, median: 76, low: 48, high: 97, p95: 93 }, self: { avg: 71.3, median: 73, low: 47, high: 90, p95: 85 }, cohesion: { avg: 33.0, median: 35, low: 1, high: 76, p95: 65 }, gameChangers: { avg: 7.3, median: 6, low: 0, high: 21, p95: 18 } },
+  { bracket: 5, label: 'B5', sampleSize: 100, weighted: { avg: 73.0, median: 74, low: 42, high: 87, p95: 84 }, win: { avg: 79.7, median: 80, low: 45, high: 97, p95: 94 }, self: { avg: 74.6, median: 76, low: 42, high: 94, p95: 87 }, cohesion: { avg: 26.3, median: 20, low: 0, high: 72, p95: 62 }, gameChangers: { avg: 13.3, median: 13, low: 0, high: 25, p95: 21 } },
 ]
+
 
 const bootstrap = ref(emptyBootstrap())
 const bootstrapped = ref(false)
@@ -67,13 +68,14 @@ const hideIsolated = ref(false)
 const draggingDeck = ref(false)
 const moxfieldProxy = ref(window.__MOXFIELD_PROXY__ || '')
 const showRecommendations = ref(false)
-const currentPage = ref<'visualization' | 'breakdown'>('visualization')
+const currentPage = ref<'visualization' | 'breakdown' | 'decklist'>('visualization')
 const selectedFamily = ref<string | null>(null)
 const showHelp = ref(false)
 const showCompare = ref(false)
 const showInteractionProofs = ref(false)
 const selectedBreakdownId = ref<string | null>(null)
 const selectedBreakdownCategoryId = ref<string | null>(null)
+const selectedBenchmarkMetricId = ref('weighted')
 const selectedProofFamily = ref<string | null>(null)
 const selectedProofCardCount = ref<number | null>(null)
 const selectedProofPackageId = ref<string | null>(null)
@@ -173,7 +175,7 @@ const activeBracketComparison = computed(() => {
     BRACKET_COMPARISON_WEIGHTS.cohesion * metrics.cohesionScore,
   )
   const nearest = BRACKET_SCORE_BENCHMARKS.reduce((best, row) =>
-    Math.abs(row.avgWeighted - score) < Math.abs(best.avgWeighted - score) ? row : best,
+    Math.abs(row.weighted.avg - score) < Math.abs(best.weighted.avg - score) ? row : best,
   )
   return {
     score,
@@ -182,6 +184,33 @@ const activeBracketComparison = computed(() => {
     sourceBracket: typeof metrics.bracketHint === 'number' ? metrics.bracketHint : null,
   }
 })
+
+const breakdownBenchmarkMetrics = computed(() => {
+  const metrics = activeMetrics.value
+  const weighted = activeBracketComparison.value?.score
+  if (!metrics || weighted == null) return []
+  const definitions = [
+    { id: 'weighted', label: 'Weighted score', current: weighted, description: activeBracketComparison.value?.formula || 'Weighted deck score for bracket calibration.' },
+    { id: 'win', label: 'Win tuning', current: metrics.winTuningScore, description: 'How directly the deck is tuned to convert resources into wins.' },
+    { id: 'self', label: 'Self-sufficiency', current: metrics.selfSufficiencyScore, description: 'Standalone card strength and ability to function without synergy links.' },
+    { id: 'cohesion', label: 'Cohesion', current: metrics.cohesionScore, description: 'How tightly the cards form mechanical interaction webs.' },
+    { id: 'gameChangers', label: 'Game Changers', current: metrics.gameChangerCount, description: 'Official WotC Commander-Brackets power-card count.' },
+  ] as const
+  return definitions.map((definition) => {
+    const rows = BRACKET_SCORE_BENCHMARKS.map(benchmark => ({
+      bracket: benchmark.bracket,
+      label: benchmark.label,
+      sampleSize: benchmark.sampleSize,
+      ...benchmark[definition.id],
+    }))
+    const nearest = rows.reduce((best, row) =>
+      Math.abs(row.avg - definition.current) < Math.abs(best.avg - definition.current) ? row : best,
+    )
+    return { ...definition, rows, nearest }
+  })
+})
+const selectedBreakdownBenchmarkMetric = computed(() =>
+  breakdownBenchmarkMetrics.value.find(metric => metric.id === selectedBenchmarkMetricId.value) || breakdownBenchmarkMetrics.value[0] || null)
 
 const selectedBreakdownSection = computed(() => selectedBreakdownId.value ? scoreSections.value.find(section => section.id === selectedBreakdownId.value) || null : null)
 const scoreBreakdownMetrics = computed(() => selectedBreakdownSection.value && activeMetrics.value ? breakdownMetrics(selectedBreakdownSection.value, activeMetrics.value) : [])
@@ -838,6 +867,7 @@ function benchmarkDelta(value: number, benchmark: number): string {
       <nav class="app-nav" aria-label="Primary">
         <button class="app-nav__item" :class="{ active: currentPage === 'visualization' }" type="button" @click="currentPage = 'visualization'">Deck visualisation</button>
         <button class="app-nav__item" :class="{ active: currentPage === 'breakdown' }" type="button" @click="currentPage = 'breakdown'">Deck breakdown</button>
+        <button class="app-nav__item" :class="{ active: currentPage === 'decklist' }" type="button" @click="currentPage = 'decklist'">Decklist</button>
       </nav>
     </header>
 
@@ -1136,11 +1166,11 @@ function benchmarkDelta(value: number, benchmark: number): string {
       </main>
     </div>
 
-    <main v-else class="breakdown-page">
+    <main v-else-if="currentPage === 'breakdown'" class="breakdown-page">
       <section class="breakdown-page__header">
         <p class="breakdown-card__eyebrow">Deck breakdown</p>
         <h1>{{ activeDeck?.title || 'Deck breakdown' }}</h1>
-        <p>Use this page for list-level inspection: bracket calibration, score context, and the full decklist. The visual graph stays under Deck visualisation.</p>
+        <p>Use this page for score-level inspection: bracket calibration, weighted score context, and per-metric benchmark distributions. The visual graph stays under Deck visualisation.</p>
       </section>
 
       <section v-if="activeBracketComparison && activeMetrics" class="breakdown-card breakdown-card--wide">
@@ -1149,7 +1179,7 @@ function benchmarkDelta(value: number, benchmark: number): string {
             <p class="breakdown-card__eyebrow">Bracket calibration</p>
             <h2>Compare weighted score to brackets</h2>
           </div>
-          <span class="breakdown-section-header__pill">Closest: {{ activeBracketComparison.nearest.label }}</span>
+          <span class="breakdown-section-header__pill">Closest weighted score: {{ activeBracketComparison.nearest.label }}</span>
         </header>
         <div class="bracket-compare">
           <section class="bracket-compare__hero">
@@ -1162,9 +1192,9 @@ function benchmarkDelta(value: number, benchmark: number): string {
               <p>Closest public-deck benchmark</p>
               <h3>{{ activeBracketComparison.nearest.label }}</h3>
               <small>
-                weighted avg {{ activeBracketComparison.nearest.avgWeighted }}
-                · median {{ activeBracketComparison.nearest.medianWeighted }}
-                · {{ benchmarkDelta(activeBracketComparison.score, activeBracketComparison.nearest.avgWeighted) }} vs avg
+                weighted avg {{ activeBracketComparison.nearest.weighted.avg }}
+                · median {{ activeBracketComparison.nearest.weighted.median }}
+                · {{ benchmarkDelta(activeBracketComparison.score, activeBracketComparison.nearest.weighted.avg) }} vs avg
               </small>
             </div>
           </section>
@@ -1175,44 +1205,79 @@ function benchmarkDelta(value: number, benchmark: number): string {
               v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
               :key="benchmark.label"
               class="bracket-compare__avg"
-              :style="{ left: benchmarkPosition(benchmark.avgWeighted) }"
-              :title="`${benchmark.label} weighted average ${benchmark.avgWeighted}; weighted median ${benchmark.medianWeighted}`"
+              :style="{ left: benchmarkPosition(benchmark.weighted.avg) }"
+              :title="`${benchmark.label} weighted average ${benchmark.weighted.avg}; weighted median ${benchmark.weighted.median}`"
             >{{ benchmark.label }} avg</span>
             <span
               v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
               :key="`${benchmark.label}-median`"
               class="bracket-compare__median"
-              :style="{ left: benchmarkPosition(benchmark.medianWeighted) }"
-              :title="`${benchmark.label} weighted median ${benchmark.medianWeighted}; weighted average ${benchmark.avgWeighted}`"
+              :style="{ left: benchmarkPosition(benchmark.weighted.median) }"
+              :title="`${benchmark.label} weighted median ${benchmark.weighted.median}; weighted average ${benchmark.weighted.avg}`"
             >{{ benchmark.label }} med</span>
             <span class="bracket-compare__marker" :style="{ left: benchmarkPosition(activeBracketComparison.score) }">
               You {{ activeBracketComparison.score }}
             </span>
             <span class="bracket-compare__tick bracket-compare__tick--high">100</span>
           </div>
-          <table class="compare-table bracket-compare__table">
-            <thead><tr><th>Bracket</th><th>Weighted avg</th><th>Weighted median</th><th>Weighted range</th><th>Your delta</th><th>Avg win</th><th>Avg self</th><th>Avg cohesion</th><th>Avg GC</th></tr></thead>
+          <div v-if="selectedBreakdownBenchmarkMetric" class="benchmark-tabs" aria-label="Deck breakdown metrics">
+            <button
+              v-for="metric in breakdownBenchmarkMetrics"
+              :key="metric.id"
+              type="button"
+              :class="{ active: selectedBreakdownBenchmarkMetric.id === metric.id }"
+              @click="selectedBenchmarkMetricId = metric.id"
+            >
+              <span>{{ metric.label }}</span>
+              <b>{{ metric.current }}</b>
+            </button>
+          </div>
+
+          <section v-if="selectedBreakdownBenchmarkMetric" class="benchmark-metric-panel">
+            <header>
+              <div>
+                <p>{{ selectedBreakdownBenchmarkMetric.description }}</p>
+                <h3>{{ selectedBreakdownBenchmarkMetric.label }} <small>Your value: {{ selectedBreakdownBenchmarkMetric.current }}</small></h3>
+              </div>
+              <span>Closest avg: {{ selectedBreakdownBenchmarkMetric.nearest.label }}</span>
+            </header>
+            <div class="benchmark-stat-cards">
+              <div><small>Nearest median</small><b>{{ selectedBreakdownBenchmarkMetric.nearest.median }}</b></div>
+              <div><small>Nearest low</small><b>{{ selectedBreakdownBenchmarkMetric.nearest.low }}</b></div>
+              <div><small>Nearest high</small><b>{{ selectedBreakdownBenchmarkMetric.nearest.high }}</b></div>
+              <div><small>Nearest p95</small><b>{{ selectedBreakdownBenchmarkMetric.nearest.p95 }}</b></div>
+            </div>
+          </section>
+
+          <table v-if="selectedBreakdownBenchmarkMetric" class="compare-table bracket-compare__table">
+            <thead><tr><th>Bracket</th><th>Avg</th><th>Median</th><th>Lowest</th><th>Highest</th><th>P95</th><th>Your delta</th><th>n</th></tr></thead>
             <tbody>
               <tr
-                v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
+                v-for="benchmark in selectedBreakdownBenchmarkMetric.rows"
                 :key="benchmark.label"
-                :class="{ active: benchmark.bracket === activeBracketComparison.nearest.bracket }"
+                :class="{ active: benchmark.bracket === selectedBreakdownBenchmarkMetric.nearest.bracket }"
               >
-                <th>{{ benchmark.label }} <small>n={{ benchmark.sampleSize }}</small></th>
-                <td>{{ benchmark.avgWeighted }}</td>
-                <td>{{ benchmark.medianWeighted }}</td>
-                <td>{{ benchmark.weightedRange[0] }}–{{ benchmark.weightedRange[1] }}</td>
-                <td>{{ benchmarkDelta(activeBracketComparison.score, benchmark.avgWeighted) }}</td>
-                <td>{{ benchmark.avgWin }}</td>
-                <td>{{ benchmark.avgSelf }}</td>
-                <td>{{ benchmark.avgCohesion }}</td>
-                <td>{{ benchmark.avgGameChangers }}</td>
+                <th>{{ benchmark.label }}</th>
+                <td>{{ benchmark.avg }}</td>
+                <td>{{ benchmark.median }}</td>
+                <td>{{ benchmark.low }}</td>
+                <td>{{ benchmark.high }}</td>
+                <td>{{ benchmark.p95 }}</td>
+                <td>{{ benchmarkDelta(selectedBreakdownBenchmarkMetric.current, benchmark.avg) }}</td>
+                <td>{{ benchmark.sampleSize }}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
+    </main>
 
+    <main v-else class="breakdown-page">
+      <section class="breakdown-page__header">
+        <p class="breakdown-card__eyebrow">Decklist</p>
+        <h1>{{ activeDeck?.title || 'Decklist' }}</h1>
+        <p>Inspect the full card list, quantities, roles, mana values, face summaries, and graph connectivity.</p>
+      </section>
       <section class="breakdown-card breakdown-card--wide">
         <DeckList :nodes="cardNodes" :selected-id="selectedNodeId" :role-labels="ROLE_LABELS" @select-card="selectCard" />
       </section>
@@ -1244,5 +1309,7 @@ function benchmarkDelta(value: number, benchmark: number): string {
 .bracket-compare{display:grid;gap:14px}.bracket-compare__hero{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.bracket-compare__hero>div{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:14px}.bracket-compare__hero p{color:var(--dim);font-size:11px;font-weight:800;letter-spacing:.08em;margin:0;text-transform:uppercase}.bracket-compare__hero h3{font-size:40px;line-height:1;margin:4px 0}.bracket-compare__hero small,.bracket-compare__note,.bracket-compare__table small{color:var(--dim);font-size:12px;line-height:1.4}.bracket-compare__note{margin:0}.bracket-compare__scale{background:linear-gradient(90deg,rgba(255,122,61,.22),rgba(224,200,90,.2),rgba(84,201,138,.24));border:1px solid var(--line);border-radius:999px;height:64px;margin:8px 4px 18px;position:relative}.bracket-compare__avg{background:rgba(14,13,18,.92);border:1px solid rgba(255,255,255,.16);border-radius:999px;color:#cfc8dc;font-size:10px;font-weight:900;padding:3px 6px;position:absolute;top:40%;transform:translate(-50%,-50%);white-space:nowrap}.bracket-compare__median{border-left:2px solid #9cc8ff;color:#9cc8ff;font-size:9px;font-weight:900;height:20px;padding-left:4px;position:absolute;top:54%;transform:translateX(-1px);white-space:nowrap}.bracket-compare__marker{background:#f0c040;border-radius:999px;box-shadow:0 0 0 4px rgba(240,192,64,.16);color:#17151d;font-size:11px;font-weight:900;left:0;padding:4px 8px;position:absolute;top:-12px;transform:translateX(-50%);white-space:nowrap}.bracket-compare__marker:after{border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #f0c040;bottom:-6px;content:"";left:50%;position:absolute;transform:translateX(-50%)}.bracket-compare__tick{bottom:-18px;color:var(--dim);font-size:10px;position:absolute}.bracket-compare__tick--low{left:0}.bracket-compare__tick--high{right:0}.bracket-compare__table tr.active th,.bracket-compare__table tr.active td{background:rgba(240,192,64,.08);color:#f0c040}
 @media(max-width:520px){.bracket-compare__hero{grid-template-columns:1fr}.bracket-compare__scale{margin-top:14px}.bracket-compare__marker{font-size:10px}}
 .breakdown-page{align-items:stretch;display:block;min-height:calc(100vh - 52px);overflow:auto;padding:28px}.breakdown-page__header{margin:0 auto 18px;max-width:1100px}.breakdown-page__header h1{font-size:30px;margin:0 0 6px}.breakdown-page__header p:last-child{color:var(--dim);line-height:1.45;margin:0}.breakdown-card--wide{margin:0 auto 18px;max-width:1100px;text-align:left}.breakdown-section-header{align-items:flex-start;display:flex;gap:12px;justify-content:space-between;margin-bottom:14px}.breakdown-section-header h2{font-size:20px;margin:2px 0 0}.breakdown-section-header__pill{background:rgba(240,192,64,.12);border:1px solid rgba(240,192,64,.26);border-radius:999px;color:#f0c040;font-size:12px;font-weight:900;padding:5px 9px;white-space:nowrap}.breakdown-card :deep(.deck-list){background:transparent;position:relative;top:auto;z-index:auto}.breakdown-card :deep(.deck-list__cards){max-height:none}.category-card-drawer{z-index:8}
+.benchmark-tabs{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}.benchmark-tabs button{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;color:var(--text);cursor:pointer;display:flex;font:inherit;gap:8px;justify-content:space-between;padding:9px 10px;text-align:left}.benchmark-tabs button:hover,.benchmark-tabs button.active{border-color:#f0c040;box-shadow:0 0 0 1px rgba(240,192,64,.12)}.benchmark-tabs span{color:#cfc8dc;font-size:12px;font-weight:800}.benchmark-tabs b{color:#f0c040;font-size:13px}.benchmark-metric-panel{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:14px;display:grid;gap:12px;padding:12px}.benchmark-metric-panel header{align-items:flex-start;display:flex;gap:12px;justify-content:space-between}.benchmark-metric-panel p{color:var(--dim);font-size:12px;line-height:1.4;margin:0}.benchmark-metric-panel h3{font-size:18px;margin:4px 0 0}.benchmark-metric-panel h3 small{color:var(--dim);font-size:12px}.benchmark-metric-panel header>span{background:rgba(90,166,255,.13);border-radius:999px;color:#9cc8ff;font-size:12px;font-weight:900;padding:5px 9px;white-space:nowrap}.benchmark-stat-cards{display:grid;gap:8px;grid-template-columns:repeat(4,minmax(0,1fr))}.benchmark-stat-cards div{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:10px;padding:9px}.benchmark-stat-cards small{color:var(--dim);display:block;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.benchmark-stat-cards b{display:block;font-size:20px;margin-top:2px}
 @media(max-width:860px){.breakdown-page{min-height:calc(100dvh - 50px);padding:18px}.breakdown-section-header{display:grid}.breakdown-section-header__pill{justify-self:start}.breakdown-card :deep(.deck-list__cards){max-height:none}}
+@media(max-width:620px){.benchmark-metric-panel header{display:grid}.benchmark-metric-panel header>span{justify-self:start}.benchmark-stat-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
