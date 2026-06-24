@@ -42,6 +42,14 @@ const ROLE_LABELS: Record<string, string> = {
   political: 'Politics / goad', utility: 'Utility', creature: 'Creature', engine: 'Engine', combo: 'Combo',
 }
 
+const BRACKET_SCORE_BENCHMARKS = [
+  { bracket: 1, label: 'B1', avgWin: 51.1, medianWin: 51, range: [11, 84] as const, avgCohesion: 39.4, avgSelf: 50.8, avgGameChangers: 0.2, sampleSize: 64 },
+  { bracket: 2, label: 'B2', avgWin: 55.9, medianWin: 56, range: [27, 77] as const, avgCohesion: 46.3, avgSelf: 58.1, avgGameChangers: 0.0, sampleSize: 100 },
+  { bracket: 3, label: 'B3', avgWin: 64.2, medianWin: 66, range: [40, 81] as const, avgCohesion: 43.4, avgSelf: 64.0, avgGameChangers: 1.6, sampleSize: 100 },
+  { bracket: 4, label: 'B4', avgWin: 75.7, medianWin: 76, range: [48, 97] as const, avgCohesion: 33.0, avgSelf: 71.3, avgGameChangers: 7.3, sampleSize: 100 },
+  { bracket: 5, label: 'B5', avgWin: 79.7, medianWin: 80, range: [45, 97] as const, avgCohesion: 26.3, avgSelf: 74.6, avgGameChangers: 13.3, sampleSize: 100 },
+]
+
 const bootstrap = ref(emptyBootstrap())
 const bootstrapped = ref(false)
 const payload = normalizeDeckPayload(bootstrap.value, bootstrap.value.title || 'Deck Interaction Map')
@@ -62,6 +70,7 @@ const currentPage = ref<'visualization' | 'breakdown'>('visualization')
 const selectedFamily = ref<string | null>(null)
 const showHelp = ref(false)
 const showCompare = ref(false)
+const showBracketCompare = ref(false)
 const showInteractionProofs = ref(false)
 const selectedBreakdownId = ref<string | null>(null)
 const selectedBreakdownCategoryId = ref<string | null>(null)
@@ -154,6 +163,19 @@ const compareMetricRows = computed(() => {
     const values = rowsByDeck.map(rows => rows.find(row => row.id === id)?.value ?? '—')
     return { id, label: first.label, section: first.section, values }
   })
+})
+const activeBracketComparison = computed(() => {
+  const metrics = activeMetrics.value
+  if (!metrics) return null
+  const score = metrics.winTuningScore
+  const nearest = BRACKET_SCORE_BENCHMARKS.reduce((best, row) =>
+    Math.abs(row.avgWin - score) < Math.abs(best.avgWin - score) ? row : best,
+  )
+  return {
+    score,
+    nearest,
+    sourceBracket: typeof metrics.bracketHint === 'number' ? metrics.bracketHint : null,
+  }
 })
 
 const selectedBreakdownSection = computed(() => selectedBreakdownId.value ? scoreSections.value.find(section => section.id === selectedBreakdownId.value) || null : null)
@@ -792,6 +814,16 @@ function formatBreakdownValue(value: unknown): string | number {
   if (value == null) return '—'
   return String(value)
 }
+
+function benchmarkPosition(value: number): string {
+  return `${Math.max(0, Math.min(100, value))}%`
+}
+
+function benchmarkDelta(value: number, benchmark: number): string {
+  const delta = Math.round(value - benchmark)
+  if (delta === 0) return 'even'
+  return `${delta > 0 ? '+' : ''}${delta}`
+}
 </script>
 
 <template>
@@ -823,6 +855,7 @@ function formatBreakdownValue(value: unknown): string | number {
         <ScorePanel :sections="scoreSections" selectable-signals @signal-select="selectScoreSignal">
           <template #section="{ section }">
             <button class="btn score-breakdown-button" type="button" @click.stop="openScoreBreakdown(section)">Breakdown</button>
+            <button v-if="section.id === 'win'" class="btn score-breakdown-button" type="button" @click.stop="showBracketCompare = true">Compare to brackets</button>
           </template>
         </ScorePanel>
         <DeckMetricsGuide :metrics="deckGuideMetrics" />
@@ -1088,6 +1121,59 @@ function formatBreakdownValue(value: unknown): string | number {
           </table>
         </ModalShell>
 
+        <ModalShell :open="showBracketCompare" title="Compare to bracket averages" id="compare-brackets" @close="showBracketCompare = false">
+          <div v-if="activeBracketComparison && activeMetrics" class="bracket-compare">
+            <section class="bracket-compare__hero">
+              <div>
+                <p>Your win tuning</p>
+                <h3>{{ activeBracketComparison.score }}</h3>
+                <small>{{ activeMetrics.winTuningBand }} · model bracket {{ activeMetrics.bracketLabel }}</small>
+              </div>
+              <div>
+                <p>Closest public-deck average</p>
+                <h3>{{ activeBracketComparison.nearest.label }}</h3>
+                <small>
+                  average {{ activeBracketComparison.nearest.avgWin }}
+                  · {{ benchmarkDelta(activeBracketComparison.score, activeBracketComparison.nearest.avgWin) }} vs avg
+                </small>
+              </div>
+            </section>
+            <p class="bracket-compare__note">Benchmarks come from the cached Moxfield bracket corpus rerun after deck size was removed from win tuning. Use this as a visual calibration aid, not a rules verdict.</p>
+            <div class="bracket-compare__scale" aria-label="Deck score on 0 to 100 bracket average scale">
+              <span class="bracket-compare__tick bracket-compare__tick--low">0</span>
+              <span
+                v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
+                :key="benchmark.label"
+                class="bracket-compare__avg"
+                :style="{ left: benchmarkPosition(benchmark.avgWin) }"
+                :title="`${benchmark.label} average win score ${benchmark.avgWin}`"
+              >{{ benchmark.label }}</span>
+              <span class="bracket-compare__marker" :style="{ left: benchmarkPosition(activeBracketComparison.score) }">
+                You {{ activeBracketComparison.score }}
+              </span>
+              <span class="bracket-compare__tick bracket-compare__tick--high">100</span>
+            </div>
+            <table class="compare-table bracket-compare__table">
+              <thead><tr><th>Bracket</th><th>Avg win</th><th>Median</th><th>Range</th><th>Your delta</th><th>Avg self</th><th>Avg GC</th></tr></thead>
+              <tbody>
+                <tr
+                  v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
+                  :key="benchmark.label"
+                  :class="{ active: benchmark.bracket === activeBracketComparison.nearest.bracket }"
+                >
+                  <th>{{ benchmark.label }} <small>n={{ benchmark.sampleSize }}</small></th>
+                  <td>{{ benchmark.avgWin }}</td>
+                  <td>{{ benchmark.medianWin }}</td>
+                  <td>{{ benchmark.range[0] }}–{{ benchmark.range[1] }}</td>
+                  <td>{{ benchmarkDelta(activeBracketComparison.score, benchmark.avgWin) }}</td>
+                  <td>{{ benchmark.avgSelf }}</td>
+                  <td>{{ benchmark.avgGameChangers }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ModalShell>
+
         <ModalShell :open="showHelp" title="How to use the graph" id="graph-help" @close="showHelp = false">
           <div class="help-grid">
             <section><h3>Read the map</h3><p>Cards are dots. Lines are real mechanical interactions: one card produces an event another card reacts to. Hover a card to trace its web; click for detail.</p></section>
@@ -1130,4 +1216,6 @@ function formatBreakdownValue(value: unknown): string | number {
 @media(max-width:860px){.proof-drawer{border-radius:14px 14px 0 0;bottom:0;left:8px;max-height:60dvh;max-width:none;overflow:auto;position:fixed;right:8px;top:auto;width:auto}}
 @media(max-width:520px){.proof-drawer{left:0;right:0}.detail-card__proofs button{align-items:flex-start;display:grid;gap:2px}.detail-card__proofs small{margin-left:0}}
 .detail-card__faces{border-top:1px solid var(--line);display:grid;gap:7px;margin-top:10px;padding-top:8px}.detail-card__faces h3{align-items:center;color:var(--dim);display:flex;font-size:11px;gap:7px;justify-content:space-between;letter-spacing:.04em;margin:0;text-transform:uppercase}.detail-card__faces h3 small{background:rgba(90,166,255,.14);border-radius:999px;color:#9cc8ff;font-size:10px;letter-spacing:0;padding:2px 7px;text-transform:none}.detail-card__faces>p{color:var(--dim);font-size:11px;line-height:1.35;margin:0}.detail-card__face{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:9px;display:grid;gap:4px;padding:8px}.detail-card__face header{align-items:flex-start;display:flex;gap:8px;justify-content:space-between}.detail-card__face strong{font-size:12px;line-height:1.25}.detail-card__face span{color:#f0c040;font-size:11px;white-space:nowrap}.detail-card__face small{color:var(--dim);font-size:11px;line-height:1.3}.detail-card__face p{color:#cfc8dc;font-size:11px;line-height:1.35;margin:0;white-space:pre-line}
+.bracket-compare{display:grid;gap:14px}.bracket-compare__hero{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.bracket-compare__hero>div{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:14px}.bracket-compare__hero p{color:var(--dim);font-size:11px;font-weight:800;letter-spacing:.08em;margin:0;text-transform:uppercase}.bracket-compare__hero h3{font-size:40px;line-height:1;margin:4px 0}.bracket-compare__hero small,.bracket-compare__note,.bracket-compare__table small{color:var(--dim);font-size:12px;line-height:1.4}.bracket-compare__note{margin:0}.bracket-compare__scale{background:linear-gradient(90deg,rgba(255,122,61,.22),rgba(224,200,90,.2),rgba(84,201,138,.24));border:1px solid var(--line);border-radius:999px;height:54px;margin:8px 4px 18px;position:relative}.bracket-compare__avg{background:rgba(14,13,18,.92);border:1px solid rgba(255,255,255,.16);border-radius:999px;color:#cfc8dc;font-size:10px;font-weight:900;padding:3px 6px;position:absolute;top:50%;transform:translate(-50%,-50%);white-space:nowrap}.bracket-compare__marker{background:#f0c040;border-radius:999px;box-shadow:0 0 0 4px rgba(240,192,64,.16);color:#17151d;font-size:11px;font-weight:900;left:0;padding:4px 8px;position:absolute;top:-12px;transform:translateX(-50%);white-space:nowrap}.bracket-compare__marker:after{border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #f0c040;bottom:-6px;content:"";left:50%;position:absolute;transform:translateX(-50%)}.bracket-compare__tick{bottom:-18px;color:var(--dim);font-size:10px;position:absolute}.bracket-compare__tick--low{left:0}.bracket-compare__tick--high{right:0}.bracket-compare__table tr.active th,.bracket-compare__table tr.active td{background:rgba(240,192,64,.08);color:#f0c040}
+@media(max-width:520px){.bracket-compare__hero{grid-template-columns:1fr}.bracket-compare__scale{margin-top:14px}.bracket-compare__marker{font-size:10px}}
 </style>

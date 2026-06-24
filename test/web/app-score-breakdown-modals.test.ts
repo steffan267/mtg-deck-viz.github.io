@@ -217,6 +217,29 @@ describe('App score breakdown drawers', () => {
     wrapper.unmount()
   })
 
+  it('opens a visual bracket comparison for the active deck score', async () => {
+    const { default: App } = await import('../../src/web/App.vue')
+    const wrapper = mount(App, { attachTo: document.body })
+    await flush()
+    await nextTick()
+
+    const win = wrapper.findAll('details.score-card')[0]
+    win.element.setAttribute('open', '')
+    await win.findAll('button').find(button => button.text() === 'Compare to brackets')!.trigger('click')
+    await nextTick()
+
+    expect(document.body.textContent).toContain('Compare to bracket averages')
+    expect(document.body.textContent).toContain('Your win tuning')
+    expect(document.body.textContent).toContain('Closest public-deck average')
+    expect(document.body.textContent).toContain('B5')
+    expect(document.body.textContent).toContain('Benchmarks come from the cached Moxfield bracket corpus')
+    expect(document.querySelector('.bracket-compare__marker')?.textContent).toContain('You 91')
+    expect(document.querySelectorAll('.bracket-compare__table tbody tr.active')).toHaveLength(1)
+    expect(document.querySelector('.bracket-compare__table tbody tr.active')?.textContent).toContain('B5')
+
+    wrapper.unmount()
+  })
+
   it('opens proof packages with filters, sequence, assumptions, and card contribution links', async () => {
     const { default: App } = await import('../../src/web/App.vue')
     const wrapper = mount(App, { attachTo: document.body })
