@@ -230,10 +230,13 @@ describe('App score breakdown drawers', () => {
 
     expect(document.body.textContent).toContain('Compare to bracket averages')
     expect(document.body.textContent).toContain('Your win tuning')
-    expect(document.body.textContent).toContain('Closest public-deck average')
+    expect(document.body.textContent).toContain('Closest public-deck benchmark')
+    expect(document.body.textContent).toContain('median 80')
     expect(document.body.textContent).toContain('B5')
     expect(document.body.textContent).toContain('Benchmarks come from the cached Moxfield bracket corpus')
     expect(document.querySelector('.bracket-compare__marker')?.textContent).toContain('You 91')
+    expect(document.querySelectorAll('.bracket-compare__median')).toHaveLength(5)
+    expect(document.querySelector('.bracket-compare__median[title*="B5 median"]')?.textContent).toContain('B5 med')
     expect(document.querySelectorAll('.bracket-compare__table tbody tr.active')).toHaveLength(1)
     expect(document.querySelector('.bracket-compare__table tbody tr.active')?.textContent).toContain('B5')
 

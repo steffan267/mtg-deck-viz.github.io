@@ -1130,10 +1130,11 @@ function benchmarkDelta(value: number, benchmark: number): string {
                 <small>{{ activeMetrics.winTuningBand }} · model bracket {{ activeMetrics.bracketLabel }}</small>
               </div>
               <div>
-                <p>Closest public-deck average</p>
+                <p>Closest public-deck benchmark</p>
                 <h3>{{ activeBracketComparison.nearest.label }}</h3>
                 <small>
                   average {{ activeBracketComparison.nearest.avgWin }}
+                  · median {{ activeBracketComparison.nearest.medianWin }}
                   · {{ benchmarkDelta(activeBracketComparison.score, activeBracketComparison.nearest.avgWin) }} vs avg
                 </small>
               </div>
@@ -1146,8 +1147,15 @@ function benchmarkDelta(value: number, benchmark: number): string {
                 :key="benchmark.label"
                 class="bracket-compare__avg"
                 :style="{ left: benchmarkPosition(benchmark.avgWin) }"
-                :title="`${benchmark.label} average win score ${benchmark.avgWin}`"
-              >{{ benchmark.label }}</span>
+                :title="`${benchmark.label} average win score ${benchmark.avgWin}; median ${benchmark.medianWin}`"
+              >{{ benchmark.label }} avg</span>
+              <span
+                v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
+                :key="`${benchmark.label}-median`"
+                class="bracket-compare__median"
+                :style="{ left: benchmarkPosition(benchmark.medianWin) }"
+                :title="`${benchmark.label} median win score ${benchmark.medianWin}; average ${benchmark.avgWin}`"
+              >{{ benchmark.label }} med</span>
               <span class="bracket-compare__marker" :style="{ left: benchmarkPosition(activeBracketComparison.score) }">
                 You {{ activeBracketComparison.score }}
               </span>
@@ -1216,6 +1224,6 @@ function benchmarkDelta(value: number, benchmark: number): string {
 @media(max-width:860px){.proof-drawer{border-radius:14px 14px 0 0;bottom:0;left:8px;max-height:60dvh;max-width:none;overflow:auto;position:fixed;right:8px;top:auto;width:auto}}
 @media(max-width:520px){.proof-drawer{left:0;right:0}.detail-card__proofs button{align-items:flex-start;display:grid;gap:2px}.detail-card__proofs small{margin-left:0}}
 .detail-card__faces{border-top:1px solid var(--line);display:grid;gap:7px;margin-top:10px;padding-top:8px}.detail-card__faces h3{align-items:center;color:var(--dim);display:flex;font-size:11px;gap:7px;justify-content:space-between;letter-spacing:.04em;margin:0;text-transform:uppercase}.detail-card__faces h3 small{background:rgba(90,166,255,.14);border-radius:999px;color:#9cc8ff;font-size:10px;letter-spacing:0;padding:2px 7px;text-transform:none}.detail-card__faces>p{color:var(--dim);font-size:11px;line-height:1.35;margin:0}.detail-card__face{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:9px;display:grid;gap:4px;padding:8px}.detail-card__face header{align-items:flex-start;display:flex;gap:8px;justify-content:space-between}.detail-card__face strong{font-size:12px;line-height:1.25}.detail-card__face span{color:#f0c040;font-size:11px;white-space:nowrap}.detail-card__face small{color:var(--dim);font-size:11px;line-height:1.3}.detail-card__face p{color:#cfc8dc;font-size:11px;line-height:1.35;margin:0;white-space:pre-line}
-.bracket-compare{display:grid;gap:14px}.bracket-compare__hero{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.bracket-compare__hero>div{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:14px}.bracket-compare__hero p{color:var(--dim);font-size:11px;font-weight:800;letter-spacing:.08em;margin:0;text-transform:uppercase}.bracket-compare__hero h3{font-size:40px;line-height:1;margin:4px 0}.bracket-compare__hero small,.bracket-compare__note,.bracket-compare__table small{color:var(--dim);font-size:12px;line-height:1.4}.bracket-compare__note{margin:0}.bracket-compare__scale{background:linear-gradient(90deg,rgba(255,122,61,.22),rgba(224,200,90,.2),rgba(84,201,138,.24));border:1px solid var(--line);border-radius:999px;height:54px;margin:8px 4px 18px;position:relative}.bracket-compare__avg{background:rgba(14,13,18,.92);border:1px solid rgba(255,255,255,.16);border-radius:999px;color:#cfc8dc;font-size:10px;font-weight:900;padding:3px 6px;position:absolute;top:50%;transform:translate(-50%,-50%);white-space:nowrap}.bracket-compare__marker{background:#f0c040;border-radius:999px;box-shadow:0 0 0 4px rgba(240,192,64,.16);color:#17151d;font-size:11px;font-weight:900;left:0;padding:4px 8px;position:absolute;top:-12px;transform:translateX(-50%);white-space:nowrap}.bracket-compare__marker:after{border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #f0c040;bottom:-6px;content:"";left:50%;position:absolute;transform:translateX(-50%)}.bracket-compare__tick{bottom:-18px;color:var(--dim);font-size:10px;position:absolute}.bracket-compare__tick--low{left:0}.bracket-compare__tick--high{right:0}.bracket-compare__table tr.active th,.bracket-compare__table tr.active td{background:rgba(240,192,64,.08);color:#f0c040}
+.bracket-compare{display:grid;gap:14px}.bracket-compare__hero{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.bracket-compare__hero>div{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:14px}.bracket-compare__hero p{color:var(--dim);font-size:11px;font-weight:800;letter-spacing:.08em;margin:0;text-transform:uppercase}.bracket-compare__hero h3{font-size:40px;line-height:1;margin:4px 0}.bracket-compare__hero small,.bracket-compare__note,.bracket-compare__table small{color:var(--dim);font-size:12px;line-height:1.4}.bracket-compare__note{margin:0}.bracket-compare__scale{background:linear-gradient(90deg,rgba(255,122,61,.22),rgba(224,200,90,.2),rgba(84,201,138,.24));border:1px solid var(--line);border-radius:999px;height:64px;margin:8px 4px 18px;position:relative}.bracket-compare__avg{background:rgba(14,13,18,.92);border:1px solid rgba(255,255,255,.16);border-radius:999px;color:#cfc8dc;font-size:10px;font-weight:900;padding:3px 6px;position:absolute;top:40%;transform:translate(-50%,-50%);white-space:nowrap}.bracket-compare__median{border-left:2px solid #9cc8ff;color:#9cc8ff;font-size:9px;font-weight:900;height:20px;padding-left:4px;position:absolute;top:54%;transform:translateX(-1px);white-space:nowrap}.bracket-compare__marker{background:#f0c040;border-radius:999px;box-shadow:0 0 0 4px rgba(240,192,64,.16);color:#17151d;font-size:11px;font-weight:900;left:0;padding:4px 8px;position:absolute;top:-12px;transform:translateX(-50%);white-space:nowrap}.bracket-compare__marker:after{border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #f0c040;bottom:-6px;content:"";left:50%;position:absolute;transform:translateX(-50%)}.bracket-compare__tick{bottom:-18px;color:var(--dim);font-size:10px;position:absolute}.bracket-compare__tick--low{left:0}.bracket-compare__tick--high{right:0}.bracket-compare__table tr.active th,.bracket-compare__table tr.active td{background:rgba(240,192,64,.08);color:#f0c040}
 @media(max-width:520px){.bracket-compare__hero{grid-template-columns:1fr}.bracket-compare__scale{margin-top:14px}.bracket-compare__marker{font-size:10px}}
 </style>
