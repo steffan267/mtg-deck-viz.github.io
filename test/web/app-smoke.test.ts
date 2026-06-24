@@ -138,7 +138,7 @@ describe('Vue app browser smoke', () => {
 
     await wrapper.findAll('button').find(button => button.text() === 'Deck breakdown')!.trigger('click')
     await nextTick()
-    expect(wrapper.text()).toContain('Compare to bracket averages')
+    expect(wrapper.text()).toContain('Compare weighted score to brackets')
     expect(wrapper.text()).toContain('Closest public-deck benchmark')
     expect(wrapper.text()).toContain('Decklist')
     const breakdownDecklist = wrapper.get('[data-testid="persistent-decklist"]')

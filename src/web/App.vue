@@ -42,12 +42,13 @@ const ROLE_LABELS: Record<string, string> = {
   political: 'Politics / goad', utility: 'Utility', creature: 'Creature', engine: 'Engine', combo: 'Combo',
 }
 
+const BRACKET_COMPARISON_WEIGHTS = Object.freeze({ win: 0.65, self: 0.25, cohesion: 0.10 })
 const BRACKET_SCORE_BENCHMARKS = [
-  { bracket: 1, label: 'B1', avgWin: 51.1, medianWin: 51, range: [11, 84] as const, avgCohesion: 39.4, avgSelf: 50.8, avgGameChangers: 0.2, sampleSize: 64 },
-  { bracket: 2, label: 'B2', avgWin: 55.9, medianWin: 56, range: [27, 77] as const, avgCohesion: 46.3, avgSelf: 58.1, avgGameChangers: 0.0, sampleSize: 100 },
-  { bracket: 3, label: 'B3', avgWin: 64.2, medianWin: 66, range: [40, 81] as const, avgCohesion: 43.4, avgSelf: 64.0, avgGameChangers: 1.6, sampleSize: 100 },
-  { bracket: 4, label: 'B4', avgWin: 75.7, medianWin: 76, range: [48, 97] as const, avgCohesion: 33.0, avgSelf: 71.3, avgGameChangers: 7.3, sampleSize: 100 },
-  { bracket: 5, label: 'B5', avgWin: 79.7, medianWin: 80, range: [45, 97] as const, avgCohesion: 26.3, avgSelf: 74.6, avgGameChangers: 13.3, sampleSize: 100 },
+  { bracket: 1, label: 'B1', avgWeighted: 49.9, medianWeighted: 50, weightedRange: [7, 76] as const, avgWin: 51.1, medianWin: 51, avgCohesion: 39.4, avgSelf: 50.8, avgGameChangers: 0.2, sampleSize: 64 },
+  { bracket: 2, label: 'B2', avgWeighted: 55.5, medianWeighted: 56, weightedRange: [28, 74] as const, avgWin: 55.9, medianWin: 56, avgCohesion: 46.3, avgSelf: 58.1, avgGameChangers: 0.0, sampleSize: 100 },
+  { bracket: 3, label: 'B3', avgWeighted: 62.0, medianWeighted: 63, weightedRange: [37, 81] as const, avgWin: 64.2, medianWin: 66, avgCohesion: 43.4, avgSelf: 64.0, avgGameChangers: 1.6, sampleSize: 100 },
+  { bracket: 4, label: 'B4', avgWeighted: 70.4, medianWeighted: 71, weightedRange: [49, 88] as const, avgWin: 75.7, medianWin: 76, avgCohesion: 33.0, avgSelf: 71.3, avgGameChangers: 7.3, sampleSize: 100 },
+  { bracket: 5, label: 'B5', avgWeighted: 73.0, medianWeighted: 74, weightedRange: [42, 87] as const, avgWin: 79.7, medianWin: 80, avgCohesion: 26.3, avgSelf: 74.6, avgGameChangers: 13.3, sampleSize: 100 },
 ]
 
 const bootstrap = ref(emptyBootstrap())
@@ -166,13 +167,18 @@ const compareMetricRows = computed(() => {
 const activeBracketComparison = computed(() => {
   const metrics = activeMetrics.value
   if (!metrics) return null
-  const score = metrics.winTuningScore
+  const score = Math.round(
+    BRACKET_COMPARISON_WEIGHTS.win * metrics.winTuningScore +
+    BRACKET_COMPARISON_WEIGHTS.self * metrics.selfSufficiencyScore +
+    BRACKET_COMPARISON_WEIGHTS.cohesion * metrics.cohesionScore,
+  )
   const nearest = BRACKET_SCORE_BENCHMARKS.reduce((best, row) =>
-    Math.abs(row.avgWin - score) < Math.abs(best.avgWin - score) ? row : best,
+    Math.abs(row.avgWeighted - score) < Math.abs(best.avgWeighted - score) ? row : best,
   )
   return {
     score,
     nearest,
+    formula: `${Math.round(BRACKET_COMPARISON_WEIGHTS.win * 100)}% win · ${Math.round(BRACKET_COMPARISON_WEIGHTS.self * 100)}% self · ${Math.round(BRACKET_COMPARISON_WEIGHTS.cohesion * 100)}% cohesion`,
     sourceBracket: typeof metrics.bracketHint === 'number' ? metrics.bracketHint : null,
   }
 })
@@ -1141,43 +1147,43 @@ function benchmarkDelta(value: number, benchmark: number): string {
         <header class="breakdown-section-header">
           <div>
             <p class="breakdown-card__eyebrow">Bracket calibration</p>
-            <h2>Compare to bracket averages</h2>
+            <h2>Compare weighted score to brackets</h2>
           </div>
           <span class="breakdown-section-header__pill">Closest: {{ activeBracketComparison.nearest.label }}</span>
         </header>
         <div class="bracket-compare">
           <section class="bracket-compare__hero">
             <div>
-              <p>Your win tuning</p>
+              <p>Your weighted score</p>
               <h3>{{ activeBracketComparison.score }}</h3>
-              <small>{{ activeMetrics.winTuningBand }} · model bracket {{ activeMetrics.bracketLabel }}</small>
+              <small>{{ activeBracketComparison.formula }} · model bracket {{ activeMetrics.bracketLabel }}</small>
             </div>
             <div>
               <p>Closest public-deck benchmark</p>
               <h3>{{ activeBracketComparison.nearest.label }}</h3>
               <small>
-                average {{ activeBracketComparison.nearest.avgWin }}
-                · median {{ activeBracketComparison.nearest.medianWin }}
-                · {{ benchmarkDelta(activeBracketComparison.score, activeBracketComparison.nearest.avgWin) }} vs avg
+                weighted avg {{ activeBracketComparison.nearest.avgWeighted }}
+                · median {{ activeBracketComparison.nearest.medianWeighted }}
+                · {{ benchmarkDelta(activeBracketComparison.score, activeBracketComparison.nearest.avgWeighted) }} vs avg
               </small>
             </div>
           </section>
-          <p class="bracket-compare__note">Benchmarks come from the cached Moxfield bracket corpus rerun after deck size was removed from win tuning. Use this as a visual calibration aid, not a rules verdict.</p>
-          <div class="bracket-compare__scale" aria-label="Deck score on 0 to 100 bracket average scale">
+          <p class="bracket-compare__note">Benchmarks come from the cached Moxfield bracket corpus rerun after deck size was removed from win tuning. The weighted score combines win tuning, self-sufficiency, and cohesion for bracket calibration; use it as a visual aid, not a rules verdict.</p>
+          <div class="bracket-compare__scale" aria-label="Deck weighted score on 0 to 100 bracket average scale">
             <span class="bracket-compare__tick bracket-compare__tick--low">0</span>
             <span
               v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
               :key="benchmark.label"
               class="bracket-compare__avg"
-              :style="{ left: benchmarkPosition(benchmark.avgWin) }"
-              :title="`${benchmark.label} average win score ${benchmark.avgWin}; median ${benchmark.medianWin}`"
+              :style="{ left: benchmarkPosition(benchmark.avgWeighted) }"
+              :title="`${benchmark.label} weighted average ${benchmark.avgWeighted}; weighted median ${benchmark.medianWeighted}`"
             >{{ benchmark.label }} avg</span>
             <span
               v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
               :key="`${benchmark.label}-median`"
               class="bracket-compare__median"
-              :style="{ left: benchmarkPosition(benchmark.medianWin) }"
-              :title="`${benchmark.label} median win score ${benchmark.medianWin}; average ${benchmark.avgWin}`"
+              :style="{ left: benchmarkPosition(benchmark.medianWeighted) }"
+              :title="`${benchmark.label} weighted median ${benchmark.medianWeighted}; weighted average ${benchmark.avgWeighted}`"
             >{{ benchmark.label }} med</span>
             <span class="bracket-compare__marker" :style="{ left: benchmarkPosition(activeBracketComparison.score) }">
               You {{ activeBracketComparison.score }}
@@ -1185,7 +1191,7 @@ function benchmarkDelta(value: number, benchmark: number): string {
             <span class="bracket-compare__tick bracket-compare__tick--high">100</span>
           </div>
           <table class="compare-table bracket-compare__table">
-            <thead><tr><th>Bracket</th><th>Avg win</th><th>Median</th><th>Range</th><th>Your delta</th><th>Avg self</th><th>Avg GC</th></tr></thead>
+            <thead><tr><th>Bracket</th><th>Weighted avg</th><th>Weighted median</th><th>Weighted range</th><th>Your delta</th><th>Avg win</th><th>Avg self</th><th>Avg cohesion</th><th>Avg GC</th></tr></thead>
             <tbody>
               <tr
                 v-for="benchmark in BRACKET_SCORE_BENCHMARKS"
@@ -1193,11 +1199,13 @@ function benchmarkDelta(value: number, benchmark: number): string {
                 :class="{ active: benchmark.bracket === activeBracketComparison.nearest.bracket }"
               >
                 <th>{{ benchmark.label }} <small>n={{ benchmark.sampleSize }}</small></th>
+                <td>{{ benchmark.avgWeighted }}</td>
+                <td>{{ benchmark.medianWeighted }}</td>
+                <td>{{ benchmark.weightedRange[0] }}–{{ benchmark.weightedRange[1] }}</td>
+                <td>{{ benchmarkDelta(activeBracketComparison.score, benchmark.avgWeighted) }}</td>
                 <td>{{ benchmark.avgWin }}</td>
-                <td>{{ benchmark.medianWin }}</td>
-                <td>{{ benchmark.range[0] }}–{{ benchmark.range[1] }}</td>
-                <td>{{ benchmarkDelta(activeBracketComparison.score, benchmark.avgWin) }}</td>
                 <td>{{ benchmark.avgSelf }}</td>
+                <td>{{ benchmark.avgCohesion }}</td>
                 <td>{{ benchmark.avgGameChangers }}</td>
               </tr>
             </tbody>
