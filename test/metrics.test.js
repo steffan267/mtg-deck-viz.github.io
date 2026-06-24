@@ -104,8 +104,20 @@ function main() {
   assert.ok(tuned.winTuningScore > combat.winTuningScore, `expected tuned finisher (${tuned.winTuningScore}) > combat value (${combat.winTuningScore})`);
   assert.ok(tuned.winTuningSignals.speed.score > combat.winTuningSignals.speed.score);
   assert.ok(tuned.winTuningSignals.closure.score > combat.winTuningSignals.closure.score);
-  assert.equal(tuned.winTuningSignals.legality.score, 100);
-  assert.equal(combat.winTuningSignals.legality.score, 100);
+  assert.equal(tuned.winTuningSignals.legality, undefined, 'deck size must not be a win-tuning signal');
+  assert.equal(combat.winTuningSignals.legality, undefined, 'deck size must not be a win-tuning signal');
+
+  const fullSizeDeck = METRICS.compute(graph([
+    card({ id: 'Compact Commander', role: 'commander', cmc: 2, text: 'Whenever you draw your second card each turn, each opponent loses 1 life.' }),
+    card({ id: 'Compact Finisher', role: 'finisher', cmc: 2, text: 'Each opponent loses X life.', mana: '{X}{B}', consumes: mana }),
+    card({ id: 'Forest', role: 'land', qty: 98, edh: null }),
+  ]));
+  const undersizedDeck = METRICS.compute(graph([
+    card({ id: 'Compact Commander', role: 'commander', cmc: 2, text: 'Whenever you draw your second card each turn, each opponent loses 1 life.' }),
+    card({ id: 'Compact Finisher', role: 'finisher', cmc: 2, text: 'Each opponent loses X life.', mana: '{X}{B}', consumes: mana }),
+    card({ id: 'Forest', role: 'land', qty: 78, edh: null }),
+  ]));
+  assert.equal(undersizedDeck.winTuningScore, fullSizeDeck.winTuningScore, 'deck size must not affect win tuning');
 
   // --- Game Changers: authoritative WotC power list, fully card-grounded. ---
   // The tuned shell runs many GC cards (Mana Vault, Demonic Tutor, Vampiric

@@ -96,15 +96,14 @@ off-list card as zero and were a maintenance treadmill). The one curated list is
 
 | Weight | Signal | Meaning |
 |--------|--------|---------|
-| 16% | **speed** | fast mana and efficient acceleration; slow ramp counts less |
-| 13% | **consistency** | tutors, weighted by flexibility and cost |
-| 13% | **card flow** | wheels, draw engines, impulse/cast-from-exile and recursion velocity |
-| 12% | **interaction** | removal, wipes, free interaction and stax/hatebears |
-| 18% | **closure** | compact win conditions and combos; combat finishers are discounted because they are board-dependent |
-| 6% | **resilience** | protection, recursion, uncounterability and defensive free spells |
-| 6% | **efficiency** | average mana value plus widely-played efficient staples |
-| 12% | **game changers** | count of official WotC Commander-Brackets power cards (see below) |
-| 4% | **deck size** | Commander deck-size sanity check; 100 cards scores best |
+| 16.7% | **speed** | fast mana and efficient acceleration; slow ramp counts less |
+| 13.5% | **consistency** | tutors, weighted by flexibility and cost |
+| 13.5% | **card flow** | wheels, draw engines, impulse/cast-from-exile and recursion velocity |
+| 12.5% | **interaction** | removal, wipes, free interaction and stax/hatebears |
+| 18.8% | **closure** | compact win conditions and combos; combat finishers are discounted because they are board-dependent |
+| 6.25% | **resilience** | protection, recursion, uncounterability and defensive free spells |
+| 6.25% | **efficiency** | average mana value plus widely-played efficient staples |
+| 12.5% | **game changers** | count of official WotC Commander-Brackets power cards (see below) |
 
 **Every signal is card-grounded:** the metric records the specific cards that
 drove each signal (hover a sidebar bar to see them) and synthesises a one-line

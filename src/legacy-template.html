@@ -237,7 +237,7 @@
           <p>Each dot is a card, colored by its job (ramp, draw, removal…). A <b>line means two cards mechanically interact</b> — one does something the other cares about. <b>Line strength shows how real the synergy is:</b> faint grey = incidental, blue = moderate, green = strong, <span style="color:#ff7a3d">orange = combo-critical</span>.</p>
           <p><b>Position shows power.</b> Each card has a <i>mass</i> that pulls it toward the centre, so the deck's most powerful and most-connected cards sit in the core and chaff drifts to the rim. The <span style="color:#e0c85a">gold-ringed</span> card in the middle is your commander (or, with no commander, the heaviest card). Bigger dot = heavier.</p></div>
         <div><h3>Three score axes</h3>
-          <p><b>Win tuning</b> (0–100) rates how directly the list is optimized to win: speed, tutors, card flow, answers, compact finishers, resilience, efficiency, <b>Game Changers</b> and deck size. A one-line plain-English summary tells you <i>how</i> the deck wins, and hovering each bar lists the cards behind it. <b>Cohesion</b> rates synergy — winning through an engine of cards that feed each other. <b>Self-sufficiency</b> rates standalone card strength.</p>
+          <p><b>Win tuning</b> (0–100) rates how directly the list is optimized to win: speed, tutors, card flow, answers, compact finishers, resilience, efficiency, and <b>Game Changers</b>. A one-line plain-English summary tells you <i>how</i> the deck wins, and hovering each bar lists the cards behind it. <b>Cohesion</b> rates synergy — winning through an engine of cards that feed each other. <b>Self-sufficiency</b> rates standalone card strength.</p>
           <p><b>Game Changers</b> are WotC's official Commander-Brackets power cards. The bracket classifier also checks the Beta rules for mass land denial, chained extra turns, two-card combo timing, tutor density, and tuning. A combat deck can be cohesive and resilient without being faster than a tutor/wheel/finisher deck. Read the three scores together. ⚡ flags a detected combo.</p></div>
         <div><h3>Add & compare decks</h3>
           <p>Click <b>“+ Add Moxfield deck”</b> (top-left) and paste a Moxfield deck link — e.g. <code>moxfield.com/decks/…</code>. It loads instantly.</p>
@@ -695,7 +695,6 @@ function wtSignalBars(sig){
     {k:"Resilience",s:sig.resilience,title:"protection, recursion, uncounterability and defensive free spells"},
     {k:"Efficiency",s:sig.efficiency,title:"average mana value plus widely-played efficient staples"},
     {k:"Game changers",s:sig.gameChangers,title:"official WotC Commander-Brackets power cards in the list"},
-    {k:"Deck size",s:sig.legality,title:"Commander deck-size check; 100 cards scores best"},
   ];
   return rows.map(r=>{const score=r.s?r.s.score:0,w=Math.min(1,score/100)*92+2;
     const cards=r.s&&r.s.cards&&r.s.cards.length?"\n• "+r.s.cards.join("\n• "):"";
@@ -739,7 +738,7 @@ function renderSidebar(){
     `<div>`+
       `<span class="scorebig" style="color:${wtColor}">${wt}</span><span style="color:var(--dim)"> / 100</span>`+
       ` <span class="band">${m.winTuningBand||""}</span>`+
-      `<div class="a2lbl" style="margin-top:3px" title="How directly the deck is tuned to win: speed, tutors, card flow, answers, compact finishers, resilience, efficiency, Game Changers and deck size.">Win tuning <span style="float:right;text-transform:none">optimized to win</span></div>`+
+      `<div class="a2lbl" style="margin-top:3px" title="How directly the deck is tuned to win: speed, tutors, card flow, answers, compact finishers, resilience, efficiency, and Game Changers.">Win tuning <span style="float:right;text-transform:none">optimized to win</span></div>`+
       summaryLine+
       gcLine+
       (wtSig?wtSignalBars(wtSig):"")+
@@ -1272,7 +1271,6 @@ const METRIC_DEFS=[
   {k:"_wt_resilience",label:"Resilience",hi:true},
   {k:"_wt_efficiency",label:"Efficiency",hi:true},
   {k:"_wt_gameChangers",label:"Game-changer score",hi:true},
-  {k:"_wt_legality",label:"Deck-size score",hi:true},
   {section:"Synergy & structure"},
   {k:"pctMeaningful",label:"% meaningfully linked",hi:true,suffix:"%"},
   {k:"meaningfulWebShare",label:"Core web %",hi:true,suffix:"%"},
@@ -1322,7 +1320,7 @@ function openCompare(){
       return `<td class="num barcell"><span class="barfill" style="width:${w}%"></span><span class="${isBest?'best':''}">${v}${def.suffix||""}</span>${band}</td>`;
     }).join("")+'</tr>';
   }
-  html+='</tbody></table><div style="font-size:11px;color:var(--dim);margin-top:10px">Green = best among loaded decks. <b>How it wins</b> and <b>Bracket</b> describe each deck in plain terms; <b>Win tuning</b> is the “optimized to win” axis (speed, tutors, card flow, answers, compact closure, resilience, efficiency, Game Changers, deck size). <b>Cohesion</b> is the synergy/engine axis and <b>Self-sufficiency</b> is standalone card strength.</div>';
+  html+='</tbody></table><div style="font-size:11px;color:var(--dim);margin-top:10px">Green = best among loaded decks. <b>How it wins</b> and <b>Bracket</b> describe each deck in plain terms; <b>Win tuning</b> is the “optimized to win” axis (speed, tutors, card flow, answers, compact closure, resilience, efficiency, Game Changers). <b>Cohesion</b> is the synergy/engine axis and <b>Self-sufficiency</b> is standalone card strength.</div>';
   document.getElementById("cmptable").innerHTML=html;
   document.getElementById("cmpmodal").classList.add("show");
 }

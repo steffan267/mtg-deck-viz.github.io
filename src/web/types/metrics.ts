@@ -33,7 +33,6 @@ export interface WinTuningSignals {
   resilience?: ScoreSignal
   efficiency?: ScoreSignal
   gameChangers?: ScoreSignal
-  legality?: ScoreSignal
   [key: string]: ScoreSignal | undefined
 }
 

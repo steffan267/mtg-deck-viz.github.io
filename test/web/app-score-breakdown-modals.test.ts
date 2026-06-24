@@ -83,7 +83,6 @@ function deck() {
           resilience: { score: 10, cards: [] },
           efficiency: { score: 70, cards: ['Sol Ring'] },
           gameChangers: { score: 0, cards: [] },
-          legality: { score: 100, cards: [] },
         },
         winSummary: 'Fast mana and repeatable activated abilities.',
         gameChangerCount: 1,

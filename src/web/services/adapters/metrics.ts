@@ -27,7 +27,6 @@ export function winTuningSignalBars(signals: WinTuningSignals): SignalBar[] {
     ['resilience', 'Resilience'],
     ['efficiency', 'Efficiency'],
     ['gameChangers', 'Game Changers'],
-    ['legality', 'Deck size'],
   ].map(([id, label]) => ({ id, label, value: signalScore(signals, id), max: 100, cards: signalCards(signals, id) }))
 }
 

@@ -67,7 +67,6 @@ function deck(title = 'Fixture deck'): DeckPayloadEntry {
           resilience: { score: 10, cards: [] },
           efficiency: { score: 70, cards: ['Sol Ring'] },
           gameChangers: { score: 0, cards: [] },
-          legality: { score: 100, cards: [] },
         },
         selfSufficiencySignals: { interaction: 1, cardAdvantage: 1, ramp: 1 },
       } as any,

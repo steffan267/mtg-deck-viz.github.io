@@ -644,7 +644,6 @@ function withSignalTitle(signal: SignalBar, sectionId: string): SignalBar {
       resilience: 'Protection, recursion, and recovery that keep the plan alive through disruption.',
       efficiency: 'Mana efficiency and cost reduction that improve action density per turn.',
       gameChangers: 'Commander bracket Game Changers present in the list.',
-      legality: 'Deck-size and basic structural checks that keep the score grounded.',
     }
     return { ...signal, title: descriptions[signal.id] || 'Contributes to the win-tuning score.' }
   }

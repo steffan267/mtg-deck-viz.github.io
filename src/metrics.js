@@ -11,6 +11,19 @@
   const clamp01 = x => Math.max(0, Math.min(1, x));
   const sat = (value, target) => clamp01(value / target);
   const round1 = value => +value.toFixed(1);
+  // Former score weights summed to 96% after removing the deck-size sanity
+  // check. These normalized fractions preserve the remaining signals' relative
+  // importance while keeping the final score on a 0–100 scale.
+  const WIN_TUNING_SIGNAL_WEIGHTS = Object.freeze({
+    speed: 16 / 96,
+    consistency: 13 / 96,
+    cardFlow: 13 / 96,
+    interaction: 12 / 96,
+    closure: 18 / 96,
+    resilience: 6 / 96,
+    efficiency: 6 / 96,
+    gameChangers: 12 / 96,
+  });
 
   // GAME CHANGERS — the official WotC "Commander Brackets" power list. This is
   // authoritative reference data (a versioned, curated list maintained by the
@@ -198,7 +211,6 @@
     const txt = n => (n.text || "").toLowerCase();
     const mv = n => n.cmc == null ? 0 : n.cmc;
     const hasCap = (n, cap) => (n.caps || []).includes(cap);
-    const totalQty = allCards.reduce((sum, n) => sum + (n.qty || 1), 0);
     // "Free" spells — both the commander-tax pitch family ("…without paying its
     // mana cost") AND the alternative-cost pitch family ("…rather than pay this
     // spell's mana cost", e.g. Force of Will / Force of Negation / Misdirection).
@@ -383,8 +395,6 @@
     const avgMv = real.reduce((sum, n) => sum + mv(n) * (n.qty || 1), 0) / nonlandQty;
     const curveScore = 100 * clamp01((4.25 - avgMv) / 2.25); // 2.0 MV ≈ max, 4.25+ ≈ 0
     const efficiencyScore = Math.round(0.6 * curveScore + 0.4 * premiumShare * 100);
-    const legalityScore = Math.max(0, 100 - Math.abs(totalQty - 100) * 25);
-
     const signals = {
       speed: { score: Math.round(100 * sat(speed.raw, 11)), raw: round1(speed.raw), label: "speed", cards: topNames(speed.cards) },
       consistency: { score: Math.round(100 * sat(consistency.raw, 7)), raw: round1(consistency.raw), label: "tutors", cards: topNames(consistency.cards) },
@@ -401,19 +411,19 @@
       resilience: { score: Math.round(100 * sat(resilience.raw, 8)), raw: round1(resilience.raw), label: "resilience", cards: topNames(resilience.cards) },
       efficiency: { score: efficiencyScore, raw: round1(avgMv), label: "efficiency", cards: [] },
       gameChangers: { score: Math.round(100 * sat(gameChangerCount, 7)), raw: gameChangerCount, label: "game changers", cards: gameChangerCards },
-      legality: { score: legalityScore, raw: totalQty, label: "deck size", cards: [] },
     };
 
+    // Deck size is a structural decklist concern; it should not make a deck
+    // more or less "tuned to win."
     const score = Math.round(
-      0.16 * signals.speed.score +
-      0.13 * signals.consistency.score +
-      0.13 * signals.cardFlow.score +
-      0.12 * signals.interaction.score +
-      0.18 * signals.closure.score +
-      0.06 * signals.resilience.score +
-      0.06 * signals.efficiency.score +
-      0.12 * signals.gameChangers.score +
-      0.04 * signals.legality.score
+      WIN_TUNING_SIGNAL_WEIGHTS.speed * signals.speed.score +
+      WIN_TUNING_SIGNAL_WEIGHTS.consistency * signals.consistency.score +
+      WIN_TUNING_SIGNAL_WEIGHTS.cardFlow * signals.cardFlow.score +
+      WIN_TUNING_SIGNAL_WEIGHTS.interaction * signals.interaction.score +
+      WIN_TUNING_SIGNAL_WEIGHTS.closure * signals.closure.score +
+      WIN_TUNING_SIGNAL_WEIGHTS.resilience * signals.resilience.score +
+      WIN_TUNING_SIGNAL_WEIGHTS.efficiency * signals.efficiency.score +
+      WIN_TUNING_SIGNAL_WEIGHTS.gameChangers * signals.gameChangers.score
     );
 
     // Plain-English "how this deck wins" — leads with the win path, then names
