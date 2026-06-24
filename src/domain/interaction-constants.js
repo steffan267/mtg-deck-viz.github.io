@@ -229,6 +229,7 @@ const Capability = freeze({
   TapsForMana: 'taps-for-mana',
   IsSelfUntapper: 'is-self-untapper',
   ManaProduced: 'mana-produced',
+  SelfUntapCost: 'self-untap-cost',
   IsRepeatableBlink: 'is-repeatable-blink',
   BlinkCost: 'blink-cost',
   EtbUntapsLand: 'etb-untaps-land',
@@ -265,6 +266,56 @@ const GraphStrength = freeze({
   ComboCritical: 'combo-critical',
 });
 
+
+const SemanticTransitionKind = freeze({
+  ActivatedAbility: 'activated-ability',
+  TriggeredAbility: 'triggered-ability',
+  StaticModifier: 'static-modifier',
+  CastAction: 'cast-action',
+  ZoneMove: 'zone-move',
+  ReplacementEffect: 'replacement-effect',
+});
+
+const UnderstandingEvidenceKind = freeze({
+  GraphExplanation: 'graph-explanation',
+  StrictProof: 'strict-proof',
+  Rejection: 'rejection',
+  EvaluatorMapping: 'evaluator-mapping',
+  DebugReport: 'debug-report',
+  HumanReview: 'human-review',
+});
+
+const SolverOutcome = freeze({
+  Proven: 'proven',
+  Rejected: 'rejected',
+  Unresolved: 'unresolved',
+});
+
+const StateDimension = freeze({
+  Mana: 'mana',
+  Untap: 'untap',
+  Blink: 'blink',
+  Etb: 'etb',
+  Ltb: 'ltb',
+  Death: 'death',
+  Cast: 'cast',
+  Tokens: 'tokens',
+  Counters: 'counters',
+  ZoneAccess: 'zone-access',
+  TurnFreshness: 'turn-freshness',
+  Legality: 'legality',
+});
+
+const LegalityPredicate = freeze({
+  PackageLocal: 'package-local',
+  RepeatableAction: 'repeatable-action',
+  LegalTarget: 'legal-target',
+  FaceCompatible: 'face-compatible',
+  PaymentClosed: 'payment-closed',
+  BoundedSearch: 'bounded-search',
+});
+
+
 function valuesOf(domain) {
   return Object.values(domain);
 }
@@ -286,6 +337,11 @@ module.exports = {
   Capability,
   Zone,
   GraphStrength,
+  SemanticTransitionKind,
+  UnderstandingEvidenceKind,
+  SolverOutcome,
+  StateDimension,
+  LegalityPredicate,
   valuesOf,
   hasDomainValue,
 };

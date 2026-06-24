@@ -3,6 +3,14 @@ const {
   boundedProofSearch,
   provePackage,
 } = require('../src/interaction-proof-search');
+const {
+  ComboFamilyId,
+  ComboResource,
+  SemanticTransitionKind,
+  SolverOutcome,
+  StateDimension,
+  UnderstandingEvidenceKind,
+} = require('../src/domain/interaction-constants');
 
 function card(id, type, text, cmc = 0, mana_cost = '') {
   return { id, name: id, type_line: type, oracle_text: text, cmc, mana_cost };
@@ -22,6 +30,13 @@ const selfLoop = provePackage([selfUntapper]);
 assert.equal(selfLoop.status, 'proven');
 assert.ok(proofByFamily(selfLoop, 'self-untap-mana-loop'));
 assert.deepEqual(proofByFamily(selfLoop, 'self-untap-mana-loop').positiveDeltas[0], { resource: 'mana', min: 2, max: 2 });
+assert.equal(selfLoop.packageUnderstanding.version, 'package-understanding.v1');
+assert.equal(selfLoop.packageUnderstanding.state.version, 'semantic-understanding-state.v1');
+const selfSolverEvidence = proofByFamily(selfLoop, ComboFamilyId.SelfUntapManaLoop).proof.understanding;
+assert.equal(selfSolverEvidence.outcome, SolverOutcome.Proven);
+assert.equal(selfSolverEvidence.kind, UnderstandingEvidenceKind.StrictProof);
+assert.ok(selfLoop.packageUnderstanding.transitions.some(item => item.kind === SemanticTransitionKind.ActivatedAbility && item.sourceCardId === selfUntapper.id));
+assert.ok(selfSolverEvidence.positiveDeltas.some(delta => delta.dimension === StateDimension.Mana && delta.resource === ComboResource.Mana));
 
 const deadeye = card(
   'Deadeye Navigator',
@@ -41,6 +56,22 @@ const blinkProof = proofByFamily(blinkLoop, 'blink-etb-land-untap-loop');
 assert.ok(blinkProof);
 assert.equal(blinkProof.positiveDeltas[0].resource, 'mana');
 assert.equal(blinkProof.proof.repeatability.status, 'repeatable');
+assert.equal(blinkProof.proof.understanding.family, ComboFamilyId.BlinkEtbLandUntapLoop);
+assert.ok(blinkProof.proof.understanding.requiredLegality.some(item => item.predicate === 'payment-closed'));
+assert.ok(blinkLoop.packageUnderstanding.transitions.some(item => item.events.includes('etb')));
+
+assert.ok(blinkLoop.packageUnderstanding.coverage.solvedFamilies.includes(ComboFamilyId.BlinkEtbLandUntapLoop));
+assert.ok(blinkLoop.packageUnderstanding.coverage.deferredDimensions.includes(StateDimension.Cast));
+const breakEvenBlinkLoop = provePackage([
+  card('Two-Mana Blink Engine', 'Creature — Spirit', '{1}{U}: Exile another target creature you control, then return it to the battlefield under your control.', 6),
+  card('Two-Land Untapper', 'Creature — Drake', 'Flying When this creature enters, untap up to two lands.', 5),
+]);
+assert.equal(breakEvenBlinkLoop.status, 'proven');
+const breakEvenBlinkProof = proofByFamily(breakEvenBlinkLoop, ComboFamilyId.BlinkEtbLandUntapLoop);
+assert.ok(breakEvenBlinkProof);
+assert.equal(breakEvenBlinkProof.proof.understanding.outcome, SolverOutcome.Proven);
+assert.equal(breakEvenBlinkProof.positiveDeltas.some(delta => delta.resource === ComboResource.Mana && delta.min === 0 && delta.max === 0), true);
+assert.equal(breakEvenBlinkLoop.packageUnderstanding.evidence.some(item => item.family === ComboFamilyId.BlinkEtbLandUntapLoop && item.outcome === SolverOutcome.Rejected), false);
 
 const ephemerate = card(
   'Ephemerate',
@@ -67,6 +98,8 @@ const exquisiteBlood = card(
 const lifeLoop = provePackage([sanguineBond, exquisiteBlood]);
 assert.equal(lifeLoop.status, 'proven');
 assert.ok(proofByFamily(lifeLoop, 'lifegain-lifeloss-loop'));
+assert.equal(proofByFamily(lifeLoop, ComboFamilyId.LifegainLifelossLoop).proof.understanding.outcome, SolverOutcome.Proven);
+assert.ok(proofByFamily(lifeLoop, ComboFamilyId.LifegainLifelossLoop).proof.understanding.assumptions.some(text => /initial/.test(text)));
 
 const fixedLifeLoop = provePackage([
   card('Fixed Gain Converts To Loss', 'Creature — Cleric', 'Whenever you gain life, each opponent loses 1 life.', 3),
@@ -82,6 +115,8 @@ const drawDamageLoop = provePackage([
 assert.equal(drawDamageLoop.status, 'proven');
 assert.ok(proofByFamily(drawDamageLoop, 'draw-damage-feedback-loop'));
 assert.ok(proofByFamily(drawDamageLoop, 'draw-damage-feedback-loop').positiveDeltas.some(delta => delta.resource === 'damage'));
+assert.equal(proofByFamily(drawDamageLoop, ComboFamilyId.DrawDamageFeedbackLoop).proof.understanding.outcome, SolverOutcome.Proven);
+assert.ok(proofByFamily(drawDamageLoop, ComboFamilyId.DrawDamageFeedbackLoop).proof.understanding.transitions.length >= 2);
 
 const noncombatDrawDamageLoop = provePackage([
   card('Draw Damage Engine', 'Legendary Creature — Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.', 6),
@@ -110,6 +145,17 @@ const drawDamageScopeNearMiss = provePackage([
 ]);
 assert.equal(drawDamageScopeNearMiss.status, 'not-repeatable');
 assert.ok(drawDamageScopeNearMiss.rejections.some(rejection => /does not apply/.test(rejection.reason)));
+assert.ok(drawDamageScopeNearMiss.packageUnderstanding.evidence.some(item => item.kind === UnderstandingEvidenceKind.Rejection && item.outcome === SolverOutcome.Rejected));
+
+const unsupportedCastUnderstanding = provePackage([
+  card('Graveyard Cast Enabler', 'Enchantment', 'You may cast creature spells from your graveyard.', 3),
+  card('Cast Payoff', 'Creature — Wizard', 'Whenever you cast a creature spell, draw a card.', 3),
+]);
+const unresolvedEvidence = unsupportedCastUnderstanding.packageUnderstanding.unresolved[0];
+assert.equal(unresolvedEvidence.kind, UnderstandingEvidenceKind.HumanReview);
+assert.equal(unresolvedEvidence.outcome, SolverOutcome.Unresolved);
+assert.match(unresolvedEvidence.rejectionReason, /intentionally deferred/);
+assert.equal(unsupportedCastUnderstanding.packageUnderstanding.evidence.includes(unresolvedEvidence), true);
 
 const selfCopySpellMagecraftDrainLoop = provePackage([
   card('Self-Copying Targeted Spell', 'Sorcery', 'Target player discards two cards. That player may copy this spell and may choose a new target for that copy.', 2),

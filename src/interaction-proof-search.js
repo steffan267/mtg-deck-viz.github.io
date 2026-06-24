@@ -6,8 +6,9 @@
  * why near-misses are not repeatable, and enforces hard card/depth/branch caps.
  */
 const { buildInteractionHypergraph } = require('./interaction-hypergraph');
-const { ProofStatus } = require('./domain/interaction-constants');
+const { ProofStatus, RepeatabilityStatus, SolverOutcome } = require('./domain/interaction-constants');
 const { buildInteractionIndexes, normalizeCard } = require('./interaction-indexes');
+const { buildPackageUnderstanding } = require('./interaction-understanding');
 const FACE_CLASSIFICATION = require('./face-classification');
 const MODEL = require('./interaction-model.js');
 const {
@@ -4054,23 +4055,36 @@ function faceIncompatibilityRejection(proof, indexedCards) {
   );
 }
 
-function provePackage(rawCards, options = {}) {
-  const limits = Object.assign({}, DEFAULT_LIMITS, options.limits || {});
-  const cards = (rawCards || []).map(normalizeCard);
-  if (cards.length > limits.maxCards) {
-    return {
-      status: ProofStatus.BoundedOut,
-      reason: `package has ${cards.length} cards; maxCards is ${limits.maxCards}`,
-      limits,
-      proofs: [],
-      rejections: [],
-    };
+
+function proofDeltasFromUnderstanding(evidence) {
+  return (evidence.positiveDeltas || []).map(delta => ({
+    resource: delta.resource || delta.dimension,
+    min: delta.amount ? delta.amount.min : 0,
+    max: delta.amount ? delta.amount.max : 0,
+  }));
+}
+
+function proofFromUnderstandingEvidence(evidence, indexedCards) {
+  const cards = (evidence.cards || []).map(id => indexedCards[id]).filter(Boolean);
+  if (evidence.outcome !== SolverOutcome.Proven) {
+    return failure(evidence.id, cards, evidence.rejectionReason || 'generic understanding solver did not prove closure', {
+      understanding: evidence,
+    });
   }
-  const indexes = buildInteractionIndexes(cards);
-  const hypergraph = buildInteractionHypergraph(indexes, { perCardPairLimit: limits.maxBranches, perCardTripleLimit: limits.maxBranches });
-  const state = abstractInitialState(cards, hypergraph, limits);
-  const transitions = cards.map(transitionForCard);
-  const results = [
+  return success(evidence.id, evidence.family, cards, {
+    requiredFacts: evidence.requiredFacts || [],
+    steps: evidence.steps || [],
+    assumptions: evidence.assumptions || [],
+    repeatability: {
+      status: RepeatabilityStatus.Repeatable,
+      reason: 'generic understanding solver closed the package-local transition/state cycle',
+    },
+    understanding: evidence,
+  }, proofDeltasFromUnderstanding(evidence));
+}
+
+function bespokeProofs(cards) {
+  return [
     proveDirectSelfLoop(cards),
     proveBlinkUntap(cards),
     proveLifeLoop(cards),
@@ -4133,7 +4147,33 @@ function provePackage(rawCards, options = {}) {
     proveCastProtectionSelfBounceLock(cards),
     proveCastProtectionGraveyardRecastLock(cards),
   ].filter(Boolean);
+}
+
+function provePackage(rawCards, options = {}) {
+  const limits = Object.assign({}, DEFAULT_LIMITS, options.limits || {});
+  const cards = (rawCards || []).map(normalizeCard);
+  if (cards.length > limits.maxCards) {
+    return {
+      status: ProofStatus.BoundedOut,
+      reason: `package has ${cards.length} cards; maxCards is ${limits.maxCards}`,
+      limits,
+      proofs: [],
+      rejections: [],
+    };
+  }
+  const indexes = buildInteractionIndexes(cards);
+  const hypergraph = buildInteractionHypergraph(indexes, { perCardPairLimit: limits.maxBranches, perCardTripleLimit: limits.maxBranches });
+  const state = abstractInitialState(cards, hypergraph, limits);
+  const transitions = cards.map(transitionForCard);
+  const understanding = buildPackageUnderstanding(cards, { limits });
   const indexedCards = cardsById(cards);
+  const solverResults = (understanding.evidence || [])
+    .filter(item => item.outcome !== SolverOutcome.Unresolved)
+    .map(item => proofFromUnderstandingEvidence(item, indexedCards));
+  const solverProvenFamilies = new Set(solverResults.filter(result => result.status === ProofStatus.Proven).map(result => result.family));
+  const familySpecificResults = bespokeProofs(cards).filter(result => !(result.status === ProofStatus.Proven && solverProvenFamilies.has(result.family)));
+  const results = [...solverResults, ...familySpecificResults];
+
   const faceRejections = results
     .filter(r => r.status === ProofStatus.Proven)
     .map(proof => faceIncompatibilityRejection(proof, indexedCards))
@@ -4146,6 +4186,7 @@ function provePackage(rawCards, options = {}) {
     limits,
     state,
     transitions,
+    packageUnderstanding: understanding,
     hyperedges: hypergraph.hyperedges,
     proofs,
     rejections,

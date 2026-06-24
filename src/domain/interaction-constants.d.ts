@@ -227,6 +227,7 @@ export const Capability: {
   readonly TapsForMana: 'taps-for-mana'
   readonly IsSelfUntapper: 'is-self-untapper'
   readonly ManaProduced: 'mana-produced'
+  readonly SelfUntapCost: 'self-untap-cost'
   readonly IsRepeatableBlink: 'is-repeatable-blink'
   readonly BlinkCost: 'blink-cost'
   readonly EtbUntapsLand: 'etb-untaps-land'
@@ -265,6 +266,60 @@ export const GraphStrength: {
   readonly ComboCritical: 'combo-critical'
 }
 export type GraphStrength = DomainValue<typeof GraphStrength>
+
+
+export const SemanticTransitionKind: {
+  readonly ActivatedAbility: 'activated-ability'
+  readonly TriggeredAbility: 'triggered-ability'
+  readonly StaticModifier: 'static-modifier'
+  readonly CastAction: 'cast-action'
+  readonly ZoneMove: 'zone-move'
+  readonly ReplacementEffect: 'replacement-effect'
+}
+export type SemanticTransitionKind = DomainValue<typeof SemanticTransitionKind>
+
+export const UnderstandingEvidenceKind: {
+  readonly GraphExplanation: 'graph-explanation'
+  readonly StrictProof: 'strict-proof'
+  readonly Rejection: 'rejection'
+  readonly EvaluatorMapping: 'evaluator-mapping'
+  readonly DebugReport: 'debug-report'
+  readonly HumanReview: 'human-review'
+}
+export type UnderstandingEvidenceKind = DomainValue<typeof UnderstandingEvidenceKind>
+
+export const SolverOutcome: {
+  readonly Proven: 'proven'
+  readonly Rejected: 'rejected'
+  readonly Unresolved: 'unresolved'
+}
+export type SolverOutcome = DomainValue<typeof SolverOutcome>
+
+export const StateDimension: {
+  readonly Mana: 'mana'
+  readonly Untap: 'untap'
+  readonly Blink: 'blink'
+  readonly Etb: 'etb'
+  readonly Ltb: 'ltb'
+  readonly Death: 'death'
+  readonly Cast: 'cast'
+  readonly Tokens: 'tokens'
+  readonly Counters: 'counters'
+  readonly ZoneAccess: 'zone-access'
+  readonly TurnFreshness: 'turn-freshness'
+  readonly Legality: 'legality'
+}
+export type StateDimension = DomainValue<typeof StateDimension>
+
+export const LegalityPredicate: {
+  readonly PackageLocal: 'package-local'
+  readonly RepeatableAction: 'repeatable-action'
+  readonly LegalTarget: 'legal-target'
+  readonly FaceCompatible: 'face-compatible'
+  readonly PaymentClosed: 'payment-closed'
+  readonly BoundedSearch: 'bounded-search'
+}
+export type LegalityPredicate = DomainValue<typeof LegalityPredicate>
 
 export function valuesOf<T extends Record<string, string>>(domain: T): Array<DomainValue<T>>
 export function hasDomainValue<T extends Record<string, string>>(domain: T, value: unknown): value is DomainValue<T>
