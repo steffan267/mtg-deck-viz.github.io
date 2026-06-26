@@ -803,6 +803,12 @@ When Gilded Goose enters, create a Food token.
   assertNoFamily(goblinChieftain, bearCub, 'lord→tribe');
   assertNoFamily(genericAnthem, bearCub, 'lord→tribe');
   assertNoFamily(bastionProtector, bearCub, 'lord→tribe');
+  const murder = node('Murder', 'Instant', 'Destroy target creature.');
+  const heroicIntervention = node('Heroic Intervention', 'Instant', 'Permanents you control gain hexproof and indestructible until end of turn.');
+  const destroyPayoff = node('Destroy Payoff', 'Creature — Horror', 'Whenever a permanent is destroyed, each opponent loses 1 life.');
+  assertNoEvent(murder, heroicIntervention, 'destroy');
+  assertNoEvent(murder, bastionProtector, 'destroy');
+  assertHasEvent(murder, destroyPayoff, 'destroy');
 
   const deadeyeNavigator = node('Deadeye Navigator', 'Creature — Spirit', 'Soulbond (You may pair this creature with another unpaired creature when either enters. They remain paired for as long as you control both of them.)\nAs long as Deadeye Navigator is paired with another creature, each of those creatures has "{1}{U}: Exile this creature, then return it to the battlefield under your control."');
   const peregrineDrake = node('Peregrine Drake', 'Creature — Drake', 'Flying\nWhen this creature enters, untap up to five lands.');

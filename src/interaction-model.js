@@ -200,10 +200,7 @@
         { re: /destroy that (creature|permanent|artifact|enchantment)/, s: A },
       ],
       consume: [
-        { re: /whenever a permanent .* is (destroyed|put into a graveyard)/, s: A },
-        { re: /can't be destroyed/, s: A },
-        { re: /\bindestructible\b/, s: A },
-        { re: /if .* would be destroyed, regenerate/, s: A },
+        { re: /whenever a permanent(?: .*?)? is (destroyed|put into a graveyard)/, s: A },
       ] },
 
     { id: "tap", label: "tap a permanent (tappers)",

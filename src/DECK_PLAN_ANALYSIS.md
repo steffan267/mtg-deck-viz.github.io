@@ -65,6 +65,14 @@ separate win, cohesion, and self-sufficiency scores.
   run this dropped watched `copy→trigger` edges from 270 to 62 in the precon
   corpus and from 1201 to 263 in the Moxfield bracket corpus, with validation
   recall and sampled precision still at 1.0 and bracket accuracy unchanged.
+- Tightened `destroy` so indestructible, can't-be-destroyed, and regeneration
+  text no longer consumes the destroy event. Removal and wraths can still feed
+  explicit destroyed-permanent payoffs, but protection/resilience cards no
+  longer become fake synergies with the deck's own answers. In the next
+  2026-06-26 score-corpus run this dropped watched `destroy` edges from 781 to
+  10 in the precon corpus and from 3525 to 6 in the Moxfield bracket corpus,
+  with validation recall and sampled precision still at 1.0 and bracket
+  accuracy unchanged.
 
 ## Data flow
 
