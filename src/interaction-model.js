@@ -1153,6 +1153,15 @@
         }
         if (s.kind === "activated"
             && /\{t\}/.test(c)
+            && /\bcopy target instant or sorcery spell you control\b/.test(e)
+            && /\bactivate only if you(?:'| have)ve cast (?:three|3) or more spells this turn\b/.test(e)) {
+          caps.add("is-cast-threshold-spell-copy-engine");
+          caps.add("spell-copy-engine-requires:spell-count");
+          caps.add("spell-copy-engine-threshold:3");
+          caps.add("spell-copy-engine-target:own-instant-or-sorcery");
+        }
+        if (s.kind === "activated"
+            && /\{t\}/.test(c)
             && !/\{[^}]*[1-9wubrgcx][^}]*\}/.test(c)
             && !/\bsacrifice\b|\bpay\b|\bdiscard\b|\bexile\b|\bremove\b/.test(c)
             && /\bthis creature deals? 1 damage to (any target|target creature)\b/.test(e))
@@ -1199,14 +1208,17 @@
             caps.add(tgt === "permanent" ? "untaps-any" : "untaps-" + tgt);  // untaps-creature / untaps-land / untaps-artifact / untaps-any
           }
         }
-        if (/\binstant\b/.test(typeText) && (cmc == null || cmc <= 2) && /untap all nonland permanents you control/.test(e)) {
+        const isCheapEngineUntapInstant = /\binstant\b/.test(typeText)
+          && (cmc == null || cmc <= 2 || (cmc <= 3 && /\bdraw a card\b/.test(e)));
+        if (isCheapEngineUntapInstant && /untap all nonland permanents you control/.test(e)) {
           caps.add("is-cheap-instant-nonland-permanent-untap-spell");
           caps.add("is-cheap-instant-engine-untap-spell");
+          if (/\bdraw a card\b/.test(e)) caps.add("is-cheap-instant-cantrip-engine-untap-spell");
           caps.add("untap-spell-target:nonland");
           caps.add("untap-spell-target:artifact");
           caps.add("untap-spell-target:creature");
         }
-        if (/\binstant\b/.test(typeText) && (cmc == null || cmc <= 2) && /\buntap\b/.test(e)) {
+        if (isCheapEngineUntapInstant && /\buntap\b/.test(e)) {
           const allTextForUntap = `${e} ${s.raw || ""}`;
           if (/\buntap target permanent\b/.test(allTextForUntap) || /\btap or untap target permanent\b/.test(allTextForUntap)) {
             caps.add("is-cheap-instant-engine-untap-spell");
@@ -1214,11 +1226,11 @@
             caps.add("untap-spell-target:artifact");
             caps.add("untap-spell-target:creature");
           }
-          if (/\buntap target artifact\b/.test(allTextForUntap) || /\btap or untap target artifact\b/.test(allTextForUntap) || /\buntap target artifact, creature, or land\b/.test(allTextForUntap)) {
+          if (/\buntap target artifact\b/.test(allTextForUntap) || /\btap or untap target artifact\b/.test(allTextForUntap) || /\b(?:tap or )?untap target artifact, creature, or land\b/.test(allTextForUntap)) {
             caps.add("is-cheap-instant-engine-untap-spell");
             caps.add("untap-spell-target:artifact");
           }
-          if (/\buntap target creature\b/.test(allTextForUntap) || /\btap or untap target creature\b/.test(allTextForUntap) || /\buntap target artifact, creature, or land\b/.test(allTextForUntap)) {
+          if (/\buntap target creature\b/.test(allTextForUntap) || /\btap or untap target creature\b/.test(allTextForUntap) || /\b(?:tap or )?untap target artifact, creature, or land\b/.test(allTextForUntap)) {
             caps.add("is-cheap-instant-engine-untap-spell");
             caps.add("untap-spell-target:creature");
           }
@@ -1227,6 +1239,9 @@
             caps.add("is-cheap-instant-engine-untap-spell");
             caps.add("untap-spell-target:creature");
           }
+          if ((caps.has("is-cheap-instant-engine-untap-spell") || caps.has("is-cheap-instant-nonland-permanent-untap-spell"))
+              && /\bdraw a card\b/.test(allTextForUntap))
+            caps.add("is-cheap-instant-cantrip-engine-untap-spell");
         }
         if (s.kind === "activated" && /\buntap (this|it|this artifact|this creature|this permanent)/.test(e)) {
           caps.add("is-self-untapper");
@@ -2653,6 +2668,9 @@
     { family: "token-replacement-sacrifice-mana-loop", from: "is-token-to-creature-token-replacer", to: "is-death-mana-payoff", kind: "enablement", strength: "combo-critical" },
     { family: "imprint-untap-spell-loop", from: "is-cheap-instant-nonland-permanent-untap-spell", to: "is-repeatable-cheap-instant-caster", kind: "enablement", strength: "combo-critical" },
     { family: "tap-free-cast→untap-engine", from: "is-cheap-instant-engine-untap-spell", to: "is-tap-free-cast-engine", kind: "enablement", strength: "strong" },
+    { family: "spell-count→spell-copy-engine", from: "is-noncreature-spell", to: "is-cast-threshold-spell-copy-engine", kind: "synergy", strength: "moderate" },
+    { family: "spell-copy-engine→cantrip-untap-loop", from: "is-cheap-instant-cantrip-engine-untap-spell", to: "is-cast-threshold-spell-copy-engine", kind: "enablement", strength: "combo-critical" },
+    { family: "spell-copy-engine→untap-reset", from: "is-cheap-instant-engine-untap-spell", to: "is-cast-threshold-spell-copy-engine", kind: "enablement", strength: "strong" },
     { family: "self-untap-mana→ability-copy-loop", from: "is-activated-ability-copier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
     { family: "hasty-copy→etb-untap-loop", from: "is-repeatable-hasty-creature-copy", to: "etb-untaps-permanent", kind: "enablement", strength: "combo-critical" },
     { family: "combat-copy-token→extra-combat-loop", from: "is-combat-copy-token-equipment", to: "is-attack-extra-combat-source", kind: "enablement", strength: "combo-critical" },
@@ -3226,6 +3244,9 @@
   EVENT_LABEL["enable:token-replacement-sacrifice-mana-loop"] = "token replacement → sacrifice/death-mana loop";
   EVENT_LABEL["enable:imprint-untap-spell-loop"] = "repeatable imprinted untap spell loop";
   EVENT_LABEL["enable:tap-free-cast→untap-engine"] = "tap/free-cast engine reset";
+  EVENT_LABEL["enable:spell-count→spell-copy-engine"] = "spell-count → spell-copy engine";
+  EVENT_LABEL["enable:spell-copy-engine→cantrip-untap-loop"] = "spell-copy cantrip untap loop";
+  EVENT_LABEL["enable:spell-copy-engine→untap-reset"] = "spell-copy engine reset";
   EVENT_LABEL["enable:self-untap-mana→ability-copy-loop"] = "self-untap mana ability copy loop";
   EVENT_LABEL["enable:hasty-copy→etb-untap-loop"] = "hasty copy → ETB untap loop";
   EVENT_LABEL["enable:combat-copy-token→extra-combat-loop"] = "combat copy token → extra combat loop";

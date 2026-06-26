@@ -113,7 +113,7 @@ function normalizePagePath(url) {
 }
 
 function discoverTagPages(indexPage) {
-  const pages = new Map([[DEFAULT_INDEX, { path: DEFAULT_INDEX, label: 'Combo', count: null }]]);
+  const pages = new Map([[DEFAULT_INDEX, { path: DEFAULT_INDEX, label: 'Combo', count: null, group: null }]]);
   for (const group of indexPage.related_info || []) {
     for (const item of group.items || []) {
       const pagePath = normalizePagePath(item.url);

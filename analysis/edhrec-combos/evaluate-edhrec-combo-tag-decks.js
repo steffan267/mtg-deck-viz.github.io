@@ -240,7 +240,8 @@ function scoreDeckInWorker(cacheFile, index, timeoutMs, deckCardLimit) {
     maxBuffer: 1024 * 1024 * 4,
   });
   if (child.error) {
-    return { ok: false, timedOut: child.error.code === 'ETIMEDOUT', error: child.error.message };
+    const childError = /** @type {NodeJS.ErrnoException} */ (child.error);
+    return { ok: false, timedOut: childError.code === 'ETIMEDOUT', error: childError.message };
   }
   if (child.status !== 0) {
     return { ok: false, timedOut: false, error: (child.stderr || child.stdout || `exit ${child.status}`).trim() };

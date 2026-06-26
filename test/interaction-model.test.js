@@ -249,11 +249,43 @@ When Gilded Goose enters, create a Food token.
     'Target creature gets +1/+2 and gains reach until end of turn. Untap it.',
     1,
   );
+  const castThresholdSpellCopyEngine = node(
+    'Cast-Threshold Spell Copy Engine',
+    'Legendary Creature — Human Rogue',
+    "Whenever you cast your second spell each turn, exile the top card of your library. Until the end of your next turn, you may play that card. {T}: Copy target instant or sorcery spell you control. You may choose new targets for the copy. Activate only if you've cast three or more spells this turn.",
+    3,
+  );
+  const cantripCreatureUntap = node(
+    'Cantrip Creature Untap',
+    'Instant',
+    'Untap target creature. Draw a card.',
+    1,
+  );
+  const tapOrUntapCantrip = node(
+    'Tap-Or-Untap Cantrip',
+    'Instant',
+    'You may tap or untap target artifact, creature, or land. Draw a card.',
+    3,
+  );
   assertHasCap(codieStyleEngine, 'is-tap-free-cast-engine');
   assertHasCap(twiddleStyleSpell, 'is-cheap-instant-engine-untap-spell');
   assertHasCap(creatureUntapTrick, 'is-cheap-instant-engine-untap-spell');
+  assertHasCap(castThresholdSpellCopyEngine, 'is-cast-threshold-spell-copy-engine');
+  assertHasCap(cantripCreatureUntap, 'is-cheap-instant-cantrip-engine-untap-spell');
+  assertHasCap(tapOrUntapCantrip, 'is-cheap-instant-engine-untap-spell');
+  assertHasCap(tapOrUntapCantrip, 'is-cheap-instant-cantrip-engine-untap-spell');
   assertHasFamily(twiddleStyleSpell, codieStyleEngine, 'tap-free-cast→untap-engine');
   assertHasFamily(creatureUntapTrick, codieStyleEngine, 'tap-free-cast→untap-engine');
+  assertHasInteraction(cantripCreatureUntap, castThresholdSpellCopyEngine,
+    it => it.family === 'spell-copy-engine→cantrip-untap-loop' && it.strength === 'combo-critical',
+    'cantrip creature untap plus cast-threshold spell-copy engine should be combo-critical');
+  assertHasInteraction(tapOrUntapCantrip, castThresholdSpellCopyEngine,
+    it => it.family === 'spell-copy-engine→cantrip-untap-loop' && it.strength === 'combo-critical',
+    'tap-or-untap cantrip text should still feed the spell-copy cantrip loop');
+  assertHasInteraction(creatureUntapTrick, castThresholdSpellCopyEngine,
+    it => it.family === 'spell-copy-engine→untap-reset' && it.strength === 'strong',
+    'non-cantrip creature untap should reset the spell-copy engine without becoming a direct combo-critical pair');
+  assertNoEvent(creatureUntapTrick, castThresholdSpellCopyEngine, 'enable:spell-copy-engine→cantrip-untap-loop');
   const nonhandCastLockpiece = node(
     'Nonhand Cast Lockpiece',
     'Creature — Human Wizard',

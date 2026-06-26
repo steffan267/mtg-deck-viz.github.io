@@ -21,6 +21,10 @@ separate win, cohesion, and self-sufficiency scores.
 - Created annotated tag `stable-1.0` on the pre-change `main` commit.
 - Added `tap-free-cast→untap-engine` classification for Codie-style tap engines
   plus cheap instant untap/reset spells.
+- Added `spell-count→spell-copy-engine`,
+  `spell-copy-engine→cantrip-untap-loop`, and
+  `spell-copy-engine→untap-reset` for Stella Lee-style cast-threshold spell-copy
+  commanders without card-name matching.
 - Added bounded proof-search and proof-package support for that value-engine
   family.
 - Verified the motivating Moxfield Codie deck no longer reads as 0 cohesion:

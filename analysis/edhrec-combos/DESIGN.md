@@ -91,6 +91,16 @@ and left several obvious combo commanders at low/no detected cohesion. Those
 timeouts and low-recognition rows are iteration targets, not failures of the
 download path.
 
+The first post-corpus interaction iteration added a generalized
+cast-threshold spell-copy engine for Stella Lee-style Oracle text plus
+cantrip-untap loop edges. On the same top-20/top-20-card slice, combo-tag
+recognition moved from 7 to 8 detected combo decks, combo pairs moved from 11
+to 14, and median cohesion moved from 14 to 16 while median win score stayed 27.
+`Stella Lee, Wild Card` moved from 0 cohesion / 0 combo pairs to 72 cohesion /
+3 combo pairs. The remaining no-combo rows in that slice are the next audit
+queue: Breya, Vivi, Rograkh/Silas, Sisay, Kefka, Krenko, Korvold,
+Thrasios/Tymna, Kenrith, Fire Lord Azula, and Celes.
+
 
 ## Current full-corpus baseline
 

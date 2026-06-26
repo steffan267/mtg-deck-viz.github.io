@@ -48,6 +48,9 @@ export interface DeckPlanAnalysis {
 
 const FAMILY_LABELS: Record<string, string> = {
   'tap-free-cast→untap-engine': 'Tap/free-cast reset engine',
+  'spell-count→spell-copy-engine': 'Spell-count copy engine',
+  'spell-copy-engine→cantrip-untap-loop': 'Spell-copy cantrip untap loop',
+  'spell-copy-engine→untap-reset': 'Spell-copy untap reset',
   'imprint-untap-spell-loop': 'Repeatable untap spell loop',
   'self-untap-mana-loop': 'Self-untap mana loop',
   'self-untap-mana→ability-copy-loop': 'Self-untap ability-copy loop',
