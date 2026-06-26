@@ -2,6 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const ANALYSIS = require("../../lib/bracket-analysis");
+const { createProgress } = require("../../lib/progress");
 
 const DEFAULT_CORPUS = path.join(__dirname, "moxfield-bracket-corpus.json");
 const DEFAULT_OUT = path.join(__dirname, "moxfield-bracket-report.md");
@@ -33,7 +34,11 @@ function writeFile(file, content) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const corpus = JSON.parse(fs.readFileSync(opts.corpus, "utf8"));
-  const report = ANALYSIS.buildBracketAnalysis(ANALYSIS.rowsFromCorpus(corpus));
+  const rows = ANALYSIS.rowsFromCorpus(corpus);
+  const progress = createProgress("bracket-analysis-report", rows.length, { every: Math.max(1, rows.length) });
+  progress.start(`corpus=${opts.corpus}`);
+  const report = ANALYSIS.buildBracketAnalysis(rows);
+  progress.done(`rows=${rows.length}`);
   const markdown = ANALYSIS.renderMarkdown(report, opts.corpus);
   writeFile(opts.out, markdown + "\n");
   writeFile(opts.jsonOut, JSON.stringify(report, null, 2) + "\n");

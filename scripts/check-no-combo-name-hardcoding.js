@@ -8,6 +8,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { createProgress } = require('../lib/progress');
 
 const ROOT = path.resolve(__dirname, '..');
 const CORE_LOGIC_FILES = [
@@ -184,7 +185,15 @@ function runNoComboNameHardcodingCheck(options = {}) {
   const root = options.root || ROOT;
   const names = normalizeNames(options.names || collectEvidenceCardNames(root));
   const files = options.files || discoverCoreLogicFiles(root);
-  const findings = files.flatMap(file => findNameMentions(file, names, root));
+  const progress = createProgress('no-hardcode-scan', files.length, { every: 1 });
+  progress.start(`names=${names.length}`);
+  const findings = [];
+  for (let i = 0; i < files.length; i++) {
+    const fileFindings = findNameMentions(files[i], names, root);
+    findings.push(...fileFindings);
+    progress.tick(i + 1, `findings=${findings.length} last=${files[i]}`);
+  }
+  progress.done(`findings=${findings.length}`);
   return {
     ok: findings.length === 0,
     checkedFiles: files,

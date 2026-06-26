@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { build, loadCards } = require('../../src/build-deck-viz');
+const { createProgress } = require('../../lib/progress');
 
 const DEFAULT_CACHE = path.join(__dirname, 'edhrec-combo-tag-decks.json');
 const DEFAULT_JSON_OUT = path.join(__dirname, 'edhrec-combo-tag-deck-evaluation.json');
@@ -194,6 +195,8 @@ function evaluateComboTagDecks(opts) {
   const decks = (cache.decks || []).slice(0, opts.max);
   const rows = [];
   const failures = [];
+  const progress = createProgress('edhrec-combo-tag-score', decks.length, { every: opts.progressEvery });
+  progress.start(`cache=${opts.cache}`);
   for (let i = 0; i < decks.length; i++) {
     const deck = decks[i];
     const result = scoreDeckInWorker(opts.cache, i, opts.timeoutMs, opts.deckCardLimit);
@@ -205,10 +208,9 @@ function evaluateComboTagDecks(opts) {
       error: result.error,
       timedOut: result.timedOut,
     });
-    if (opts.progressEvery && ((i + 1) % opts.progressEvery === 0 || i + 1 === decks.length)) {
-      process.stdout.write(`[score] ${i + 1}/${decks.length} rows=${rows.length} failures=${failures.length} last="${deck.name}"\n`);
-    }
+    progress.tick(i + 1, `rows=${rows.length} failures=${failures.length} last="${deck.name}"`);
   }
+  progress.done(`rows=${rows.length} failures=${failures.length}`);
   return {
     meta: {
       cache: opts.cache,

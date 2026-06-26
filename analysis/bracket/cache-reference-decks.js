@@ -12,13 +12,14 @@
 const fs = require('fs');
 const path = require('path');
 const { fetchMoxfield } = require('../../src/build-deck-viz.js');
+const { createProgress } = require('../../lib/progress');
 
 const DEFAULT_SAMPLE = path.join(__dirname, 'moxfield-bracket-sample-500.json');
 const DEFAULT_OUT = path.join(__dirname, 'moxfield-reference-decks.json');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function usage() {
-  console.error('Usage: node analysis/bracket/cache-reference-decks.js [--sample file] [--out file] [--limit n] [--delay-ms n] [--retries n] [--force] [--fail-fast]');
+  console.error('Usage: node analysis/bracket/cache-reference-decks.js [--sample file] [--out file] [--limit n] [--delay-ms n] [--retries n] [--force] [--fail-fast] [--progress-every n]');
   process.exit(2);
 }
 
@@ -36,6 +37,7 @@ function parseArgs(argv) {
     retries: 5,
     force: false,
     failFast: false,
+    progressEvery: 10,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -46,6 +48,7 @@ function parseArgs(argv) {
     else if (a === '--retries') opts.retries = parsePositiveInt(argv[++i], opts.retries);
     else if (a === '--force') opts.force = true;
     else if (a === '--fail-fast') opts.failFast = true;
+    else if (a === '--progress-every') opts.progressEvery = parsePositiveInt(argv[++i], opts.progressEvery);
     else if (a === '--help') usage();
     else usage();
   }
@@ -161,10 +164,15 @@ async function cacheReferenceDecks(opts, fetcher = fetchMoxfield) {
 
   process.stdout.write(`Reference sample ${opts.sample}: ${sampleDecks.length} decks\n`);
   process.stdout.write(`Resuming with ${recordsById.size} cached decklists and ${failuresById.size} prior failures\n`);
+  const progress = createProgress('reference-deck-cache', sampleDecks.length, { every: opts.progressEvery });
+  progress.start(`out=${opts.out}`);
 
   for (let i = 0; i < sampleDecks.length; i++) {
     const source = sampleDecks[i];
-    if (!opts.force && recordsById.has(source.id)) continue;
+    if (!opts.force && recordsById.has(source.id)) {
+      progress.tick(i + 1, `cached=${recordsById.size} failures=${failuresById.size} last=${source.name || source.id}`);
+      continue;
+    }
     process.stdout.write(`[${i + 1}/${sampleDecks.length}] ${String(source.name || source.id).slice(0, 44)} … `);
     try {
       const fetched = await fetchWithRetry(source.id, fetcher, opts.retries);
@@ -186,8 +194,10 @@ async function cacheReferenceDecks(opts, fetcher = fetchMoxfield) {
       if (opts.failFast) throw err;
     }
     writeCheckpoint(opts.out, buildOutput(opts.sample, sampleDecks, recordsById, failuresById));
+    progress.tick(i + 1, `cached=${recordsById.size} failures=${failuresById.size} last=${source.name || source.id}`);
     if (opts.delayMs > 0) await sleep(opts.delayMs);
   }
+  progress.done(`cached=${recordsById.size} failures=${failuresById.size}`);
 
   const payload = buildOutput(opts.sample, sampleDecks, recordsById, failuresById);
   writeCheckpoint(opts.out, payload);

@@ -9,6 +9,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { createProgress } = require('../../lib/progress');
 
 const BASE_JSON_URL = 'https://json.edhrec.com/pages';
 const DEFAULT_OUT = path.join(__dirname, 'edhrec-combo-tag-decks.json');
@@ -304,7 +305,11 @@ async function fetchEdhrecComboTagDecks(opts, fetcher = httpGetJson) {
   const failures = [];
   const index = await fetcher(jsonUrl(DEFAULT_INDEX));
   const tagPages = [];
-  for (const tagPage of discoverTagPages(index)) {
+  const discoveredTagPages = discoverTagPages(index);
+  const tagProgress = createProgress('edhrec-combo-tag-pages', discoveredTagPages.length, { every: 1 });
+  tagProgress.start(`out=${opts.out}`);
+  for (let tagIndex = 0; tagIndex < discoveredTagPages.length; tagIndex++) {
+    const tagPage = discoveredTagPages[tagIndex];
     process.stdout.write(`[tag] ${tagPage.path} … `);
     try {
       const payload = tagPage.path === DEFAULT_INDEX ? index : await fetcher(jsonUrl(tagPage.path));
@@ -318,15 +323,20 @@ async function fetchEdhrecComboTagDecks(opts, fetcher = httpGetJson) {
       failures.push({ stage: 'tag-page', path: tagPage.path, error: error.message, failedAt: new Date().toISOString() });
       process.stdout.write(`✗ ${error.message}\n`);
     }
+    tagProgress.tick(tagIndex + 1, `tagPages=${tagPages.length} failures=${failures.length} last=${tagPage.path}`);
     if (opts.delayMs > 0) await sleep(opts.delayMs);
   }
+  tagProgress.done(`tagPages=${tagPages.length} failures=${failures.length}`);
 
   const seeds = collectCommanderSeeds(tagPages);
   const targetSeeds = seeds.slice(0, opts.maxCommanders);
+  const commanderProgress = createProgress('edhrec-combo-commanders', targetSeeds.length, { every: 10 });
+  commanderProgress.start(`cached=${decksById.size}`);
   for (let i = 0; i < targetSeeds.length; i++) {
     const seed = targetSeeds[i];
     if (!opts.force && decksById.has(seed.slug)) {
       process.stdout.write(`[commander ${i + 1}/${targetSeeds.length}] ${seed.name} … cached\n`);
+      commanderProgress.tick(i + 1, `cached=${decksById.size} failures=${failures.length} last=${seed.name}`);
       continue;
     }
     process.stdout.write(`[commander ${i + 1}/${targetSeeds.length}] ${seed.name} … `);
@@ -340,8 +350,10 @@ async function fetchEdhrecComboTagDecks(opts, fetcher = httpGetJson) {
     }
     const payload = buildPayload(opts, tagPages, seeds, [...decksById.values()], failures);
     writeJson(opts.out, payload);
+    commanderProgress.tick(i + 1, `cached=${decksById.size} failures=${failures.length} last=${seed.name}`);
     if (opts.delayMs > 0) await sleep(opts.delayMs);
   }
+  commanderProgress.done(`cached=${decksById.size} failures=${failures.length}`);
   const payload = buildPayload(opts, tagPages, seeds, [...decksById.values()], failures);
   writeJson(opts.out, payload);
   return payload;

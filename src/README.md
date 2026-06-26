@@ -193,6 +193,12 @@ For EDHREC combo iteration, `npm run fetch-edhrec-combos` and
 average-deck corpus used to pressure-test combo, deck-plan, and commander-plan
 recognition.
 
+Long-running analysis and build commands emit structured progress lines to
+`stderr` using `[progress] <label> current/total pct eta elapsed rate | detail`.
+This keeps JSON/Markdown/stdout payloads parseable while making corpus runs easy
+to monitor. The largest corpus scripts also accept `--progress-every n` so full
+EDHREC or Moxfield runs can be made quieter or chattier without changing code.
+
 ## In the browser
 
 - **+ Add Moxfield deck** — paste a URL to fetch and add a deck live.

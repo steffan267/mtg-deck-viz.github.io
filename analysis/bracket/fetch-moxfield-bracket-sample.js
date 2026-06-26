@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const { createProgress } = require('../../lib/progress');
 const {
   TARGET_BRACKETS,
   GLOBAL_PAGE_SIZE,
@@ -74,18 +75,28 @@ function save(out, payload) {
 }
 
 async function seedBracketPages(state, targetPerBracket) {
-  for (const bracket of TARGET_BRACKETS) {
-    if (state.counts[bracket] >= targetPerBracket) continue;
+  const progress = createProgress('moxfield-bracket-seed', TARGET_BRACKETS.length, { every: 1 });
+  progress.start(`targetPerBracket=${targetPerBracket}`);
+  for (let i = 0; i < TARGET_BRACKETS.length; i++) {
+    const bracket = TARGET_BRACKETS[i];
+    if (state.counts[bracket] >= targetPerBracket) {
+      progress.tick(i + 1, `counts=${JSON.stringify(sampleStatus(state.decks, targetPerBracket).counts)} last=B${bracket}`);
+      continue;
+    }
     const q = encodePublicBracketQuery(bracket);
     const body = await fetchViaJina(PUBLIC_PAGE + q);
     const entries = parsePublicBracketPage(body, bracket);
     for (const deck of entries) maybeAddDeck(state, deck, targetPerBracket);
+    progress.tick(i + 1, `counts=${JSON.stringify(sampleStatus(state.decks, targetPerBracket).counts)} last=B${bracket}`);
     await sleep(500);
   }
+  progress.done(`counts=${JSON.stringify(sampleStatus(state.decks, targetPerBracket).counts)}`);
 }
 
 async function scanGlobalLikes(state, targetPerBracket, maxPages, pageSize) {
   let pagesScanned = 0;
+  const progress = createProgress('moxfield-global-likes-pages', maxPages, { every: 1 });
+  progress.start(`pageSize=${pageSize}`);
   for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
     const qs = new URLSearchParams({ pageNumber: String(pageNumber), pageSize: String(pageSize), sortType: 'likes' });
     const body = await fetchViaJina(`${SEARCH_API}?${qs.toString()}`);
@@ -100,9 +111,14 @@ async function scanGlobalLikes(state, targetPerBracket, maxPages, pageSize) {
     }
     const status = sampleStatus(state.decks, targetPerBracket);
     process.stdout.write(`[global page ${pageNumber}] counts ${JSON.stringify(status.counts)}\n`);
-    if (status.complete) return { pagesScanned, complete: true };
+    progress.tick(pageNumber, `counts=${JSON.stringify(status.counts)}`);
+    if (status.complete) {
+      progress.done(`counts=${JSON.stringify(status.counts)} complete=true`);
+      return { pagesScanned, complete: true };
+    }
     await sleep(350);
   }
+  progress.done(`counts=${JSON.stringify(sampleStatus(state.decks, targetPerBracket).counts)} complete=false`);
   return { pagesScanned, complete: false };
 }
 

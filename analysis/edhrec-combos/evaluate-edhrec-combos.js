@@ -16,6 +16,7 @@ const { COMBO_FAMILIES } = require('../../src/combo-family-library');
 const { ProofStatus } = require('../../src/domain/interaction-constants');
 const MODEL = require('../../src/interaction-model');
 const SEMANTICS = require('../../src/semantic-proof-utils');
+const { createProgress } = require('../../lib/progress');
 
 const DEFAULT_CACHE = path.join(__dirname, 'edhrec-combo-cache.json');
 const DEFAULT_JSON_OUT = path.join(__dirname, 'edhrec-combo-evaluation.json');
@@ -115,7 +116,7 @@ const EDGE_RESULT_CLASS_MAP = {
 };
 
 function usage() {
-  console.error('Usage: node analysis/edhrec-combos/evaluate-edhrec-combos.js [--cache file] [--json-out file] [--md-out file] [--max n]');
+  console.error('Usage: node analysis/edhrec-combos/evaluate-edhrec-combos.js [--cache file] [--json-out file] [--md-out file] [--max n] [--progress-every n]');
   process.exit(2);
 }
 
@@ -125,13 +126,14 @@ function parsePositiveInt(value, fallback) {
 }
 
 function parseArgs(argv) {
-  const opts = { cache: DEFAULT_CACHE, jsonOut: DEFAULT_JSON_OUT, mdOut: DEFAULT_MD_OUT, max: Infinity };
+  const opts = { cache: DEFAULT_CACHE, jsonOut: DEFAULT_JSON_OUT, mdOut: DEFAULT_MD_OUT, max: Infinity, progressEvery: 1000 };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--cache') opts.cache = argv[++i];
     else if (arg === '--json-out') opts.jsonOut = argv[++i];
     else if (arg === '--md-out') opts.mdOut = argv[++i];
     else if (arg === '--max') opts.max = parsePositiveInt(argv[++i], opts.max);
+    else if (arg === '--progress-every') opts.progressEvery = parsePositiveInt(argv[++i], opts.progressEvery);
     else if (arg === '--help') usage();
     else usage();
   }
@@ -767,7 +769,17 @@ function main() {
   const cache = loadCache(opts.cache);
   const combos = detailedCombos(cache, opts.max);
   const idx = loadCards();
-  const evaluations = combos.map(combo => evaluateCombo(combo, idx));
+  const progress = createProgress('edhrec-combo-eval', combos.length, { every: opts.progressEvery });
+  const progressBuckets = {};
+  const evaluations = [];
+  progress.start(`cache=${opts.cache}`);
+  for (let i = 0; i < combos.length; i++) {
+    const evaluation = evaluateCombo(combos[i], idx);
+    evaluations.push(evaluation);
+    increment(progressBuckets, evaluation.bucket);
+    progress.tick(i + 1, `proved=${progressBuckets.proved || 0} classified=${progressBuckets['classified-not-proven'] || 0} missed=${progressBuckets.missed || 0} last=${evaluation.id}`);
+  }
+  progress.done(`proved=${progressBuckets.proved || 0} total=${evaluations.length}`);
   const summary = summarizeEvaluations(evaluations, cache.meta || {});
   const payload = {
     meta: {

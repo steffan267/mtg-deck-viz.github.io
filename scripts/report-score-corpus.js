@@ -9,6 +9,7 @@ const path = require('node:path');
 
 const { build, loadCards } = require('../src/build-deck-viz');
 const { evaluateCorpus } = require('./report-interaction-validation');
+const { createProgress } = require('../lib/progress');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -253,10 +254,12 @@ function interactionRowsFromCache(relativePath) {
 function interactionRowsFromDecks(decks) {
   if (!decks.length) return [];
   const idx = loadCards();
-  return decks.map(deck => {
+  const progress = createProgress('score-corpus-interaction-rows', decks.length);
+  progress.start();
+  const rows = decks.map((deck, index) => {
     const graph = build(deck.decklist || [], idx);
     const metrics = graph.metrics || {};
-    return {
+    const row = {
       id: deck.id,
       name: deck.name || deck.title || deck.id,
       cards: graph.nodes.filter(node => node.role !== 'zone').length,
@@ -278,7 +281,11 @@ function interactionRowsFromDecks(decks) {
       topFamilies: topFamilies(graph),
       inflationFamilies: inflationFamilies(graph),
     };
+    progress.tick(index + 1, `last=${row.name}`);
+    return row;
   });
+  progress.done(`rows=${rows.length}`);
+  return rows;
 }
 
 function topFamilies(graph) {
@@ -433,16 +440,33 @@ function summarizeAudit() {
 }
 
 function main() {
+  const progress = createProgress('score-corpus-report', 7, { every: 1 });
+  progress.start();
+  progress.tick(1, 'interactionValidation');
+  const interactionValidation = summarizeInteractionValidation();
+  progress.tick(2, 'baseline');
+  const baseline = summarizeBaseline();
+  progress.tick(3, 'preconWinTuningCorpus');
+  const preconWinTuningCorpus = summarizeWinTuningCorpus();
+  progress.tick(4, 'preconInteractionCorpus');
+  const preconInteractionCorpus = summarizePreconInteractionCorpus();
+  progress.tick(5, 'moxfieldBracketCorpus');
+  const moxfieldBracketCorpus = summarizeMoxfieldBracketCorpus();
+  progress.tick(6, 'edhrecComboTagDecks');
+  const edhrecComboTagDecks = summarizeEdhrecComboTagDecks();
+  progress.tick(7, 'auditRound5');
+  const auditRound5 = summarizeAudit();
+  progress.done('ready');
   const report = {
     generatedBy: 'scripts/report-score-corpus.js',
     note: 'Uses whichever local sample/corpus files exist. Ignored analysis/ and work/ caches are valid inputs for current model evaluation.',
-    interactionValidation: summarizeInteractionValidation(),
-    baseline: summarizeBaseline(),
-    preconWinTuningCorpus: summarizeWinTuningCorpus(),
-    preconInteractionCorpus: summarizePreconInteractionCorpus(),
-    moxfieldBracketCorpus: summarizeMoxfieldBracketCorpus(),
-    edhrecComboTagDecks: summarizeEdhrecComboTagDecks(),
-    auditRound5: summarizeAudit(),
+    interactionValidation,
+    baseline,
+    preconWinTuningCorpus,
+    preconInteractionCorpus,
+    moxfieldBracketCorpus,
+    edhrecComboTagDecks,
+    auditRound5,
   };
   process.stdout.write(JSON.stringify(report, null, 2) + '\n');
 }

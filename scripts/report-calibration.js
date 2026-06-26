@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { build, loadCards } = require('../src/build-deck-viz');
+const { createProgress } = require('../lib/progress');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -132,7 +133,7 @@ function familyCounts(graph) {
   return out;
 }
 
-function buildRows(cacheFile, baselineFile) {
+function buildRows(cacheFile, baselineFile, label = 'calibration-build-rows') {
   if (!exists(cacheFile)) return { source: cacheFile, available: false, rows: [] };
   const cache = readJson(cacheFile);
   const decks = Array.isArray(cache) ? cache : (cache.decks || []);
@@ -140,12 +141,14 @@ function buildRows(cacheFile, baselineFile) {
   const baselineById = new Map(baselineRows.filter(row => row.id).map(row => [row.id, row]));
   const baselineByName = new Map(baselineRows.map(row => [normalizeName(row.name || row.title), row]));
   const idx = loadCards();
-  const rows = decks.map(deck => {
+  const progress = createProgress(label, decks.length);
+  progress.start(`cache=${cacheFile}`);
+  const rows = decks.map((deck, index) => {
     const graph = build(deck.decklist || [], idx);
     const metrics = graph.metrics || {};
     const baseline = baselineById.get(deck.id) || baselineByName.get(normalizeName(deck.name || deck.title));
     const families = familyCounts(graph);
-    return {
+    const row = {
       id: deck.id,
       name: deck.name || deck.title || deck.id,
       sourceBracket: baseline?.sourceBracket || deck.sourceBracket || null,
@@ -174,7 +177,10 @@ function buildRows(cacheFile, baselineFile) {
       } : null,
       families,
     };
+    progress.tick(index + 1, `last=${row.name}`);
+    return row;
   });
+  progress.done(`rows=${rows.length}`);
   return { source: cacheFile, baseline: baselineFile, available: true, rows };
 }
 
@@ -355,8 +361,8 @@ function summarizeAuditTracking(preconRows) {
 
 function main() {
   const args = parseArgs(process.argv);
-  const precon = buildRows(PRECON_CACHE_FILE, PRECON_BASELINE_FILE);
-  const moxfield = buildRows(MOXFIELD_CACHE_FILE, MOXFIELD_BASELINE_FILE);
+  const precon = buildRows(PRECON_CACHE_FILE, PRECON_BASELINE_FILE, 'calibration-precon-rows');
+  const moxfield = buildRows(MOXFIELD_CACHE_FILE, MOXFIELD_BASELINE_FILE, 'calibration-moxfield-rows');
   const watchlist = loadWatchlist();
   const report = {
     schemaVersion: 'calibration-report.v1',

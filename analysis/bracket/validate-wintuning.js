@@ -15,6 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 const { loadCards, build, fetchMoxfield } = require("../../src/build-deck-viz.js");
+const { createProgress } = require("../../lib/progress");
 
 const ROOT = path.resolve(__dirname, "../..");
 const DEFAULT_CORPUS = path.join(ROOT, "data/precon-sample-100.json");
@@ -35,16 +36,17 @@ async function fetchWithRetry(id, tries = 5) {
 }
 
 function parseArgs(argv) {
-  const opts = { corpus: DEFAULT_CORPUS, out: DEFAULT_OUT, limit: Infinity, deckCache: null };
+  const opts = { corpus: DEFAULT_CORPUS, out: DEFAULT_OUT, limit: Infinity, deckCache: null, progressEvery: 10 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--corpus') opts.corpus = argv[++i];
     else if (a === '--out') opts.out = argv[++i];
     else if (a === '--deck-cache') opts.deckCache = argv[++i];
     else if (a === '--limit') opts.limit = parseInt(argv[++i], 10) || Infinity;
+    else if (a === '--progress-every') opts.progressEvery = parseInt(argv[++i], 10) || opts.progressEvery;
     else if (/^\d+$/.test(a)) opts.limit = parseInt(a, 10);
     else if (a === '--help') {
-      console.error('Usage: node analysis/bracket/validate-wintuning.js [limit] [--corpus file] [--out file] [--deck-cache file] [--limit n]');
+      console.error('Usage: node analysis/bracket/validate-wintuning.js [limit] [--corpus file] [--out file] [--deck-cache file] [--limit n] [--progress-every n]');
       process.exit(2);
     }
   }
@@ -116,9 +118,15 @@ async function main() {
   const done = new Map(prior.results.map(r => [r.id, r]));
   const results = [];
   const failures = [];
+  const progress = createProgress('wintuning-corpus', corpus.length, { every: opts.progressEvery });
+  progress.start(`out=${opts.out}`);
   for (let i = 0; i < corpus.length; i++) {
     const { id, name } = corpus[i];
-    if (done.has(id)) { results.push(done.get(id)); continue; }
+    if (done.has(id)) {
+      results.push(done.get(id));
+      progress.tick(i + 1, `scored=${results.length} failures=${failures.length} cached-prior=true last=${name}`);
+      continue;
+    }
     process.stdout.write(`[${i + 1}/${corpus.length}] ${name.slice(0, 40)} … `);
     try {
       const cached = getCachedDeck(deckCache, id);
@@ -147,7 +155,9 @@ async function main() {
       });
       writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures, opts.deckCache));
     }
+    progress.tick(i + 1, `scored=${results.length} failures=${failures.length} last=${name}`);
   }
+  progress.done(`scored=${results.length} failures=${failures.length}`);
 
   writeCheckpoint(opts.out, buildOutput(opts.corpus, corpus.length, results, failures, opts.deckCache));
 

@@ -12,6 +12,7 @@ const {
   buildInteractionProofPackages,
 } = require('../src/interaction-proof-packages');
 const { COMBO_FAMILIES, validateComboFamilyLibrary } = require('../src/combo-family-library');
+const { createProgress } = require('../lib/progress');
 
 const ROOT = path.resolve(__dirname, '..');
 const VALIDATION_REPORT = path.join(ROOT, 'analysis/interaction-validation/report.json');
@@ -129,11 +130,19 @@ function checkFamilyDefinitions(errors) {
 
 function runHardeningChecks() {
   const errors = [];
+  const progress = createProgress('interaction-hardening', 5, { every: 1 });
+  progress.start();
   checkFamilyDefinitions(errors);
+  progress.tick(1, 'family-definitions');
   checkValidationMetrics(errors);
+  progress.tick(2, 'validation-metrics');
   checkProofPayloadBudgets(errors);
+  progress.tick(3, 'proof-payload-budgets');
   checkRuntimeContracts(errors);
+  progress.tick(4, 'runtime-contracts');
   requireDocSections(errors);
+  progress.tick(5, 'doc-sections');
+  progress.done(`errors=${errors.length}`);
   return {
     ok: errors.length === 0,
     errors,

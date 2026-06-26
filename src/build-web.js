@@ -9,6 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const cp = require("child_process");
 const { loadCards, resolveSource, build, candidateIndex } = require("./build-deck-viz.js");
+const { createProgress } = require("../lib/progress");
 
 const ROOT = path.resolve(__dirname, "..");
 const DOCS = path.join(ROOT, "docs");
@@ -96,11 +97,16 @@ async function writeBootstrap(options = {}) {
   const idx = loadCards();
   const candidates = candidateIndex(idx);
   const decks = [];
-  for (const source of sources) {
+  const progress = createProgress("web-bootstrap-decks", sources.length, { every: 1 });
+  progress.start();
+  for (let index = 0; index < sources.length; index++) {
+    const source = sources[index];
     const resolved = await resolveSource(sourceForResolve(source), idx);
     const graph = build(resolved.decklist, idx, { includeInteractionProofs: true });
     decks.push({ title: titleForSource(source, resolved), graph, sourceId: publicSourceId(source) });
+    progress.tick(index + 1, `last=${resolved.title}`);
   }
+  progress.done(`decks=${decks.length}`);
   if (!decks.length) throw new Error("No decks were built for the Pages bootstrap");
   const title = decks.length === 1 ? decks[0].title : `${decks.length} deck comparison`;
   const bootstrap = {
@@ -117,20 +123,29 @@ async function writeBootstrap(options = {}) {
 }
 
 async function main() {
+  const progress = createProgress("build-web", 6, { every: 1 });
+  progress.start("clean-root");
   removeRootPagesArtifacts();
+  progress.tick(1, "bootstrap");
   const sources = buildSources();
   const bootstrap = await writeBootstrap({ sources });
+  progress.tick(2, "vite-build");
   rmrf(DIST);
   cp.execFileSync(path.join(ROOT, "node_modules/.bin/vite"), ["build"], { cwd: ROOT, stdio: "inherit" });
+  progress.tick(3, "copy-docs");
   rmrf(DOCS);
   copyDir(DIST, DOCS);
+  progress.tick(4, "bootstrap-copy");
   fs.copyFileSync(path.join(GENERATED, "bootstrap-data.json"), path.join(DOCS, "bootstrap-data.json"));
   const inlined = inlineBuiltAssets(fs.readFileSync(path.join(DOCS, "index.html"), "utf8"), bootstrap);
   fs.writeFileSync(path.join(DOCS, "index.html"), inlined);
+  progress.tick(5, "worker-copy");
   for (const asset of fs.readdirSync(path.join(DOCS, "assets"))) {
     if (/^recommendation\.worker-.*\.js$/.test(asset)) fs.copyFileSync(path.join(DOCS, "assets", asset), path.join(DOCS, asset));
   }
   fs.writeFileSync(path.join(DOCS, ".nojekyll"), "");
+  progress.tick(6, "done");
+  progress.done(`decks=${bootstrap.decks.length}`);
   console.log(`✓ Vue site built to docs/ (${bootstrap.decks.length} deck${bootstrap.decks.length === 1 ? "" : "s"}, candidates: ${bootstrap.candidates.length})`);
   console.log(`  Included decks: ${bootstrap.decks.map(deck => deck.title).join(", ")}`);
   console.log(`  Moxfield proxy: ${process.env.MOXFIELD_PROXY || "(none — file/paste import only)"}`);

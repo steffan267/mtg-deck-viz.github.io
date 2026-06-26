@@ -6,6 +6,7 @@
  */
 const { performance } = require('node:perf_hooks');
 const { candidateIndex, loadCards } = require('../src/build-deck-viz');
+const { createProgress } = require('../lib/progress');
 const {
   buildInteractionIndexes,
   candidateClosures,
@@ -48,13 +49,22 @@ function main() {
   let cards = candidateIndex(loadCards()).map(toIndexableCard);
   if (Number.isFinite(args.limit) && args.limit > 0) cards = cards.slice(0, args.limit);
   const loadEnd = performance.now();
+  const progress = createProgress('interaction-index-performance', 3, { every: 1 });
+  progress.start(`cards=${cards.length}`);
   const indexStart = performance.now();
   const indexes = buildInteractionIndexes(cards);
   const indexEnd = performance.now();
+  progress.tick(1, 'indexes-built');
 
   const samples = {};
-  for (const name of args.sample) {
-    if (!indexes.cardsById[name]) continue;
+  const sampleProgress = createProgress('interaction-index-samples', args.sample.length, { every: 1 });
+  sampleProgress.start();
+  for (let i = 0; i < args.sample.length; i++) {
+    const name = args.sample[i];
+    if (!indexes.cardsById[name]) {
+      sampleProgress.tick(i + 1, `missing=${name}`);
+      continue;
+    }
     const pairStart = performance.now();
     const pairs = candidatePairs(name, indexes, { limit: 25 });
     const pairEnd = performance.now();
@@ -69,7 +79,10 @@ function main() {
       firstPairs: pairs.slice(0, 3),
       firstTriples: triples.slice(0, 3),
     };
+    sampleProgress.tick(i + 1, `last=${name}`);
   }
+  sampleProgress.done(`samples=${Object.keys(samples).length}`);
+  progress.tick(2, 'samples-tested');
 
   const closureStart = performance.now();
   const closures = candidateClosures([
@@ -78,6 +91,8 @@ function main() {
     { kind: 'capability', predicate: 'is-token-doubler' },
   ], indexes);
   const closureEnd = performance.now();
+  progress.tick(3, `closures=${closures.candidates.length}`);
+  progress.done('ready');
 
   process.stdout.write(JSON.stringify({
     cardCount: cards.length,

@@ -26,6 +26,7 @@ const METRICS = require("./metrics.js");
 const PROOF_PACKAGES = require("./interaction-proof-packages.js");
 const CARD_FACES = require("./card-faces.js");
 const FACE_CLASSIFICATION = require("./face-classification.js");
+const { createProgress } = require("../lib/progress");
 
 const ROOT = path.resolve(__dirname, "..");
 const COMPACT = path.join(ROOT, "data/out/commander-search.json");
@@ -322,17 +323,26 @@ async function main() {
 
   const idx = loadCards();
   const decks = [];
-  for (const src of sources) {
+  const progress = createProgress("deck-viz-sources", sources.length, { every: 1 });
+  progress.start(`out=${outPath}`);
+  for (let index = 0; index < sources.length; index++) {
+    const src = sources[index];
     process.stdout.write(`• ${src}\n`);
     let resolved;
     try { resolved = await resolveSource(src, idx); }
-    catch (e) { console.error("  ✗ " + e.message); continue; }
+    catch (e) {
+      console.error("  ✗ " + e.message);
+      progress.tick(index + 1, `failed=${src}`);
+      continue;
+    }
     const graph = build(resolved.decklist, idx, { includeInteractionProofs: true });
     if (graph.missing.length) console.warn("  ⚠ skipped (not found): " + graph.missing.join(", "));
     decks.push({ title: resolved.title, graph });
     console.log(`  ✓ ${resolved.title}`);
     console.log(fmtMetrics(graph.metrics));
+    progress.tick(index + 1, `built=${decks.length} last=${resolved.title}`);
   }
+  progress.done(`built=${decks.length}`);
   if (!decks.length) { console.error("No decks built."); process.exit(1); }
 
   fs.writeFileSync(outPath, emit({ decks, active: 0 }));

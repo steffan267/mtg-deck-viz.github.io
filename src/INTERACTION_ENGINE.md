@@ -122,6 +122,12 @@ The current combo corpus work established these reusable constraints:
 - **Proof-package seeds are product behavior.** If `provePackage()` learns a new
   family, `interaction-proof-packages.js` must seed the same bounded candidate
   shape so static/UI `interactionProofs` do not lag the proof engine.
+- **Routing-slip search belongs in the understanding layer first.** The first
+  bounded obligation-stack prototype resolves recursive-body sacrifice loops
+  where a free creature-sacrifice outlet creates the death event, a death-mana
+  payoff pays the recursive body cost, and the recursive body restores the
+  starting state. This keeps generalized multi-step search behind the same
+  package-local proof bridge before promoting broader graph behavior.
 - **Fresh-token combat/turn loops need freshness and axis guards.** Hasty
   copy-token loops are only a proof when the token is created before attacker
   declaration, survives copy/legend restrictions on the same compatible face,

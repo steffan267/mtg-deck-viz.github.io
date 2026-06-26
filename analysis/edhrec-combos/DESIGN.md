@@ -83,6 +83,12 @@ npm run evaluate-edhrec-combo-tag-decks -- --max 20 --deck-card-limit 20 --timeo
 npm run report:score-corpus
 ```
 
+All EDHREC fetch/evaluation scripts now emit `[progress]` lines to `stderr`.
+The evaluator reports live proved/classified/missed bucket counts; fetchers
+report category, detail, tag-page, commander, failure, and cache counts. Use
+`--progress-every n` on the large combo evaluator/fetcher and combo-tag scorer
+to tune log volume during full-corpus runs.
+
 The fetched corpus is resumable and local-only. On 2026-06-26 it discovered 33
 combo tag/color pages and 784 unique commander average lists with zero fetch
 failures. The first top-20/top-20-card score slice evaluated 19 decks, timed out
@@ -100,6 +106,15 @@ to 14, and median cohesion moved from 14 to 16 while median win score stayed 27.
 3 combo pairs. The remaining no-combo rows in that slice are the next audit
 queue: Breya, Vivi, Rograkh/Silas, Sisay, Kefka, Krenko, Korvold,
 Thrasios/Tymna, Kenrith, Fire Lord Azula, and Celes.
+
+The first routing-slip proof-search iteration added a bounded obligation stack
+inside `interaction-understanding.js`. Its initial target is recursive-body
+sacrifice loops whose mana is supplied by a death trigger rather than directly
+by the sacrifice outlet. On a 9,000-row EDHREC combo-card evaluator slice, the
+`Pitiless Plunderer` + `Gravecrawler` + free-outlet variants moved from
+classified-but-not-proven to `recursive-body-sacrifice-mana-loop` proofs while
+leaving separate side axes such as scry, counters, damage, and mill unclaimed
+unless another proof/family explains them.
 
 
 ## Current full-corpus baseline

@@ -1256,6 +1256,27 @@ const recursiveProof = proofByFamily(recursiveSacLoop, 'recursive-body-sacrifice
 assert.ok(recursiveProof);
 assert.ok(recursiveProof.positiveDeltas.some(delta => delta.resource === 'casts'));
 
+const routingSlipRecursiveDeathManaLoop = provePackage([
+  card('Typed Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control a Zombie.', 1, '{B}'),
+  card('Free Creature Sac Outlet', 'Creature — Vampire Wizard', 'Sacrifice a creature: Scry 1.', 1),
+  card('Death Mana Payoff', 'Creature — Human Pirate', 'Whenever another creature you control dies, create a Treasure token.', 4),
+]);
+assert.equal(routingSlipRecursiveDeathManaLoop.status, 'proven');
+const routingSlipRecursiveProof = proofByFamily(routingSlipRecursiveDeathManaLoop, 'recursive-body-sacrifice-mana-loop');
+assert.ok(routingSlipRecursiveProof);
+assert.equal(routingSlipRecursiveProof.proof.understanding.kind, 'strict-proof');
+assert.ok(routingSlipRecursiveProof.proof.understanding.requiredLegality.some(item => item.predicate === 'bounded-search'));
+assert.ok(routingSlipRecursiveProof.positiveDeltas.some(delta => delta.resource === 'casts'));
+assert.ok(routingSlipRecursiveProof.positiveDeltas.some(delta => delta.resource === 'sacrifices'));
+
+const routingSlipRecursiveInsufficientMana = provePackage([
+  card('Expensive Recursive Cast Body', 'Creature — Zombie', 'You may cast this card from your graveyard as long as you control a Zombie.', 2, '{1}{B}'),
+  card('Free Creature Sac Outlet', 'Creature — Vampire Wizard', 'Sacrifice a creature: Scry 1.', 1),
+  card('Death Mana Payoff', 'Creature — Human Pirate', 'Whenever another creature you control dies, create a Treasure token.', 4),
+]);
+assert.notEqual(routingSlipRecursiveInsufficientMana.status, 'proven');
+assert.equal(proofByFamily(routingSlipRecursiveInsufficientMana, 'recursive-body-sacrifice-mana-loop'), undefined);
+
 const exileRecastCreatureManaLoop = provePackage([
   card('Recursive Exile Creature', 'Creature — Elemental', 'You may cast this card from exile.', 3, '{2}{R}'),
   card('Creature-Only Exile Mana Outlet', 'Enchantment', "Exile a creature you control: Add X mana of any one color, where X is 1 plus the exiled creature's mana value. Spend this mana only to cast creature spells.", 3),

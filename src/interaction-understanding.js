@@ -19,9 +19,14 @@ const {
 } = require('./domain/interaction-constants');
 const MODEL = require('./interaction-model.js');
 const {
+  addManaProfiles,
+  canPayManaCost,
   capValue,
+  emptyManaProfile,
   fact,
   hasCap,
+  manaCostProfileFromCaps,
+  manaProductionProfileFromCaps,
   sortedUnique: sorted,
 } = require('./semantic-proof-utils');
 
@@ -49,6 +54,7 @@ const UNDERSTANDING_COVERAGE = Object.freeze({
     ComboFamilyId.BlinkEtbLandUntapLoop,
     ComboFamilyId.LifegainLifelossLoop,
     ComboFamilyId.DrawDamageFeedbackLoop,
+    ComboFamilyId.RecursiveBodySacrificeManaLoop,
   ]),
   deferredDimensions: Object.freeze([
     StateDimension.Cast,
@@ -233,6 +239,159 @@ function damageToDrawAppliesToSource(damageToDraw, source) {
   return false;
 }
 
+function frameKey(frame) {
+  return JSON.stringify({
+    pointer: frame.pointer,
+    obligations: frame.obligations,
+    mana: frame.state?.mana,
+    death: frame.state?.deathEvents || 0,
+    sacrifices: frame.state?.sacrifices || 0,
+    restored: frame.state?.restoredBodies || 0,
+  });
+}
+
+function obligationStackSearch(seedFrame, resolver, limits = {}) {
+  const maxBranches = limits.maxBranches || 64;
+  const maxDepth = limits.maxDepth || 8;
+  const stack = [seedFrame];
+  const visited = new Set();
+  let branches = 0;
+  while (stack.length) {
+    const frame = stack.pop();
+    const key = frameKey(frame);
+    if (visited.has(key)) continue;
+    visited.add(key);
+    if ((frame.path || []).length > maxDepth) continue;
+    if (!(frame.obligations || []).length) return frame;
+    if (++branches > maxBranches) break;
+    const [nextObligation, ...remaining] = frame.obligations;
+    for (const next of resolver(frame, nextObligation) || []) {
+      stack.push({
+        ...next,
+        obligations: [...(next.obligations || []), ...remaining],
+        path: [...(frame.path || []), ...(next.path || [])],
+      });
+    }
+  }
+  return null;
+}
+
+function recursiveBodyCostProfile(card) {
+  return manaCostProfileFromCaps(card, 'recursive-body');
+}
+
+function deathManaProfile(card) {
+  return manaProductionProfileFromCaps(card, 'death-mana');
+}
+
+function freeSacOutletCanSacrificeBody(outlet) {
+  if (!hasCap(outlet, 'is-creature-sac-outlet')) return false;
+  return manaCostProfileFromCaps(outlet, 'sac-outlet-activation').total === 0;
+}
+
+function recursiveBodyPreconditionSatisfied(body, outlet, support) {
+  if (!hasCap(body, 'recursive-body-requires-another-creature')) return true;
+  return [outlet, support].some(card => card && card !== body && MODEL.faceCompatibleCaps(card, ['is-creature-permanent']));
+}
+
+function solveRecursiveBodyDeathManaSacrifice(cards) {
+  const bodies = cards.filter(card => hasCap(card, Capability.IsRecursiveBody));
+  const outlets = cards.filter(freeSacOutletCanSacrificeBody);
+  const payoffs = cards.filter(card => hasCap(card, 'is-death-mana-payoff'));
+  for (const body of bodies) {
+    for (const outlet of outlets) {
+      if (outlet === body) continue;
+      for (const payoff of payoffs) {
+        if (payoff === body || payoff === outlet) continue;
+        if (!recursiveBodyPreconditionSatisfied(body, outlet, payoff)) continue;
+        const cost = recursiveBodyCostProfile(body);
+        const deathMana = deathManaProfile(payoff);
+        const seed = {
+          pointer: body.id,
+          obligations: [
+            { kind: 'sacrifice-recursive-body', cardId: body.id },
+            { kind: 'pay-recursion-cost', cardId: body.id },
+            { kind: 'restore-recursive-body', cardId: body.id },
+          ],
+          state: {
+            mana: emptyManaProfile(),
+            deathEvents: 0,
+            sacrifices: 0,
+            restoredBodies: 0,
+          },
+          path: [],
+        };
+        const closed = obligationStackSearch(seed, (frame, obligation) => {
+          if (obligation.kind === 'sacrifice-recursive-body') {
+            return [{
+              pointer: outlet.id,
+              obligations: [],
+              state: {
+                ...frame.state,
+                deathEvents: (frame.state.deathEvents || 0) + 1,
+                sacrifices: (frame.state.sacrifices || 0) + 1,
+              },
+              path: [{ cardId: outlet.id, action: 'sacrifice the recursive body, creating death and sacrifice events' }],
+            }];
+          }
+          if (obligation.kind === 'pay-recursion-cost') {
+            if ((frame.state.deathEvents || 0) <= 0) return [];
+            const mana = addManaProfiles(frame.state.mana, deathMana);
+            if (!canPayManaCost(cost, mana)) return [];
+            return [{
+              pointer: payoff.id,
+              obligations: [],
+              state: { ...frame.state, mana },
+              path: [{ cardId: payoff.id, action: 'death trigger creates mana that pays the recursive body cost' }],
+            }];
+          }
+          if (obligation.kind === 'restore-recursive-body') {
+            if (!canPayManaCost(cost, frame.state.mana)) return [];
+            return [{
+              pointer: body.id,
+              obligations: [],
+              state: { ...frame.state, restoredBodies: (frame.state.restoredBodies || 0) + 1 },
+              path: [{ cardId: body.id, action: 'recast or return the same recursive body, restoring the starting body state' }],
+            }];
+          }
+          return [];
+        }, { maxDepth: 6, maxBranches: 16 });
+        if (!closed) continue;
+        const proofCards = [body, outlet, payoff];
+        const netMana = Math.max(0, (deathMana.total || 0) - (cost.total || 0));
+        return evidence('solver:routing-slip-recursive-body-sacrifice-mana:' + cardIds(proofCards).join('|'), ComboFamilyId.RecursiveBodySacrificeManaLoop, proofCards, [], {
+          requiredLegality: [
+            legality(LegalityPredicate.BoundedSearch, 'routing-slip obligation stack clears within bounded package-local search'),
+            legality(LegalityPredicate.PaymentClosed, 'death-triggered mana pays the recursive body cost', payoff.id, body.id),
+            legality(LegalityPredicate.RepeatableAction, 'free creature sacrifice outlet and recursive body restore the same abstract state', outlet.id, body.id),
+          ],
+          requiredFacts: [
+            fact(body, Capability.IsRecursiveBody),
+            fact(body, Capability.RecursiveBodyCost),
+            fact(outlet, 'is-creature-sac-outlet'),
+            fact(outlet, Capability.IsSacOutlet),
+            fact(payoff, 'is-death-mana-payoff'),
+            fact(payoff, 'death-mana-produced'),
+          ],
+          steps: closed.path,
+          positiveDeltas: [
+            amount(StateDimension.Death, 1, 1, { resource: 'deathTriggers' }),
+            amount(StateDimension.Ltb, 1, 1, { resource: 'ltbTriggers' }),
+            amount(StateDimension.Etb, 1, 1, { resource: 'etbTriggers' }),
+            amount(StateDimension.Cast, hasCap(body, 'is-recursive-cast-body') ? 1 : 0, hasCap(body, 'is-recursive-cast-body') ? 1 : 0, { resource: 'casts' }),
+            amount(StateDimension.Death, 1, 1, { resource: 'sacrifices' }),
+            ...(netMana > 0 ? [amount(StateDimension.Mana, netMana, netMana, { resource: ComboResource.Mana })] : []),
+          ],
+          assumptions: hasCap(body, 'recursive-body-requires-another-creature')
+            ? ['another package-local creature remains controlled while the recursive body is in the graveyard']
+            : [],
+        });
+      }
+    }
+  }
+  return null;
+}
+
 function solveSelfUntapMana(cards, transitions) {
   const source = cards.find(card => hasCap(card, Capability.TapsForMana) && hasCap(card, Capability.IsSelfUntapper));
   if (!source) return null;
@@ -354,6 +513,7 @@ function solvePackageUnderstanding(cards, transitions) {
     solveBlinkEtbUntap(cards, transitions),
     solveLifeFeedback(cards, transitions),
     solveDrawDamageFeedback(cards, transitions),
+    solveRecursiveBodyDeathManaSacrifice(cards),
   ].filter(Boolean);
 }
 

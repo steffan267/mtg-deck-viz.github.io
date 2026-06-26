@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
+const { createProgress } = require('../lib/progress');
 
 function registerTypeScriptRequire() {
   if (require.extensions['.ts']) return;
@@ -46,7 +47,11 @@ function main() {
   const fixturePath = path.resolve(args.fixture);
   const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
   const { runComboStrategyBenchmark } = require('../src/combo-detection');
+  const cases = fixture.cases || [];
+  const progress = createProgress('combo-strategy-benchmark', cases.length, { every: Math.max(1, cases.length) });
+  progress.start(`fixture=${fixturePath}`);
   const result = runComboStrategyBenchmark(fixture.cases || [], undefined, '1970-01-01T00:00:00.000Z');
+  progress.done(`cases=${cases.length}`);
   process.stdout.write(JSON.stringify(result, null, args.pretty ? 2 : 0));
   process.stdout.write('\n');
 }

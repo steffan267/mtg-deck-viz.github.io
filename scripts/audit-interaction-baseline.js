@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { loadCards, build, parseDecklist } = require('../src/build-deck-viz');
+const { createProgress } = require('../lib/progress');
 
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_OUT_DIR = path.join(ROOT, 'analysis/interaction-baseline');
@@ -427,11 +428,13 @@ function fixtureChecks(fixture, graph, edges) {
 }
 
 function evaluateGoldenFixtures(idx, fixtures = GOLDEN_FIXTURES) {
-  return fixtures.map(fixture => {
+  const progress = createProgress('interaction-baseline-fixtures', fixtures.length);
+  progress.start();
+  const rows = fixtures.map((fixture, index) => {
     const graph = graphForFixture(fixture, idx);
     const edges = edgeBetween(graph, fixture.cards);
     const checks = fixtureChecks(fixture, graph, edges);
-    return {
+    const row = {
       id: fixture.id,
       title: fixture.title,
       cards: fixture.cards.slice().sort(),
@@ -450,7 +453,11 @@ function evaluateGoldenFixtures(idx, fixtures = GOLDEN_FIXTURES) {
       },
       checks,
     };
+    progress.tick(index + 1, `last=${fixture.id}`);
+    return row;
   }).sort((a, b) => a.id.localeCompare(b.id));
+  progress.done(`fixtures=${rows.length}`);
+  return rows;
 }
 
 function summarizeDeck(spec, graph) {
@@ -593,7 +600,15 @@ function assertLocalDataAvailable() {
 function buildBaseline(options = {}) {
   if (options.requireLocalData !== false) assertLocalDataAvailable();
   const idx = options.idx || loadCards();
-  const decks = (options.decks || BASELINE_DECKS).map(spec => summarizeDeck(spec, build(decklistFromSpec(spec), idx)));
+  const deckSpecs = options.decks || BASELINE_DECKS;
+  const deckProgress = createProgress('interaction-baseline-decks', deckSpecs.length, { every: 1 });
+  deckProgress.start();
+  const decks = deckSpecs.map((spec, index) => {
+    const deck = summarizeDeck(spec, build(decklistFromSpec(spec), idx));
+    deckProgress.tick(index + 1, `last=${spec.id}`);
+    return deck;
+  });
+  deckProgress.done(`decks=${decks.length}`);
   const goldenFixtures = evaluateGoldenFixtures(idx, options.fixtures || GOLDEN_FIXTURES);
   const aggregateFamilyCounts = {};
   const aggregateEventCounts = {};

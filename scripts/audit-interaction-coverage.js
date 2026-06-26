@@ -14,6 +14,7 @@
 const fs = require('fs');
 const MODEL = require('../src/interaction-model');
 const { loadCards, build, parseDecklist } = require('../src/build-deck-viz');
+const { createProgress } = require('../lib/progress');
 
 const PRECON_EXAMPLES = [
   'Heartstone', 'Skullclamp', 'Panharmonicon', 'Anointed Procession', 'Divine Visitation',
@@ -192,7 +193,14 @@ function main() {
       profileByName.set(node.id.toLowerCase(), MODEL.interactionProfile(node, graph));
     }
   }
-  const rows = cards.map(card => classifyCard(card, profileByName)).sort((a, b) => b.warnings.length - a.warnings.length || a.name.localeCompare(b.name));
+  const progress = createProgress('interaction-coverage-cards', cards.length);
+  progress.start();
+  const rows = cards.map((card, index) => {
+    const row = classifyCard(card, profileByName);
+    progress.tick(index + 1, `last=${row.name}`);
+    return row;
+  }).sort((a, b) => b.warnings.length - a.warnings.length || a.name.localeCompare(b.name));
+  progress.done(`cards=${rows.length} missing=${missing.length}`);
   const report = { generatedAt: new Date().toISOString(), summary: summarize(rows, missing), cards: rows };
   const body = asMarkdown ? markdown(report) : JSON.stringify(report, null, 2);
   if (out) fs.writeFileSync(out, body); else process.stdout.write(body + '\n');

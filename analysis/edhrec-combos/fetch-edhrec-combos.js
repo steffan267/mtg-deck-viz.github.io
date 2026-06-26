@@ -7,6 +7,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { createProgress } = require('../../lib/progress');
 
 const DEFAULT_OUT = path.join(__dirname, 'edhrec-combo-cache.json');
 const BASE_URL = 'https://edhrec.com';
@@ -50,7 +51,7 @@ const CATEGORY_RE = /\/combos\/(early-game-2-card-combos|late-game-2-card-combos
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function usage() {
-  console.error('Usage: node analysis/edhrec-combos/fetch-edhrec-combos.js [--out file] [--categories a,b] [--discover-categories|--all] [--per-category n|all] [--max-details n|all] [--max-pages-per-category n|all] [--no-details] [--fresh] [--delay-ms n] [--force]');
+  console.error('Usage: node analysis/edhrec-combos/fetch-edhrec-combos.js [--out file] [--categories a,b] [--discover-categories|--all] [--per-category n|all] [--max-details n|all] [--max-pages-per-category n|all] [--no-details] [--fresh] [--delay-ms n] [--force] [--progress-every n]');
   process.exit(2);
 }
 
@@ -87,6 +88,7 @@ function parseArgs(argv) {
     else if (arg === '--fresh') opts.fresh = true;
     else if (arg === '--delay-ms') opts.delayMs = parsePositiveInt(argv[++i], opts.delayMs);
     else if (arg === '--force') opts.force = true;
+    else if (arg === '--progress-every') opts.progressEvery = parsePositiveInt(argv[++i], opts.progressEvery);
     else if (arg === '--help') usage();
     else usage();
   }
@@ -105,6 +107,7 @@ function defaultOptions() {
     fresh: false,
     discoverCategories: false,
     fetchDetails: true,
+    progressEvery: 25,
   };
 }
 
@@ -512,7 +515,10 @@ async function fetchEdhrecCombos(opts, fetcher = httpGet) {
     }
   }
 
-  for (const category of categoriesToFetch) {
+  const categoryProgress = createProgress('edhrec-combo-categories', categoriesToFetch.length, { every: 1 });
+  categoryProgress.start(`out=${opts.out}`);
+  for (let categoryIndex = 0; categoryIndex < categoriesToFetch.length; categoryIndex++) {
+    const category = categoriesToFetch[categoryIndex];
     const url = categoryUrl(category);
     process.stdout.write(`[category] ${category} … `);
     try {
@@ -556,14 +562,21 @@ async function fetchEdhrecCombos(opts, fetcher = httpGet) {
       setFailure(failuresByUrl, { url, category, stage: 'category', error: err.message, failedAt: new Date().toISOString() });
       process.stdout.write(`✗ ${err.message}\n`);
     }
+    categoryProgress.tick(categoryIndex + 1, `combos=${combosByPath.size} failures=${failuresByUrl.size} last=${category}`);
     writeCache(opts.out, buildOutput(opts, categories, combosByPath, failuresByUrl));
     if (opts.delayMs > 0) await sleep(opts.delayMs);
   }
+  categoryProgress.done(`combos=${combosByPath.size} failures=${failuresByUrl.size}`);
 
   const seeds = opts.fetchDetails ? [...combosByPath.values()].slice(0, opts.maxDetails) : [];
+  const detailProgress = createProgress('edhrec-combo-details', seeds.length, { every: opts.progressEvery });
+  if (seeds.length) detailProgress.start(`out=${opts.out}`);
   for (let i = 0; i < seeds.length; i++) {
     const seed = seeds[i];
-    if (!opts.force && Array.isArray(seed.steps) && seed.steps.length) continue;
+    if (!opts.force && Array.isArray(seed.steps) && seed.steps.length) {
+      detailProgress.tick(i + 1, `cached=${seed.detailPath}`);
+      continue;
+    }
     process.stdout.write(`[detail ${i + 1}/${seeds.length}] ${seed.detailPath} … `);
     try {
       const html = await fetcher(seed.url);
@@ -575,9 +588,11 @@ async function fetchEdhrecCombos(opts, fetcher = httpGet) {
       setFailure(failuresByUrl, { url: seed.url, detailPath: seed.detailPath, stage: 'detail', error: err.message, failedAt: new Date().toISOString() });
       process.stdout.write(`✗ ${err.message}\n`);
     }
+    detailProgress.tick(i + 1, `combos=${combosByPath.size} failures=${failuresByUrl.size} last=${seed.detailPath}`);
     writeCache(opts.out, buildOutput(opts, categories, combosByPath, failuresByUrl));
     if (opts.delayMs > 0) await sleep(opts.delayMs);
   }
+  if (seeds.length) detailProgress.done(`combos=${combosByPath.size} failures=${failuresByUrl.size}`);
 
   const payload = buildOutput(opts, categories, combosByPath, failuresByUrl);
   writeCache(opts.out, payload);

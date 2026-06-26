@@ -10,6 +10,7 @@ const { performance } = require('node:perf_hooks');
 const { getComboFamily } = require('../src/combo-family-library');
 const { ProofStatus } = require('../src/domain/interaction-constants');
 const { provePackage } = require('../src/interaction-proof-search');
+const { createProgress } = require('../lib/progress');
 
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_CORPUS = path.join(ROOT, 'analysis/interaction-validation/corpus.json');
@@ -173,7 +174,11 @@ function summarizeSourceCoverage(corpus) {
 
 function evaluateCorpus(corpus) {
   const rows = [];
-  for (const testCase of corpus.cases || []) {
+  const cases = corpus.cases || [];
+  const progress = createProgress('interaction-validation-cases', cases.length);
+  progress.start();
+  for (let index = 0; index < cases.length; index++) {
+    const testCase = cases[index];
     const result = provePackage(testCase.cards);
     const positive = expectedPositive(testCase);
     const pass = casePassed(testCase, result);
@@ -192,7 +197,9 @@ function evaluateCorpus(corpus) {
       confidence: round(confidenceForResult(result), 3),
       rejectionReasons,
     });
+    progress.tick(index + 1, `last=${testCase.id}`);
   }
+  progress.done(`rows=${rows.length}`);
 
   const positives = rows.filter(row => row.expectedStatus === ProofStatus.Proven);
   const negatives = rows.filter(row => row.expectedStatus !== ProofStatus.Proven);
