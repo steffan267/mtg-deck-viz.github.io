@@ -81,6 +81,16 @@ separate win, cohesion, and self-sufficiency scores.
   and 32 edges across 5 Moxfield bracket decks, including Nekusar and
   Sheoldred-style lists; validation recall and sampled precision stayed at 1.0
   and bracket accuracy was unchanged.
+- Added `lifegain-source→drain-payoff` for repeatable lifegain engines feeding
+  Sanguine Bond / Vito-style lifegain-to-lifeloss payoffs. The family uses
+  repeatable creature-ETB lifegain, tap lifegain, and lifelink-grant sources,
+  not one-shot lifegain spells, so lifegain decks get a real directed engine
+  without reviving a generic lifegain hub. The 2026-06-26 corpus run added 5
+  targeted edges in the precon corpus, all in `Food and Fellowship`, and 122
+  edges across 9 Moxfield bracket decks, concentrated in dedicated Dina,
+  Witherbloom, Oloro, Karlov, and Food-and-Fellowship-style lifegain shells;
+  validation recall and sampled precision stayed at 1.0 and bracket accuracy
+  was unchanged.
 
 ## Data flow
 

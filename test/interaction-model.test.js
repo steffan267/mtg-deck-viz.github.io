@@ -857,6 +857,14 @@ When Gilded Goose enters, create a Food token.
   assertHasInteraction(lifegainFromOppLoss, fixedOppLossFromLifeGain,
     it => it.family === 'lifegain→lifeloss-loop' && it.strength === 'combo-critical',
     'fixed opponent life-loss from your lifegain should be treated as a reciprocal loop candidate');
+  const creatureEtbLifegainEngine = node('Creature ETB Lifegain Engine', 'Creature — Cleric', 'Whenever another creature enters the battlefield under your control, you gain 1 life.');
+  const tapLifegainEngine = node('Tap Lifegain Engine', 'Creature — Cleric', '{T}: You gain 1 life.');
+  const lifelinkGrantEngine = node('Lifelink Grant Engine', 'Enchantment', '{1}{W}: Another target creature gains lifelink until end of turn.');
+  const smallLifegainSpell = node('Small Lifegain Spell', 'Instant', 'You gain 3 life.');
+  assertHasFamily(creatureEtbLifegainEngine, oppLossFromLifeGain, 'lifegain-source→drain-payoff');
+  assertHasFamily(tapLifegainEngine, oppLossFromLifeGain, 'lifegain-source→drain-payoff');
+  assertHasFamily(lifelinkGrantEngine, oppLossFromLifeGain, 'lifegain-source→drain-payoff');
+  assertNoEvent(smallLifegainSpell, oppLossFromLifeGain, 'enable:lifegain-source→drain-payoff');
 
   const impulseDraw = node('Impulse Draw', 'Artifact', '{3}: Exile the top card of your library. You may play that card this turn.');
   assertNoCap(impulseDraw, 'is-library-exile-source');

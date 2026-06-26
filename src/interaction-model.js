@@ -2611,6 +2611,9 @@
     { family: "go-wide→payoff",    from: "is-creature-token-producer", to: "is-width-payoff",  kind: "synergy", strength: "moderate" },
     { family: "convoke-fodder→payoff", from: "is-creature-token-producer", to: "is-convoke-cast-payoff", kind: "synergy", strength: "weak" },
     { family: "convoke-spell→payoff", from: "is-convoke-spell", to: "is-convoke-cast-payoff", kind: "synergy", strength: "moderate" },
+    { family: "lifegain-source→drain-payoff", from: "is-creature-etb-lifegain-payoff", to: "is-lifeloss-from-your-lifegain", kind: "synergy", strength: "strong" },
+    { family: "lifegain-source→drain-payoff", from: "is-repeatable-tap-lifegain-ability", to: "is-lifeloss-from-your-lifegain", kind: "synergy", strength: "moderate" },
+    { family: "lifegain-source→drain-payoff", from: "grants-lifelink-to-creature", to: "is-lifeloss-from-your-lifegain", kind: "synergy", strength: "moderate" },
     // counters: proliferate / multipliers amplify any counter source
     { family: "proliferate→counters", from: "is-proliferator",     to: "has-counters", kind: "synergy", strength: "moderate" },
     { family: "counter-multiplier",   from: "is-counter-multiplier", to: "has-counters", kind: "synergy", strength: "strong" },
@@ -3195,6 +3198,7 @@
   EVENT_LABEL["enable:go-wide→payoff"] = "tokens → go-wide payoff";
   EVENT_LABEL["enable:convoke-fodder→payoff"] = "creature tokens → convoke payoff";
   EVENT_LABEL["enable:convoke-spell→payoff"] = "convoke spell → cast payoff";
+  EVENT_LABEL["enable:lifegain-source→drain-payoff"] = "lifegain source → drain payoff";
   EVENT_LABEL["enable:token-production→amplifier"] = "token production → token amplifier";
   EVENT_LABEL["enable:token-production→replacement"] = "token production → token replacement";
   EVENT_LABEL["enable:proliferate→counters"] = "proliferate → counters";
@@ -3244,6 +3248,7 @@
   EVENT_LABEL["recursive-body-sacrifice-mana-loop"] = "recursive body sacrifice mana loop";
   EVENT_LABEL["lifelink-counter-damage-loop"] = "lifelink counter-damage loop";
   EVENT_LABEL["opponent-draw→punisher"] = "opponent draw → punisher";
+  EVENT_LABEL["lifegain-source→drain-payoff"] = "lifegain source → drain payoff";
   EVENT_LABEL["copy→trigger"] = "copy → trigger";
   EVENT_LABEL["blink→land-untap-etb"] = "repeatable blink → land-untap ETB loop";
   EVENT_LABEL["lord→tribe"] = "tribal (creature-type synergy)";
