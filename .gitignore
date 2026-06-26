@@ -32,3 +32,5 @@ analysis/**/*.tmp
 analysis/edhrec-combos/edhrec-combo-cache.json
 analysis/edhrec-combos/edhrec-combo-evaluation.json
 analysis/edhrec-combos/edhrec-combo-evaluation.md
+analysis/edhrec-combos/edhrec-combo-tag-decks.json
+analysis/edhrec-combos/edhrec-combo-tag-deck-evaluation.json

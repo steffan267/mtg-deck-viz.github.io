@@ -47,14 +47,49 @@ Ignored generated artifacts under `analysis/edhrec-combos/`:
 - `edhrec-combo-cache.json` — fetched category and detail evidence records.
 - `edhrec-combo-evaluation.json` — machine-readable evaluation of model behavior.
 - `edhrec-combo-evaluation.md` — human-readable baseline and edge-case report.
+- `edhrec-combo-tag-decks.json` — fetched `/tags/combo` commander aggregate
+  pages, stored as average-deck approximations for engine scoring.
+- `edhrec-combo-tag-deck-evaluation.json` — machine-readable score summary for
+  those combo-tag average decks.
 
 Tracked tools/tests:
 
 - `analysis/edhrec-combos/fetch-edhrec-combos.js` — polite/resumable scraper.
 - `analysis/edhrec-combos/evaluate-edhrec-combos.js` — offline evaluator.
+- `analysis/edhrec-combos/fetch-edhrec-combo-tag-decks.js` —
+  `/tags/combo` aggregate commander/cardlist downloader.
+- `analysis/edhrec-combos/evaluate-edhrec-combo-tag-decks.js` —
+  timeout-safe average-deck scorer. It defaults to a top-card slice because
+  EDHREC tag pages expose recommendation pools, not exact 100-card lists.
 - `analysis/edhrec-combos/evidence-card-names.json` — generated EDHREC card-name
   evidence for the no-hardcoding guard in clean checkouts.
 - tests for parser/evaluator behavior with fixed HTML/fixture data.
+
+## Combo tag average-deck corpus
+
+`https://edhrec.com/tags/combo` is separate from `https://edhrec.com/combos`.
+The combo pages are card-combo evidence. The tag page is aggregate deck evidence:
+it exposes combo-tagged commanders and tag-filtered commander cardlists through
+`https://json.edhrec.com/pages/tags/combo.json` and
+`https://json.edhrec.com/pages/commanders/<slug>/combo.json`.
+
+Use this path when we want to iterate on deck-plan, commander-plan, score, graph,
+and combo-detection behavior over decks that EDHREC users identify as combo
+decks:
+
+```bash
+npm run fetch-edhrec-combo-tag-decks -- --delay-ms 25 --fresh --force
+npm run evaluate-edhrec-combo-tag-decks -- --max 20 --deck-card-limit 20 --timeout-ms 15000
+npm run report:score-corpus
+```
+
+The fetched corpus is resumable and local-only. On 2026-06-26 it discovered 33
+combo tag/color pages and 784 unique commander average lists with zero fetch
+failures. The first top-20/top-20-card score slice evaluated 19 decks, timed out
+on `K'rrik, Son of Yawgmoth`, detected combos in 7 decks with 11 combo pairs,
+and left several obvious combo commanders at low/no detected cohesion. Those
+timeouts and low-recognition rows are iteration targets, not failures of the
+download path.
 
 
 ## Current full-corpus baseline

@@ -186,6 +186,13 @@ That report compares current rebuilt precon/Moxfield reference scores against
 saved baselines, bracket labels, audit verdicts, watched false-positive
 inflation families, and the real engine families we are intentionally adding.
 
+For EDHREC combo iteration, `npm run fetch-edhrec-combos` and
+`npm run evaluate-edhrec-combos` maintain the card-combo evidence corpus, while
+`npm run fetch-edhrec-combo-tag-decks` and
+`npm run evaluate-edhrec-combo-tag-decks` maintain the `/tags/combo` commander
+average-deck corpus used to pressure-test combo, deck-plan, and commander-plan
+recognition.
+
 ## In the browser
 
 - **+ Add Moxfield deck** — paste a URL to fetch and add a deck live.

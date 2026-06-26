@@ -192,6 +192,53 @@ function summarizeMoxfieldBracketCorpus() {
   };
 }
 
+function summarizeEdhrecComboTagDecks() {
+  const cacheFile = firstExisting([
+    'analysis/edhrec-combos/edhrec-combo-tag-decks.json',
+    'work/edhrec-combo-tag-decks.json',
+  ]);
+  if (!cacheFile) return null;
+  const evaluationFile = firstExisting([
+    'analysis/edhrec-combos/edhrec-combo-tag-deck-evaluation.json',
+    'work/edhrec-combo-tag-deck-evaluation.json',
+  ]);
+  const source = readJson(cacheFile);
+  if (!evaluationFile) {
+    return {
+      source: cacheFile,
+      deckCount: source.meta?.deckCount ?? (source.decks || []).length,
+      complete: Boolean(source.meta && source.meta.complete),
+      commanderSeedCount: source.meta?.commanderSeedCount ?? null,
+      failures: Array.isArray(source.failures) ? source.failures.length : 0,
+      note: 'Run npm run evaluate-edhrec-combo-tag-decks to generate score metrics for this corpus.',
+    };
+  }
+  const evaluation = readJson(evaluationFile);
+  const summary = evaluation.summary || {};
+  return {
+    source: cacheFile,
+    evaluation: evaluationFile,
+    deckCount: summary.evaluatedDecks || 0,
+    complete: Boolean(source.meta && source.meta.complete),
+    commanderSeedCount: source.meta?.commanderSeedCount ?? null,
+    failures: Array.isArray(source.failures) ? source.failures.length : 0,
+    win: summary.win,
+    cohesion: summary.cohesion,
+    self: summary.self,
+    edges: summary.edges,
+    islands: summary.islands,
+    comboDeckCount: summary.comboDeckCount,
+    comboPairCount: summary.comboPairCount,
+    cohesionBands: summary.cohesionBands,
+    winBands: summary.winBands,
+    brackets: summary.brackets,
+    topCohesion: summary.topCohesion,
+    bottomCohesion: summary.lowestCohesion,
+    topComboPairs: summary.topComboPairs,
+    topFamilies: summary.topFamilies,
+  };
+}
+
 function preconInteractionRowsFromCache(relativePath) {
   return interactionRowsFromCache(relativePath);
 }
@@ -200,6 +247,11 @@ function interactionRowsFromCache(relativePath) {
   const cache = readJson(relativePath);
   const decks = Array.isArray(cache) ? cache : (cache.decks || []);
   if (!decks.length) return null;
+  return interactionRowsFromDecks(decks);
+}
+
+function interactionRowsFromDecks(decks) {
+  if (!decks.length) return [];
   const idx = loadCards();
   return decks.map(deck => {
     const graph = build(deck.decklist || [], idx);
@@ -208,6 +260,10 @@ function interactionRowsFromCache(relativePath) {
       id: deck.id,
       name: deck.name || deck.title || deck.id,
       cards: graph.nodes.filter(node => node.role !== 'zone').length,
+      win: metrics.winTuningScore,
+      winBand: metrics.winTuningBand,
+      self: metrics.selfSufficiencyScore,
+      bracket: metrics.commanderBracket?.bracket || null,
       cohesion: metrics.cohesionScore,
       band: metrics.cohesionBand,
       pctInteractive: metrics.pctInteractive,
@@ -257,6 +313,25 @@ function countFamilies(graph) {
     }
   }
   return familyCounts;
+}
+
+function summarizeTopFamilies(rows) {
+  const totals = new Map();
+  const deckHits = new Map();
+  for (const row of rows) {
+    const seen = new Set();
+    for (const value of row.topFamilies || []) {
+      const parsed = parseFamilyCount(value);
+      if (!parsed) continue;
+      totals.set(parsed.family, (totals.get(parsed.family) || 0) + parsed.count);
+      seen.add(parsed.family);
+    }
+    for (const family of seen) deckHits.set(family, (deckHits.get(family) || 0) + 1);
+  }
+  return [...totals.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 12)
+    .map(([family, count]) => ({ family, count, deckHits: deckHits.get(family) || 0 }));
 }
 
 function parseFamilyCount(value) {
@@ -366,6 +441,7 @@ function main() {
     preconWinTuningCorpus: summarizeWinTuningCorpus(),
     preconInteractionCorpus: summarizePreconInteractionCorpus(),
     moxfieldBracketCorpus: summarizeMoxfieldBracketCorpus(),
+    edhrecComboTagDecks: summarizeEdhrecComboTagDecks(),
     auditRound5: summarizeAudit(),
   };
   process.stdout.write(JSON.stringify(report, null, 2) + '\n');
