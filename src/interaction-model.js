@@ -1717,6 +1717,7 @@
         caps.add(e.includes("target creature or enchantment") ? "lifegain-counter-target:creature-or-enchantment" : "lifegain-counter-target:creature");
       }
       const selfCounterTrigger = /\bwhenever one or more \+1\/\+1 counters are put on this creature\b/.test(s.trigger)
+        || /\bwhenever one or more \+1\/\+1 counters are put on this creature\b/.test(effectAndRaw)
         || (selfNamePattern(classified._name)
           && new RegExp("\\bwhenever one or more \\+1\\/\\+1 counters are put on " + selfNamePattern(classified._name) + "\\b").test(s.trigger));
       if (selfCounterTrigger

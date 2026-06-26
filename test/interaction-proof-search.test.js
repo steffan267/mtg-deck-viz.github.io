@@ -653,6 +653,13 @@ assert.ok(counterTokenProof);
 assert.ok(counterTokenProof.positiveDeltas.some(delta => delta.resource === 'tokens'));
 assert.ok(counterTokenProof.positiveDeltas.some(delta => delta.resource === 'counters'));
 
+const reminderTextCounterTokenEtbCounterLoop = provePackage([
+  card('Reminder Text Counter Token Engine', 'Creature — Treefolk', 'Evolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.) Whenever one or more +1/+1 counters are put on this creature, you may create a 1/1 green Squirrel creature token.', 3),
+  card('Green ETB Counter Granter', 'Creature — Elf', 'Whenever another green creature you control enters, put a +1/+1 counter on target creature.', 4),
+]);
+assert.equal(reminderTextCounterTokenEtbCounterLoop.status, 'proven');
+assert.ok(proofByFamily(reminderTextCounterTokenEtbCounterLoop, 'counter-token→etb-counter-loop'));
+
 const counterTokenColorNearMiss = provePackage([
   card('Colorless Counter Token Engine', 'Creature — Eldrazi', 'Whenever one or more +1/+1 counters are put on this creature, create a 0/1 colorless Eldrazi Spawn creature token.', 2),
   card('Green ETB Counter Granter', 'Creature — Elf', 'Whenever another green creature you control enters, put a +1/+1 counter on target creature.', 4),

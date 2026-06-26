@@ -127,6 +127,13 @@ coverage rounded from 8.9% to 9.0%, with `escape-mill-mana-loop` proving the
 full three-role storm-mill package while leaving incomplete packages as graph
 evidence only.
 
+A follow-up classifier iteration widened the existing counter-token engine
+predicate to survive reminder text before the real "one or more +1/+1 counters"
+trigger. No new family was needed: those cards now flow into the existing
+`counter-token→etb-counter-loop` and `lifegain-counter-token-etb-loop` proofs.
+On the same 9,000-row slice, strict proofs moved from 678 to 686 while the
+moved rows stayed confined to counter/token/ETB/lifegain result classes.
+
 
 ## Current full-corpus baseline
 

@@ -1173,9 +1173,12 @@ When Gilded Goose enters, create a Food token.
   const greenEtbCounterGranter = node('Green ETB Counter Granter', 'Creature — Elf', 'Whenever another green creature you control enters, put a +1/+1 counter on target creature.');
   const anyEtbCounterGranter = node('Any ETB Counter Granter', 'Creature — Citizen', 'Alliance — Whenever another creature you control enters, put a +1/+1 counter on target creature you control.');
   const colorlessCounterTokenEngine = node('Colorless Counter Token Engine', 'Creature — Eldrazi', 'Whenever one or more +1/+1 counters are put on this creature, create a 0/1 colorless Eldrazi Spawn creature token.');
+  const reminderTextCounterTokenEngine = node('Reminder Text Counter Token Engine', 'Creature — Treefolk', 'Evolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.) Whenever one or more +1/+1 counters are put on this creature, you may create a 1/1 green Squirrel creature token.');
   const splitCounterAndTokenCard = node('Split Counter And Token Card', 'Creature — Weird', 'Whenever one or more +1/+1 counters are put on this creature, add one mana of any color.\n{X}, {T}: Create a 0/0 green Fractal creature token and put X +1/+1 counters on it.');
   assertHasCap(counterTokenEngine, 'is-counter-to-creature-token-engine');
   assertHasCap(counterTokenEngine, 'counter-token-color:g');
+  assertHasCap(reminderTextCounterTokenEngine, 'is-counter-to-creature-token-engine');
+  assertHasCap(reminderTextCounterTokenEngine, 'counter-token-color:g');
   assertHasCap(greenEtbCounterGranter, 'is-creature-etb-counter-granter');
   assertHasCap(greenEtbCounterGranter, 'etb-counter-granter-token-color:g');
   assertHasInteraction(counterTokenEngine, greenEtbCounterGranter,
@@ -1184,6 +1187,9 @@ When Gilded Goose enters, create a Food token.
   assertHasInteraction(colorlessCounterTokenEngine, anyEtbCounterGranter,
     it => it.family === 'counter-token→etb-counter-loop' && it.strength === 'combo-critical',
     'unrestricted creature-ETB counter granters can use colorless creature tokens');
+  assertHasInteraction(reminderTextCounterTokenEngine, greenEtbCounterGranter,
+    it => it.family === 'counter-token→etb-counter-loop' && it.strength === 'combo-critical',
+    'counter-token engines should survive reminder text before the real counter trigger');
   assertNoCap(splitCounterAndTokenCard, 'is-counter-to-creature-token-engine');
   assertNoEvent(colorlessCounterTokenEngine, greenEtbCounterGranter, 'enable:counter-token→etb-counter-loop');
 

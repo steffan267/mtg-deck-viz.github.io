@@ -135,6 +135,12 @@ The current combo corpus work established these reusable constraints:
   storm-mill casts. The evaluator must not give full result-class credit to
   partial pair edges unless a complete family or strict proof accounts for the
   missing mana, fuel, tutor, or card-flow roles.
+- **Reminder text must not hide the real trigger.** Keyword reminder text can
+  precede another triggered ability in the same Oracle-text paragraph and make
+  a clean segment-level trigger unavailable. High-value capability predicates
+  may inspect the bounded raw ability text as a fallback, but still need a
+  complete trigger/effect shape so separate abilities are not merged into a
+  false loop.
 - **Fresh-token combat/turn loops need freshness and axis guards.** Hasty
   copy-token loops are only a proof when the token is created before attacker
   declaration, survives copy/legend restrictions on the same compatible face,
