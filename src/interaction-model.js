@@ -371,14 +371,13 @@
     { id: "attach", label: "Equipment / Aura attach (Voltron)",
       produce: [
         { re: /attach (it|this|that|target)/, s: Y },
-        { re: /\benchant (creature|permanent|player)/, s: Y },
+        { re: /\benchant (creature|permanent)/, s: Y },
         { re: /for mirrodin!/, s: Y },
       ],
       consume: [
         { re: /whenever .* becomes attached/, s: Y },
         { re: /whenever .* becomes equipped/, s: Y },
         { re: /whenever an aura .* is attached/, s: Y },
-        { re: /equipped creature/, s: Y },
       ] },
 
     { id: "blocked", label: "blocks / becomes blocked (combat sub-triggers)",
@@ -1052,6 +1051,21 @@
     const hasCheapInstantImprint = /\bexile an? instant card\b.{0,80}\bmana value 2 or less\b/.test(allText);
     const typeText = classified._type || "";
     const cmc = Number.isFinite(classified._cmc) ? classified._cmc : null;
+    if (/\bequipment\b/.test(typeText) || /\bequip\b/.test(allText) || /\bfor mirrodin!\b/.test(allText)) {
+      caps.add("is-equipment-attachment-source");
+      caps.add("is-creature-attachment-source");
+    }
+    if (/\baura\b/.test(typeText) && /\benchant (?:creature|permanent)\b/.test(allText)) {
+      caps.add("is-aura-attachment-source");
+      caps.add("is-creature-attachment-source");
+    }
+    if (/\baura\b/.test(typeText) && /\benchant (?:player|opponent)\b/.test(allText))
+      caps.add("is-player-attachment-source");
+    if (/\bwhenever [^.]{0,100} becomes (?:attached|equipped)\b/.test(allText)
+        || /\bwhenever an? aura [^.]{0,100} is attached\b/.test(allText)
+        || /\bwhenever you attach\b/.test(allText)) {
+      caps.add("is-attachment-payoff");
+    }
     // Lands tap for mana and some untap lands; counting them as combo pieces
     // makes every basic + fetchland a "combo" node. Exclude lands entirely from
     // the tap/untap/mana enablement families.
@@ -2591,6 +2605,7 @@
     // ENABLER (evasion/double-strike/extra-combat) amplifying the payoff: strong.
     { family: "combat→payoff",     from: "is-creature-token-producer", to: "is-combat-payoff",    kind: "synergy", strength: "weak" },
     { family: "combat-enabler",    from: "is-combat-enabler", to: "is-combat-payoff",    kind: "synergy", strength: "strong" },
+    { family: "attachment-source→payoff", from: "is-creature-attachment-source", to: "is-attachment-payoff", kind: "synergy", strength: "moderate" },
     // --- political / forced-combat engine: goad sources force opponents to
     // attack INTO your attack-punisher payoffs. A real directed build-around
     // (the pillowfort/group-slug archetype), so moderate — not a combo loop.

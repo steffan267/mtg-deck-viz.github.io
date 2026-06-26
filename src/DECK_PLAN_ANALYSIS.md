@@ -49,6 +49,14 @@ separate win, cohesion, and self-sufficiency scores.
   `proliferate→counters` and `counter-multiplier` now rely on explicit
   high-signal counter axes such as `+1/+1`, loyalty, charge, poison, or
   fabricate instead of named burden counters like delay/depletion/incarnation.
+- Tightened `attach` so Equipment, creature Auras, and player Curses no longer
+  form generic gear-to-gear or Equipment-to-Curse cliques. Attachment sources
+  now connect to explicit attach/equip payoffs through
+  `attachment-source→payoff`; the old generic `attach` reaction no longer fires
+  on ordinary `equipped creature` text. In the 2026-06-26 score-corpus run this
+  dropped watched `attach` edges from 412 to 18 in the precon corpus and from
+  2781 to 2 in the Moxfield bracket corpus, with validation recall and sampled
+  precision still at 1.0 and bracket accuracy unchanged.
 
 ## Data flow
 

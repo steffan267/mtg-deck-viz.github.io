@@ -735,6 +735,20 @@ When Gilded Goose enters, create a Food token.
   assertHasCap(professionalFaceBreaker, 'is-token-producer');
   assertNoCap(professionalFaceBreaker, 'is-creature-token-producer');
 
+  const swiftfootBoots = node('Swiftfoot Boots', 'Artifact — Equipment', 'Equipped creature has hexproof and haste.\nEquip {1} ({1}: Attach to target creature you control. Equip only as a sorcery.)');
+  const maskOfMemory = node('Mask of Memory', 'Artifact — Equipment', 'Whenever equipped creature deals combat damage to a player, you may draw two cards. If you do, discard a card.\nEquip {1} ({1}: Attach to target creature you control. Equip only as a sorcery.)');
+  const attachPayoff = node('Attach Payoff', 'Creature — Artificer', 'Whenever an Equipment becomes attached to a creature you control, draw a card.');
+  const curseAura = node('Player Curse Aura', 'Enchantment — Aura Curse', 'Enchant player\nWhenever enchanted player is attacked, create a Treasure token.');
+  assertHasCap(swiftfootBoots, 'is-equipment-attachment-source');
+  assertHasCap(swiftfootBoots, 'is-creature-attachment-source');
+  assertHasCap(attachPayoff, 'is-attachment-payoff');
+  assertHasCap(curseAura, 'is-player-attachment-source');
+  assertNoCap(curseAura, 'is-creature-attachment-source');
+  assertNoEvent(swiftfootBoots, maskOfMemory, 'attach');
+  assertNoFamily(swiftfootBoots, maskOfMemory, 'attachment-source→payoff');
+  assertHasFamily(swiftfootBoots, attachPayoff, 'attachment-source→payoff');
+  assertNoFamily(curseAura, attachPayoff, 'attachment-source→payoff');
+
   const caravan = node('Cultivator\'s Caravan', 'Artifact — Vehicle', '{T}: Add one mana of any color.\nCrew 3');
   const depala = node('Depala, Pilot Exemplar', 'Legendary Creature — Dwarf Pilot', 'Other Dwarves you control get +1/+1. Each Vehicle you control gets +1/+1. Whenever Depala becomes tapped, you may pay {X}. If you do, reveal the top X cards of your library, put all Dwarf and Vehicle cards from among them into your hand.');
   assertHasCap(caravan, 'is-vehicle');
