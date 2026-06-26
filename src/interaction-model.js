@@ -1768,6 +1768,16 @@
           if (amount) caps.add("opponent-draw-punisher-damage:" + amount[1]);
         }
       }
+      if (s.kind === "triggered"
+          && /\bat the beginning of (?:each|every) (?:player'?s|opponent'?s) (?:draw step|upkeep|end step)\b/.test(s.trigger)
+          && /\b(?:that player|each player|each opponent|active player) draws? (?:a card|an additional card|two cards)\b/.test(e)) {
+        caps.add("is-repeatable-opponent-draw-source");
+      }
+      if (s.kind === "triggered"
+          && /\bwhenever (?:an opponent|a player) (?:casts?|attacks?|deals? combat damage)\b/.test(s.trigger)
+          && /\bthat player draws? a card\b/.test(e)) {
+        caps.add("is-repeatable-opponent-draw-source");
+      }
       if (/target player draws? cards? equal to half (the number of cards in )?(their|that player'?s?) library/.test(effectAndRaw)
           || /target opponent draws? cards? equal to half (the number of cards in )?(their|that opponent'?s?) library/.test(effectAndRaw)) {
         caps.add("is-mass-opponent-draw-source");
@@ -2633,6 +2643,7 @@
     { family: "opponent-draw-punisher-win", from: "is-mass-opponent-draw-source", to: "is-opponent-draw-punisher", kind: "enablement", strength: "combo-critical" },
     { family: "mill-multiplier-finite-mill", from: "is-half-library-mill-source", to: "is-mill-multiplier", kind: "enablement", strength: "combo-critical" },
     { family: "delayed-mill-equalizer-finite-mill", from: "is-half-library-mill-source", to: "is-delayed-same-turn-mill-payoff", kind: "enablement", strength: "combo-critical" },
+    { family: "opponent-draw→punisher", from: "is-repeatable-opponent-draw-source", to: "is-opponent-draw-punisher", kind: "synergy", strength: "strong" },
     { family: "mutual-etb-blink-reset-loop", from: "is-etb-blink", to: "is-etb-blink", kind: "enablement", strength: "combo-critical" },
     { family: "self-untap-mana-loop", from: "is-colorless-mana-amplifier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
     { family: "lifelink-counter-damage-loop", from: "is-lifelink-counter-engine", to: "is-counter-to-damage-source", kind: "enablement", strength: "combo-critical" },
@@ -3202,6 +3213,7 @@
   EVENT_LABEL["enable:lifegain→lifeloss-loop"] = "life gain → life loss loop";
   EVENT_LABEL["enable:mill-lifeloss-feedback-loop"] = "mill ↔ life loss loop";
   EVENT_LABEL["enable:opponent-draw-punisher-win"] = "opponent mass draw → punisher win";
+  EVENT_LABEL["enable:opponent-draw→punisher"] = "opponent draw → punisher";
   EVENT_LABEL["enable:mill-multiplier-finite-mill"] = "mill multiplier → finite mill";
   EVENT_LABEL["enable:delayed-mill-equalizer-finite-mill"] = "same-turn mill equalizer → finite mill";
   EVENT_LABEL["enable:mutual-etb-blink-reset-loop"] = "mutual ETB blink reset loop";
@@ -3231,6 +3243,7 @@
   EVENT_LABEL["draw-damage-feedback-loop"] = "draw/damage feedback loop";
   EVENT_LABEL["recursive-body-sacrifice-mana-loop"] = "recursive body sacrifice mana loop";
   EVENT_LABEL["lifelink-counter-damage-loop"] = "lifelink counter-damage loop";
+  EVENT_LABEL["opponent-draw→punisher"] = "opponent draw → punisher";
   EVENT_LABEL["copy→trigger"] = "copy → trigger";
   EVENT_LABEL["blink→land-untap-etb"] = "repeatable blink → land-untap ETB loop";
   EVENT_LABEL["lord→tribe"] = "tribal (creature-type synergy)";

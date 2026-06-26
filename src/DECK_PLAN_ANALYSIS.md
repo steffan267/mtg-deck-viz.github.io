@@ -73,6 +73,14 @@ separate win, cohesion, and self-sufficiency scores.
   10 in the precon corpus and from 3525 to 6 in the Moxfield bracket corpus,
   with validation recall and sampled precision still at 1.0 and bracket
   accuracy unchanged.
+- Added `opponent-draw→punisher` for repeatable table/opponent draw sources
+  feeding opponent-draw lifeloss or damage payoffs. This models group-slug and
+  Nekusar-style draw-punisher engines without treating one-shot cantrips or
+  small target-opponent draw spells as deck engines. The 2026-06-26 corpus run
+  added 2 targeted edges in the precon corpus, both in `Endless Punishment`,
+  and 32 edges across 5 Moxfield bracket decks, including Nekusar and
+  Sheoldred-style lists; validation recall and sampled precision stayed at 1.0
+  and bracket accuracy was unchanged.
 
 ## Data flow
 

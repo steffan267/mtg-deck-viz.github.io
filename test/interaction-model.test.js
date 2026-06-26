@@ -1269,10 +1269,20 @@ When Gilded Goose enters, create a Food token.
   const opponentDrawPunisher = node('Opponent Draw Punisher', 'Enchantment', 'Whenever an opponent draws a card, that player loses 1 life.');
   const compoundOpponentDrawPunisher = node('Compound Opponent Draw Punisher', 'Creature — Archer', 'When this creature enters and whenever an opponent draws a card except the first one they draw in each of their draw steps, this creature deals 1 damage to any target.');
   const smallOpponentDraw = node('Small Opponent Draw', 'Sorcery', 'Target opponent draws a card.');
+  const repeatableTableDraw = node('Repeatable Table Draw', 'Creature — Human Knight', 'At the beginning of each player\'s upkeep, that player draws a card and loses 1 life.');
+  const additionalDrawStepDraw = node('Additional Draw Step Draw', 'Enchantment', 'At the beginning of each player\'s draw step, that player draws an additional card.');
   assertHasCap(massOpponentDraw, 'is-mass-opponent-draw-source');
+  assertHasCap(repeatableTableDraw, 'is-repeatable-opponent-draw-source');
+  assertHasCap(additionalDrawStepDraw, 'is-repeatable-opponent-draw-source');
   assertHasCap(opponentDrawPunisher, 'is-opponent-draw-punisher');
   assertHasCap(compoundOpponentDrawPunisher, 'is-opponent-draw-punisher');
   assertHasCap(compoundOpponentDrawPunisher, 'opponent-draw-punisher-damage:1');
+  assertHasInteraction(repeatableTableDraw, opponentDrawPunisher,
+    it => it.family === 'opponent-draw→punisher' && it.strength === 'strong',
+    'repeatable table draw should feed opponent-draw punishers as a deck engine');
+  assertHasInteraction(additionalDrawStepDraw, compoundOpponentDrawPunisher,
+    it => it.family === 'opponent-draw→punisher' && it.strength === 'strong',
+    'additional draw-step draw should feed damage-based opponent-draw punishers');
   assertHasInteraction(massOpponentDraw, opponentDrawPunisher,
     it => it.family === 'opponent-draw-punisher-win' && it.strength === 'combo-critical',
     'large opponent draw source plus opponent draw punisher should be a finite threshold win signal');
@@ -1280,6 +1290,7 @@ When Gilded Goose enters, create a Food token.
     it => it.family === 'opponent-draw-punisher-win' && it.strength === 'combo-critical',
     'compound ETB/opponent-draw trigger text should preserve the opponent-draw punisher signal');
   assertNoEvent(smallOpponentDraw, opponentDrawPunisher, 'enable:opponent-draw-punisher-win');
+  assertNoEvent(smallOpponentDraw, opponentDrawPunisher, 'enable:opponent-draw→punisher');
 
   const halfLibraryMill = node('Half-Library Mill', 'Sorcery', 'Target player mills half their library, rounded up.');
   const millMultiplier = node('Mill Multiplier', 'Enchantment', 'If an opponent would mill one or more cards, that player mills twice that many cards instead.');
