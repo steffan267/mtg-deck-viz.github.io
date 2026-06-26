@@ -1723,6 +1723,27 @@ const COMBO_FAMILIES = [
     knownFalsePositives: ['spell-copy text matched to permanent ETBs', 'one-shot copy treated as repeatable'],
     uiExplanation: 'A copy effect reuses a permanent or trigger only when its scope matches the target.',
   },
+  {
+    id: 'tap-free-cast→untap-engine',
+    title: 'Tap/free-cast engine plus untap reset',
+    maxCards: 2,
+    confidenceGate: 'heuristic',
+    requiredFacts: [
+      { role: 'engine', kind: 'capability', predicate: 'is-tap-free-cast-engine' },
+      { role: 'support', kind: 'capability', predicate: 'is-cheap-instant-engine-untap-spell' },
+    ],
+    optionalAccelerants: [
+      { kind: 'capability', predicate: 'tap-free-cast-requires:mana', note: 'mana production and rituals can increase how often the engine is activated' },
+      { kind: 'capability', predicate: 'tap-free-cast-origin:library', note: 'library/free-cast access makes the engine a deck-plan hub' },
+    ],
+    disqualifiers: [{ kind: 'target-legality', rule: 'the untap spell must be able to target the tap/free-cast permanent type' }],
+    repeatability: { rule: 'value engine: untap support resets a tap/free-cast engine, but sequencing and mana still gate each use' },
+    payoffCriteria: [{ event: 'cast', comparator: 'enables free-cast chain' }, { event: 'untap', comparator: 'resets engine' }],
+    examples: [{ name: 'Codie-style free-cast commander plus Twiddle effect', cards: ['Codie, Vociferous Codex', 'Twiddle'] }],
+    negativeFixtures: [{ name: 'creature-only untap plus noncreature nonartifact engine', cards: ['Creature Untap Spell', 'Tap Free-Cast Enchantment'], reason: 'untap target scope does not match the engine' }],
+    knownFalsePositives: ['land-only untap spells', 'free-cast effects that do not tap and therefore do not need reset support', 'generic untap spells counted as deterministic infinite loops'],
+    uiExplanation: 'A tapped free-cast engine becomes a deck-plan hub when cheap untap spells can reset it for another activation line.',
+  },
 ];
 
 function byId() {

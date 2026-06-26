@@ -62,6 +62,7 @@ const ComboFamilyId = freeze({
   DelayedMillEqualizerFiniteMill: 'delayed-mill-equalizer-finite-mill',
   LibraryExileEmptyLibraryWin: 'library-exile-empty-library-win',
   ImprintUntapSpellLoop: 'imprint-untap-spell-loop',
+  TapFreeCastUntapEngine: 'tap-free-cast→untap-engine',
   SelfUntapManaAbilityCopyLoop: 'self-untap-mana→ability-copy-loop',
   HastyCopyEtbUntapLoop: 'hasty-copy→etb-untap-loop',
   CombatCopyTokenExtraCombatLoop: 'combat-copy-token→extra-combat-loop',

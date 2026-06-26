@@ -352,7 +352,8 @@
       "pass": true,
       "confidence": 0,
       "rejectionReasons": [
-        "self-untap cost is not below produced mana"
+        "self-untap cost is not below produced mana",
+        "self-untap cost is not below produced mana in the package-local state model"
       ]
     },
     {
@@ -394,7 +395,8 @@
       "pass": true,
       "confidence": 0,
       "rejectionReasons": [
-        "self-untap cost is not below produced mana"
+        "self-untap cost is not below produced mana",
+        "self-untap cost is not below produced mana in the package-local state model"
       ]
     },
     {
@@ -463,7 +465,8 @@
       "confidence": 0,
       "rejectionReasons": [
         "copied untap does not create positive mana after copy cost",
-        "self-untap cost is not below produced mana"
+        "self-untap cost is not below produced mana",
+        "self-untap cost is not below produced mana in the package-local state model"
       ]
     },
     {
@@ -773,7 +776,7 @@
       "purpose": "Moxfield bracket calibration source for runtime/precision sampling across power bands.",
       "source": "analysis/bracket/moxfield-bracket-corpus.json",
       "sourceStatus": "ok",
-      "deckCount": 464,
+      "deckCount": 461,
       "failedDeckCount": 0,
       "complete": true,
       "brackets": [
@@ -810,7 +813,7 @@
       "status": "ok",
       "source": "analysis/interaction-baseline/interaction-baseline.json",
       "baselineDeckId": "sample-xantcha",
-      "edgeCount": 154,
+      "edgeCount": 144,
       "comboCriticalPairCount": 5,
       "comboCriticalTripleCount": 0,
       "highFanoutFamilies": [
@@ -823,7 +826,7 @@
           "count": 42
         }
       ],
-      "weakInteractionShare": 0.91
+      "weakInteractionShare": 0.891
     }
   ],
   "manualAudit": {

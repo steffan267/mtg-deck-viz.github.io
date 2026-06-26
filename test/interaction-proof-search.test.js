@@ -719,6 +719,21 @@ assert.equal(imprintLoop.status, 'proven');
 assert.ok(proofByFamily(imprintLoop, 'imprint-untap-spell-loop'));
 assert.equal(proofByFamily(imprintLoop, 'imprint-untap-spell-loop').proof.repeatability.status, 'repeatable-candidate');
 
+const tapFreeCastUntapEngine = provePackage([
+  card('Codie-Style Engine', 'Legendary Artifact Creature — Construct', '{4}, {T}: Add {W}{U}{B}{R}{G}. When you cast your next spell this turn, exile cards from the top of your library until you exile an instant or sorcery card with lesser mana value. Until end of turn, you may cast that card without paying its mana cost.', 3),
+  card('Twiddle-Style Spell', 'Instant', 'You may tap or untap target artifact, creature, or land.', 1),
+]);
+assert.equal(tapFreeCastUntapEngine.status, 'proven');
+assert.ok(proofByFamily(tapFreeCastUntapEngine, 'tap-free-cast→untap-engine'));
+assert.equal(proofByFamily(tapFreeCastUntapEngine, 'tap-free-cast→untap-engine').proof.repeatability.status, 'value-engine');
+
+const targetMismatchTapFreeCastEngine = provePackage([
+  card('Tap Free-Cast Enchantment', 'Enchantment', '{2}, {T}: Exile the top card of your library. You may cast it without paying its mana cost.', 3),
+  card('Creature-Only Untap Spell', 'Instant', 'Untap target creature.', 1),
+]);
+assert.equal(targetMismatchTapFreeCastEngine.status, 'not-repeatable');
+assert.ok(targetMismatchTapFreeCastEngine.rejections.some(rejection => /cannot legally reset/.test(rejection.reason)));
+
 const abilityCopyLoop = provePackage([
   card('Ability Copier', 'Artifact', "Whenever you activate an ability, if it isn't a mana ability, you may pay {2}. If you do, copy that ability.", 3),
   card('Self Untap Mana Rock', 'Artifact', "{T}: Add {C}{C}{C}. {3}: Untap this artifact.", 3),

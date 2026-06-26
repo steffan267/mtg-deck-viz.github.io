@@ -8,6 +8,7 @@ import DeckList from './components/sidebar/DeckList.vue'
 import DeckTabs from './components/sidebar/DeckTabs.vue'
 import SidebarShell from './components/sidebar/SidebarShell.vue'
 import DeckMetricsGuide from './components/sidebar/DeckMetricsGuide.vue'
+import DeckPlanAnalysisPanel from './components/sidebar/DeckPlanAnalysis.vue'
 import ScorePanel from './components/score/ScorePanel.vue'
 import SignalBarList from './components/score/SignalBarList.vue'
 import ToolbarButton from './components/common/ToolbarButton.vue'
@@ -17,6 +18,7 @@ import { emptyBootstrap, loadBrowserBootstrap } from './services/bootstrap'
 import { createBrowserRecommendationProvider } from './services/recommendations'
 import { saltyCardReferences } from './services/saltList'
 import { buildDeckGuideMetrics } from './services/deckGuideMetrics'
+import { buildDeckPlanAnalysis } from './services/deckPlanAnalysis'
 import { createBrowserGraphBuilder } from './services/browserGraphBuilder'
 import { useDeckImport } from './composables/useDeckImport'
 import { layoutStrategies } from './services/graphLayoutStrategies'
@@ -93,7 +95,8 @@ const baseScoreSections = computed(() => activeMetrics.value ? metricsToScoreSec
 const scoreSections = computed<ScoreSection[]>(() => enrichScoreSections(baseScoreSections.value))
 const layoutModeLabel = computed(() => layoutStrategies.find(strategy => strategy.id === layoutMode.value)?.label || layoutStrategies[0].label)
 const saltReferences = computed(() => saltyCardReferences(cardNodes.value.map(node => node.id)))
-const deckGuideMetrics = computed(() => buildDeckGuideMetrics(cardNodes.value, activeMetrics.value))
+const deckPlanAnalysis = computed(() => buildDeckPlanAnalysis(activeGraph.value, activeMetrics.value))
+const deckGuideMetrics = computed(() => buildDeckGuideMetrics(cardNodes.value, activeMetrics.value, deckPlanAnalysis.value))
 
 const browserGlobals = globalThis as typeof globalThis & {
   INTERACTION_MODEL?: unknown
@@ -462,6 +465,19 @@ function selectCard(id: string) {
   selectedProofPackageId.value = null
   selectedBreakdownCategoryId.value = null
   selectedNodeId.value = id
+}
+
+function selectPlanCard(id: string) {
+  selectCard(id)
+  currentPage.value = 'visualization'
+}
+
+function selectPlanCards(ids: string[]) {
+  selectedFamily.value = deckPlanAnalysis.value?.packages.find(pkg => ids.every(id => pkg.cards.includes(id)))?.family || null
+  selectedProofPackageId.value = null
+  selectedBreakdownCategoryId.value = null
+  selectedNodeId.value = ids[0] || null
+  currentPage.value = 'visualization'
 }
 
 function resetView() {
@@ -1170,7 +1186,15 @@ function benchmarkDelta(value: number, benchmark: number): string {
       <section class="breakdown-page__header">
         <p class="breakdown-card__eyebrow">Deck breakdown</p>
         <h1>{{ activeDeck?.title || 'Deck breakdown' }}</h1>
-        <p>Use this page for score-level inspection: bracket calibration, weighted score context, and per-metric benchmark distributions. The visual graph stays under Deck visualisation.</p>
+        <p>Use this page for plan-level inspection: the detected deck plan, engine packages, support shell, review queue, bracket calibration, and score benchmarks.</p>
+      </section>
+
+      <section v-if="deckPlanAnalysis" class="breakdown-card breakdown-card--wide">
+        <DeckPlanAnalysisPanel
+          :analysis="deckPlanAnalysis"
+          @select-card="selectPlanCard"
+          @select-cards="selectPlanCards"
+        />
       </section>
 
       <section v-if="activeBracketComparison && activeMetrics" class="breakdown-card breakdown-card--wide">

@@ -51,6 +51,7 @@ export const ComboFamilyId: {
   readonly DelayedMillEqualizerFiniteMill: 'delayed-mill-equalizer-finite-mill'
   readonly LibraryExileEmptyLibraryWin: 'library-exile-empty-library-win'
   readonly ImprintUntapSpellLoop: 'imprint-untap-spell-loop'
+  readonly TapFreeCastUntapEngine: 'tap-free-cast→untap-engine'
   readonly SelfUntapManaAbilityCopyLoop: 'self-untap-mana→ability-copy-loop'
   readonly HastyCopyEtbUntapLoop: 'hasty-copy→etb-untap-loop'
   readonly CombatCopyTokenExtraCombatLoop: 'combat-copy-token→extra-combat-loop'

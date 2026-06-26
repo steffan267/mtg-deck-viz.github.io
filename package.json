@@ -17,6 +17,7 @@
     "audit:interaction-index-performance": "node ./scripts/audit-interaction-index-performance.js",
     "validate:interactions": "node ./scripts/report-interaction-validation.js --write",
     "validate:interactions:check": "node ./scripts/report-interaction-validation.js --check",
+    "report:score-corpus": "node ./scripts/report-score-corpus.js",
     "hardening:interactions": "node ./scripts/check-interaction-hardening.js",
     "fetch-bracket-sample": "node ./analysis/bracket/fetch-moxfield-bracket-sample.js",
     "cache-reference-decks": "node ./analysis/bracket/cache-reference-decks.js --sample ./analysis/bracket/moxfield-bracket-sample-500.json --out ./analysis/bracket/moxfield-reference-decks.json",

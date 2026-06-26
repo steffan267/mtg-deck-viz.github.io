@@ -349,6 +349,12 @@ function seedCandidates(indexes, options) {
 
   pairCandidates(
     candidates,
+    capabilityIds(indexes, 'is-cheap-instant-engine-untap-spell'),
+    capabilityIds(indexes, 'is-tap-free-cast-engine'),
+  );
+
+  pairCandidates(
+    candidates,
     capabilityIds(indexes, 'is-activated-ability-copier'),
     capabilityIds(indexes, 'is-self-untapper'),
   );

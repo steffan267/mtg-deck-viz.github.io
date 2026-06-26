@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "interaction-inflation-watchlist.v1",
+  "purpose": "Track interaction families that are known to inflate cohesion when they fan out as generic cliques or hubs. Score reports summarize these separately so model improvements can distinguish real recall from noisy graph density.",
+  "source": "data/AUDIT-100-decks-round5-FINAL.json synthesis.topFalsePositivePatterns",
+  "families": [
+    {
+      "family": "ramp→sink",
+      "severity": "high",
+      "reason": "Generic ramp-to-mana-sink wiring appears in almost every Commander deck and can create large bipartite fans that do not describe deck-specific strategy.",
+      "exampleDecks": [
+        "Eldrazi Incursion",
+        "Token Triumph",
+        "Divine Convocation",
+        "Hail, Caesar",
+        "Scions & Spellcraft"
+      ]
+    },
+    {
+      "family": "lord→tribe",
+      "severity": "high",
+      "reason": "Lord and anthem cards can connect to the whole creature base without checking the actual subtype, color, legendary status, or buff condition.",
+      "exampleDecks": [
+        "Riders of Rohan",
+        "Family Matters",
+        "Blame Game",
+        "Forces of the Imperium",
+        "Coven Counters"
+      ]
+    },
+    {
+      "family": "graveyard",
+      "severity": "high",
+      "reason": "Undirected graveyard edges can merge self-mill, recursion, reanimation, graveyard hate, and incidental text into one mega-clique.",
+      "exampleDecks": [
+        "Sultai Arisen",
+        "Revenant Recon",
+        "Death Toll",
+        "Lorehold Spirit"
+      ]
+    },
+    {
+      "family": "graveyard-fuel→recursion",
+      "severity": "watch",
+      "reason": "Directional self-mill or surveil into recursion is a real graveyard-plan signal, but it can still fan out when many fuel cards connect to many recursion cards.",
+      "exampleDecks": [
+        "Revenant Recon",
+        "Death Toll",
+        "Sultai Arisen",
+        "Lorehold Spirit"
+      ]
+    },
+    {
+      "family": "proliferate→counters",
+      "severity": "high",
+      "reason": "Proliferators and counter permanents can over-connect when the model does not check counter type or whether the relationship is repeatable.",
+      "exampleDecks": [
+        "Counter Intelligence",
+        "Corrupting Influence",
+        "Quandrix Unlimited",
+        "Upgrades Unleashed"
+      ]
+    },
+    {
+      "family": "counter-multiplier",
+      "severity": "watch",
+      "reason": "Counter doublers and one-shot counter placers can read as persistent multipliers unless the family is kept directional and counter-type aware.",
+      "exampleDecks": [
+        "Counter Intelligence",
+        "Corrupting Influence",
+        "Mutant Menace",
+        "Coven Counters"
+      ]
+    },
+    {
+      "family": "sac-fodder→outlet",
+      "severity": "high",
+      "reason": "A single sacrifice outlet can star-wire to every creature even when the deck has no sacrifice payoff or aristocrats engine.",
+      "exampleDecks": [
+        "Abzan Armor",
+        "Urza's Iron Alliance",
+        "Ahoy Mateys",
+        "Forces of the Imperium"
+      ]
+    },
+    {
+      "family": "copy→trigger",
+      "severity": "medium",
+      "reason": "Copy effects can connect to illegal or irrelevant trigger targets when spell-copy, token-copy, attacker-copy, and clone effects are not separated.",
+      "exampleDecks": [
+        "Eternal Might",
+        "Mind Flayarrrs",
+        "Squirreled Away",
+        "Token Triumph"
+      ]
+    },
+    {
+      "family": "destroy",
+      "severity": "medium",
+      "reason": "Removal, wipes, protection, and indestructible text can be grouped as shared destroy text even when the cards do not help each other.",
+      "exampleDecks": [
+        "Food and Fellowship",
+        "Cavalry Charge",
+        "Necron Dynasties",
+        "Mardu Surge"
+      ]
+    },
+    {
+      "family": "attach",
+      "severity": "medium",
+      "reason": "Equipment, Auras, Curses, and attach payoffs can collide into gear-to-gear or equipment-to-player-aura edges instead of directed support lines.",
+      "exampleDecks": [
+        "Scrappy Survivors",
+        "Upgrades Unleashed",
+        "Vampiric Bloodlust",
+        "Elven Council"
+      ]
+    },
+    {
+      "family": "draw",
+      "severity": "watch",
+      "reason": "Draw is often legitimate glue, but shared draw text can become a broad hub when there is no downstream draw-matters payoff.",
+      "exampleDecks": [
+        "sample-xantcha",
+        "Paradox Power"
+      ]
+    }
+  ]
+}

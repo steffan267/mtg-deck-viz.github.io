@@ -50,22 +50,6 @@
         { re: /whenever you discards?/, s: Y },
       ] },
 
-    { id: "graveyard", label: "graveyard (fill ↔ use)",
-      // Largely about your own yard; reanimation reaches "a graveyard" (any).
-      produce: [
-        { re: /put .* into (your|a) graveyard/, s: A },
-        { re: /into (your|a) graveyard/, s: A },
-        { re: /\bmills?\b/, s: A },
-        { re: /\bsurveil\b/, s: Y },
-        { re: /when(ever)? .* dies/, s: A },               // a death feeds the graveyard
-      ],
-      consume: [
-        { re: /from (your|a|their) graveyard/, s: A },
-        { re: /return .* graveyard/, s: A },
-        { re: /cast .* from your graveyard/, s: A },
-        { re: /creature card (in|from) (a|your|their) graveyard/, s: A },
-      ] },
-
     { id: "sacrifice", label: "creatures dying / sacrificed",
       produce: [
         { re: /sacrifices? a creature/, s: Y },            // you sac as a cost
@@ -481,7 +465,6 @@
         { re: /add (one|two|three|four|five|six|x) (?:additional |more )?mana/, s: Y },
         { re: /add .* mana of any/, s: Y },
         { re: /add an additional|twice that much mana|doesn't empty/, s: Y }, // doublers
-        { re: /\bconvoke\b/, s: Y },                        // creatures help pay = mana engine
       ],
       consume: [
         { re: /(loses?|lose) x life/, s: Y },
@@ -493,7 +476,6 @@
         { re: /repeat .* x times/, s: Y },
         { re: /\bx target/, s: Y },
         { re: /where x is/, s: Y },
-        { re: /\bconvoke\b/, s: Y },
         { re: /spend .* mana .* as though|spend this mana/, s: Y },
       ] },
   ];
@@ -850,7 +832,7 @@
 
   // ============================ PIPELINE: TAG ===============================
   // Per-segment capability flags. These are the currency of the enablement
-  // families (untap→tap, etb→blink, sac-fodder→outlet, …). Kept deliberately
+  // families (untap→tap, etb→blink, death→payoff, …). Kept deliberately
   // recognizable; tightening for false-hubs happens later, against real decks.
   // A "free/cheap" untap activation has no mana cost beyond the untap itself —
   // these are the ones that go infinite (return-a-Forest, {0}, {Q}). A costed
@@ -1149,6 +1131,17 @@
           caps.add("has-nonmana-activated-ability");
         if (s.kind === "activated"
             && /\{t\}/.test(c)
+            && /\bmay cast\b/.test(e)
+            && /\bwithout paying its mana cost\b/.test(e)
+            && /\b(exile|top|library)\b/.test(e)) {
+          caps.add("is-tap-free-cast-engine");
+          caps.add("tap-free-cast-payment:free");
+          if (/\blibrary\b|\btop\b/.test(e)) caps.add("tap-free-cast-origin:library");
+          if (/\bexile\b/.test(e)) caps.add("tap-free-cast-origin:exile");
+          if (manaCostValue(c) > 0) caps.add("tap-free-cast-requires:mana");
+        }
+        if (s.kind === "activated"
+            && /\{t\}/.test(c)
             && !/\{[^}]*[1-9wubrgcx][^}]*\}/.test(c)
             && !/\bsacrifice\b|\bpay\b|\bdiscard\b|\bexile\b|\bremove\b/.test(c)
             && /\bthis creature deals? 1 damage to (any target|target creature)\b/.test(e))
@@ -1195,8 +1188,35 @@
             caps.add(tgt === "permanent" ? "untaps-any" : "untaps-" + tgt);  // untaps-creature / untaps-land / untaps-artifact / untaps-any
           }
         }
-        if (/\binstant\b/.test(typeText) && (cmc == null || cmc <= 2) && /untap all nonland permanents you control/.test(e))
+        if (/\binstant\b/.test(typeText) && (cmc == null || cmc <= 2) && /untap all nonland permanents you control/.test(e)) {
           caps.add("is-cheap-instant-nonland-permanent-untap-spell");
+          caps.add("is-cheap-instant-engine-untap-spell");
+          caps.add("untap-spell-target:nonland");
+          caps.add("untap-spell-target:artifact");
+          caps.add("untap-spell-target:creature");
+        }
+        if (/\binstant\b/.test(typeText) && (cmc == null || cmc <= 2) && /\buntap\b/.test(e)) {
+          const allTextForUntap = `${e} ${s.raw || ""}`;
+          if (/\buntap target permanent\b/.test(allTextForUntap) || /\btap or untap target permanent\b/.test(allTextForUntap)) {
+            caps.add("is-cheap-instant-engine-untap-spell");
+            caps.add("untap-spell-target:permanent");
+            caps.add("untap-spell-target:artifact");
+            caps.add("untap-spell-target:creature");
+          }
+          if (/\buntap target artifact\b/.test(allTextForUntap) || /\btap or untap target artifact\b/.test(allTextForUntap) || /\buntap target artifact, creature, or land\b/.test(allTextForUntap)) {
+            caps.add("is-cheap-instant-engine-untap-spell");
+            caps.add("untap-spell-target:artifact");
+          }
+          if (/\buntap target creature\b/.test(allTextForUntap) || /\btap or untap target creature\b/.test(allTextForUntap) || /\buntap target artifact, creature, or land\b/.test(allTextForUntap)) {
+            caps.add("is-cheap-instant-engine-untap-spell");
+            caps.add("untap-spell-target:creature");
+          }
+          if (/\btarget creatures?\b/.test(allTextForUntap)
+              && /\buntap (?:it|that creature|those creatures|target creatures?)\b/.test(allTextForUntap)) {
+            caps.add("is-cheap-instant-engine-untap-spell");
+            caps.add("untap-spell-target:creature");
+          }
+        }
         if (s.kind === "activated" && /\buntap (this|it|this artifact|this creature|this permanent)/.test(e)) {
           caps.add("is-self-untapper");
           caps.add("self-untap-cost:" + manaCostValue(c));
@@ -1811,6 +1831,17 @@
           caps.add("forced-cast-origin:library-top");
         }
       }
+      if (/\{t\}/.test(allText)
+          && /\bwhen you (?:cast your next|next cast a) spell this turn\b/.test(allText)
+          && /\bmay cast\b/.test(allText)
+          && /\bwithout paying its mana cost\b/.test(allText)
+          && /\b(exile|top|library)\b/.test(allText)) {
+        caps.add("is-tap-free-cast-engine");
+        caps.add("tap-free-cast-payment:free");
+        if (/\blibrary\b|\btop\b/.test(allText)) caps.add("tap-free-cast-origin:library");
+        if (/\bexile\b/.test(allText)) caps.add("tap-free-cast-origin:exile");
+        if (/\{[1-9xwubrgc]/.test(allText)) caps.add("tap-free-cast-requires:mana");
+      }
       if (/\bat the beginning of each player'?s draw step\b/.test(allText)
           && /\bputs? the cards? in (?:their|his or her|that player'?s) hand on the (?:bottom of|bottom into) (?:their|his or her|that player'?s) library\b/.test(allText)
           && /\bdraws? that many cards\b/.test(allText)) {
@@ -2193,6 +2224,10 @@
           }
         }
       }
+      if (/\bconvoke\b/.test(e) || /\bconvoke\b/.test(s.trigger))
+        caps.add("is-convoke-spell");
+      if (/whenever you cast .*convoke/.test(s.trigger) || /whenever you cast .*convoke/.test(e))
+        caps.add("is-convoke-cast-payoff");
       if (/if one or more tokens? would be created under your control|if .* would create .* tokens?.* instead|tokens? plus .* token .* created instead|twice that many tokens|double .* tokens/.test(e))
         caps.add("is-token-doubler");
       if (/if .*tokens? would be created under your control.*tokens?.*created instead/.test(e)
@@ -2288,7 +2323,7 @@
 
       // proliferate CONSUMER: a card that puts/uses counters benefits from
       // proliferate (the audit: proliferate had producers but no consumer).
-      if (/\+1\/\+1 counter|loyalty counter|charge counter|\bpoison\b|counter on|\bfabricate \d+/.test(e) && !/proliferate/.test(e))
+      if (/\+1\/\+1 counter|loyalty counter|charge counter|\bpoison\b|\bfabricate \d+/.test(e + " " + c) && !/proliferate/.test(e))
         caps.add("has-counters");
       if (/\bproliferate\b/.test(e)) caps.add("is-proliferator");
       // counter MULTIPLIER (doublers): much stronger than a single counter source
@@ -2338,6 +2373,10 @@
       // MILL as engine: opponent-mill source + graveyard-size payoff
       if (/(target (player|opponent)|each opponent|that player) (mills?|puts? the top)/.test(e) || /\bmills? (a|an|\d+|that many)/.test(e))
         caps.add("is-mill-source");
+      if (/\bmills?\b|\bsurveil\b|put .* (top|cards?) .* into (your|a) graveyard/.test(e))
+        caps.add("is-graveyard-fuel");
+      if (/return .* from (your|a|their) graveyard|return .* graveyard .* battlefield|put .* creature card .* graveyard onto the battlefield|cast .* from your graveyard|play .* from your graveyard|you may (cast|play) .* from your graveyard/.test(effectAndRaw))
+        caps.add("is-graveyard-recursion");
       if (/if (an|a) opponent would mill|if .* would mill one or more cards?.*mill twice that many|mills? twice that many cards? instead/.test(effectAndRaw))
         caps.add("is-mill-multiplier");
       if (/beginning of each end step/.test(effectAndRaw)
@@ -2494,7 +2533,8 @@
   // Each yields a classified Interaction (kind/family/strength) when card X has
   // `from` and card Y has `to`. `kind` enablement edges feed loop detection.
   // Enablement families. Strengths are deliberately conservative after the
-  // 100-precon audit: families that fire in most decks (sac-fodder, ramp→sink)
+  // 100-precon audit: families that fire in most decks (generic sacrifice,
+  // ramp→sink)
   // are WEAK so they don't inflate cohesion; only genuinely deck-defining,
   // directed enablement (blink→etb, free-untap loops) earns strong/combo.
   const ENABLEMENT = [
@@ -2503,7 +2543,6 @@
     { family: "untap→tap-ability", from: "is-free-untapper", to: "has-tap-ability", kind: "enablement", strength: "strong",
       manaLoop: "taps-for-mana" },     // free untap re-tapping a MANA ability = combo-critical
     { family: "etb→blink",         from: "is-blink",    to: "has-etb",          kind: "enablement", strength: "strong" },
-    { family: "sac-fodder→outlet", from: "is-body",     to: "is-sac-outlet",    kind: "enablement", strength: "weak" },
     { family: "cost-reduction→ability", from: "is-creature-ability-cost-reducer", to: "has-creature-activated-ability", kind: "enablement", strength: "weak" },
     { family: "cost-reduction→ability", from: "is-cost-reducer", to: "has-nonmana-activated-ability", kind: "enablement", strength: "weak" },
     { family: "cost-reduction→ability", from: "is-artifact-activated-ability-cost-reducer", to: "has-nonmana-activated-ability", kind: "enablement", strength: "weak" },
@@ -2534,6 +2573,8 @@
     // payoff or an overrun. No longer "any body → any attack trigger".
     { family: "go-wide→payoff",    from: "is-creature-token-producer", to: "is-overrun",       kind: "synergy", strength: "strong" },
     { family: "go-wide→payoff",    from: "is-creature-token-producer", to: "is-width-payoff",  kind: "synergy", strength: "moderate" },
+    { family: "convoke-fodder→payoff", from: "is-creature-token-producer", to: "is-convoke-cast-payoff", kind: "synergy", strength: "weak" },
+    { family: "convoke-spell→payoff", from: "is-convoke-spell", to: "is-convoke-cast-payoff", kind: "synergy", strength: "moderate" },
     // counters: proliferate / multipliers amplify any counter source
     { family: "proliferate→counters", from: "is-proliferator",     to: "has-counters", kind: "synergy", strength: "moderate" },
     { family: "counter-multiplier",   from: "is-counter-multiplier", to: "has-counters", kind: "synergy", strength: "strong" },
@@ -2541,6 +2582,7 @@
     { family: "enchantress",       from: "is-enchantment",      to: "is-enchantress-payoff", kind: "synergy", strength: "strong" },
     { family: "magecraft",         from: "is-noncreature-spell", to: "is-spellcast-payoff",  kind: "synergy", strength: "moderate" },
     { family: "mill→graveyard-payoff", from: "is-mill-source",  to: "is-graveyard-size-payoff", kind: "synergy", strength: "moderate" },
+    { family: "graveyard-fuel→recursion", from: "is-graveyard-fuel", to: "is-graveyard-recursion", kind: "synergy", strength: "moderate" },
     { family: "tribal-count→payoff",   from: "is-body",          to: "is-typecount-payoff",  kind: "synergy", strength: "moderate" },
     // --- Round-4: the combat axis (biggest missing payoff class) ---
     // attackers feed a combat-trigger payoff — WEAK: "I have creatures + an
@@ -2569,6 +2611,7 @@
     { family: "lifelink-counter-damage-loop", from: "is-lifelink-counter-engine", to: "is-counter-to-damage-source", kind: "enablement", strength: "combo-critical" },
     { family: "token-replacement-sacrifice-mana-loop", from: "is-token-to-creature-token-replacer", to: "is-death-mana-payoff", kind: "enablement", strength: "combo-critical" },
     { family: "imprint-untap-spell-loop", from: "is-cheap-instant-nonland-permanent-untap-spell", to: "is-repeatable-cheap-instant-caster", kind: "enablement", strength: "combo-critical" },
+    { family: "tap-free-cast→untap-engine", from: "is-cheap-instant-engine-untap-spell", to: "is-tap-free-cast-engine", kind: "enablement", strength: "strong" },
     { family: "self-untap-mana→ability-copy-loop", from: "is-activated-ability-copier", to: "is-self-untapper", kind: "enablement", strength: "combo-critical" },
     { family: "hasty-copy→etb-untap-loop", from: "is-repeatable-hasty-creature-copy", to: "etb-untaps-permanent", kind: "enablement", strength: "combo-critical" },
     { family: "combat-copy-token→extra-combat-loop", from: "is-combat-copy-token-equipment", to: "is-attack-extra-combat-source", kind: "enablement", strength: "combo-critical" },
@@ -2766,12 +2809,12 @@
     // 2) tribal synergy: a TYPED lord ↔ matching creature is a real build-around
     // (moderate); a generic team anthem links to every creature (weak). GATED to
     // the is-lord cap so mis-tagged instants/equipment (audit #1) don't fire.
-    const aLord = hasCap(a, "is-lord"), bLord = hasCap(b, "is-lord");
-    const typedTribal = (hasCap(a, "is-typed-lord") && tribalMatch(a.tribalRefs.filter(r => r !== "creature"), b.myTypes))
-      || (hasCap(b, "is-typed-lord") && tribalMatch(b.tribalRefs.filter(r => r !== "creature"), a.myTypes));
-    if ((aLord && tribalMatch(a.tribalRefs, b.myTypes)) || (bLord && tribalMatch(b.tribalRefs, a.myTypes)))
+    const aLordRefs = hasCap(a, "is-typed-lord") ? a.tribalRefs.filter(r => r !== "creature") : [];
+    const bLordRefs = hasCap(b, "is-typed-lord") ? b.tribalRefs.filter(r => r !== "creature") : [];
+    const typedTribal = tribalMatch(aLordRefs, b.myTypes) || tribalMatch(bLordRefs, a.myTypes);
+    if (typedTribal)
       out.push({ kind: "synergy", family: "lord→tribe", event: "tribal", direction: "both",
-        strength: typedTribal ? "moderate" : "weak", loops: false, evidence: { tribal: true, typed: typedTribal } });
+        strength: "moderate", loops: false, evidence: { tribal: true, typed: true } });
     const aTribalPayoff = hasCap(a, "is-tribal-payoff") && tribalMatch(a.tribalRefs.filter(r => r !== "creature"), b.myTypes);
     const bTribalPayoff = hasCap(b, "is-tribal-payoff") && tribalMatch(b.tribalRefs.filter(r => r !== "creature"), a.myTypes);
     if (aTribalPayoff || bTribalPayoff)
@@ -3081,7 +3124,6 @@
   EVENT_LABEL["enable:untap→tap-ability"] = "untap → re-use tap ability (combo)";
   EVENT_LABEL["enable:etb→blink"] = "blink → re-trigger ETB";
   EVENT_LABEL["enable:blink→land-untap-etb"] = "repeatable blink → land-untap ETB loop";
-  EVENT_LABEL["enable:sac-fodder→outlet"] = "sac fodder → sacrifice outlet";
   EVENT_LABEL["enable:cost-reduction→ability"] = "cost reduction → activated ability";
   EVENT_LABEL["enable:copy→trigger"] = "copy → re-trigger";
   EVENT_LABEL["enable:etb-doubler"] = "ETB doubler → ETB trigger";
@@ -3091,6 +3133,8 @@
   EVENT_LABEL["enable:death→draw"] = "death → draw payoff";
   EVENT_LABEL["enable:death→tokens"] = "death → token payoff";
   EVENT_LABEL["enable:go-wide→payoff"] = "tokens → go-wide payoff";
+  EVENT_LABEL["enable:convoke-fodder→payoff"] = "creature tokens → convoke payoff";
+  EVENT_LABEL["enable:convoke-spell→payoff"] = "convoke spell → cast payoff";
   EVENT_LABEL["enable:token-production→amplifier"] = "token production → token amplifier";
   EVENT_LABEL["enable:token-production→replacement"] = "token production → token replacement";
   EVENT_LABEL["enable:proliferate→counters"] = "proliferate → counters";
@@ -3098,6 +3142,7 @@
   EVENT_LABEL["enable:enchantress"] = "enchantment → enchantress payoff";
   EVENT_LABEL["enable:magecraft"] = "spell → magecraft payoff";
   EVENT_LABEL["enable:mill→graveyard-payoff"] = "mill → graveyard-size payoff";
+  EVENT_LABEL["enable:graveyard-fuel→recursion"] = "graveyard fuel → recursion";
   EVENT_LABEL["enable:tribal-count→payoff"] = "creatures → type-count payoff";
   EVENT_LABEL["enable:combat→payoff"] = "attackers → combat-trigger payoff";
   EVENT_LABEL["enable:combat-enabler"] = "evasion/extra-combat → combat payoff";
@@ -3115,6 +3160,7 @@
   EVENT_LABEL["enable:lifelink-counter-damage-loop"] = "lifelink counter-damage loop";
   EVENT_LABEL["enable:token-replacement-sacrifice-mana-loop"] = "token replacement → sacrifice/death-mana loop";
   EVENT_LABEL["enable:imprint-untap-spell-loop"] = "repeatable imprinted untap spell loop";
+  EVENT_LABEL["enable:tap-free-cast→untap-engine"] = "tap/free-cast engine reset";
   EVENT_LABEL["enable:self-untap-mana→ability-copy-loop"] = "self-untap mana ability copy loop";
   EVENT_LABEL["enable:hasty-copy→etb-untap-loop"] = "hasty copy → ETB untap loop";
   EVENT_LABEL["enable:combat-copy-token→extra-combat-loop"] = "combat copy token → extra combat loop";

@@ -123,11 +123,33 @@ When Gilded Goose enters, create a Food token.
   const worldShaper = node('World Shaper', 'Creature — Merfolk Shaman', 'Whenever World Shaper attacks, you mill three cards. When World Shaper dies, return all land cards from your graveyard to the battlefield tapped.');
   const rampagingBaloths = node('Rampaging Baloths', 'Creature — Beast', 'Landfall — Whenever a land enters the battlefield under your control, create a 4/4 green Beast creature token.');
   assertHasCap(worldShaper, 'is-land-recursion');
+  assertHasCap(worldShaper, 'is-graveyard-fuel');
+  assertHasCap(worldShaper, 'is-graveyard-recursion');
   assertHasCap(rampagingBaloths, 'is-landfall-payoff');
   assertHasEvent(worldShaper, rampagingBaloths, 'landfall');
   assertHasFamily(worldShaper, rampagingBaloths, 'land-recursion→landfall');
   const cultivate = node('Cultivate', 'Sorcery', 'Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand. Then shuffle.');
   assertHasEvent(cultivate, rampagingBaloths, 'landfall');
+
+  const stitchersSupplier = node('Stitcher-Style Supplier', 'Creature — Zombie', 'When this creature enters, mill three cards.');
+  const reanimateSpell = node('Reanimate-Style Spell', 'Sorcery', 'Return target creature card from a graveyard to the battlefield under your control.');
+  const eternalWitness = node('Eternal Witness-Style Recursion', 'Creature — Human Shaman', 'When this creature enters, return target card from your graveyard to your hand.');
+  assertHasCap(stitchersSupplier, 'is-graveyard-fuel');
+  assertHasCap(reanimateSpell, 'is-graveyard-recursion');
+  assertHasFamily(stitchersSupplier, reanimateSpell, 'graveyard-fuel→recursion');
+  assertNoFamily(reanimateSpell, eternalWitness, 'graveyard-fuel→recursion');
+  assertNoFamily(stitchersSupplier, reanimateSpell, 'graveyard');
+
+  const battleScreech = node('Battle Screech', 'Sorcery', 'Create two 1/1 white Bird creature tokens with flying. Flashback—Tap three untapped white creatures you control.');
+  const stokeTheFlames = node('Stoke the Flames', 'Instant', 'Convoke. Stoke the Flames deals 4 damage to any target.');
+  const kasla = node('Kasla, the Broken Halo', 'Legendary Creature — Angel Ally', 'Convoke. Flying, vigilance, haste. Whenever you cast another spell that has convoke, scry 2, then draw a card.');
+  assertHasCap(battleScreech, 'is-creature-token-producer');
+  assertHasCap(stokeTheFlames, 'is-convoke-spell');
+  assertHasCap(kasla, 'is-convoke-cast-payoff');
+  assertNoFamily(battleScreech, stokeTheFlames, 'ramp→sink');
+  assertNoFamily(battleScreech, stokeTheFlames, 'convoke-fodder→payoff');
+  assertHasFamily(battleScreech, kasla, 'convoke-fodder→payoff');
+  assertHasFamily(stokeTheFlames, kasla, 'convoke-spell→payoff');
 
   const panharmonicon = node('Panharmonicon', 'Artifact', 'If an artifact or creature entering the battlefield causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.');
   const wallOfOmens = node('Wall of Omens', 'Creature — Wall', 'When Wall of Omens enters the battlefield, draw a card.');
@@ -140,6 +162,10 @@ When Gilded Goose enters, create a Food token.
 
   const visceraSeer = node('Viscera Seer', 'Creature — Vampire Wizard', 'Sacrifice a creature: Scry 1.');
   const skullclamp = node('Skullclamp', 'Artifact — Equipment', 'Equipped creature gets +1/-1.\nWhenever equipped creature dies, draw two cards.\nEquip {1}');
+  const grizzlyBears = node('Grizzly Bears', 'Creature — Bear', '');
+  assertHasCap(visceraSeer, 'is-sac-outlet');
+  assertHasCap(grizzlyBears, 'is-body');
+  assertNoFamily(grizzlyBears, visceraSeer, 'sac-fodder→outlet');
   assertHasCap(skullclamp, 'has-death-trigger');
   assertHasCap(skullclamp, 'is-death-draw-payoff');
   assertHasFamily(visceraSeer, skullclamp, 'death→draw');
@@ -205,6 +231,29 @@ When Gilded Goose enters, create a Food token.
     "Players can't draw cards. At the beginning of each player's draw step, that player exiles the top card of their library. If it's a land card, the player puts it onto the battlefield. Otherwise, the player casts it without paying its mana cost if able.",
     5,
   );
+  const codieStyleEngine = node(
+    'Codie-Style Engine',
+    'Legendary Artifact Creature — Construct',
+    '{4}, {T}: Add {W}{U}{B}{R}{G}. When you cast your next spell this turn, exile cards from the top of your library until you exile an instant or sorcery card with lesser mana value. Until end of turn, you may cast that card without paying its mana cost.',
+    3,
+  );
+  const twiddleStyleSpell = node(
+    'Twiddle-Style Spell',
+    'Instant',
+    'You may tap or untap target artifact, creature, or land.',
+    1,
+  );
+  const creatureUntapTrick = node(
+    'Creature Untap Trick',
+    'Instant',
+    'Target creature gets +1/+2 and gains reach until end of turn. Untap it.',
+    1,
+  );
+  assertHasCap(codieStyleEngine, 'is-tap-free-cast-engine');
+  assertHasCap(twiddleStyleSpell, 'is-cheap-instant-engine-untap-spell');
+  assertHasCap(creatureUntapTrick, 'is-cheap-instant-engine-untap-spell');
+  assertHasFamily(twiddleStyleSpell, codieStyleEngine, 'tap-free-cast→untap-engine');
+  assertHasFamily(creatureUntapTrick, codieStyleEngine, 'tap-free-cast→untap-engine');
   const nonhandCastLockpiece = node(
     'Nonhand Cast Lockpiece',
     'Creature — Human Wizard',
@@ -271,6 +320,13 @@ When Gilded Goose enters, create a Food token.
     "You don't lose the game for having 0 or less life. As long as you have 0 or less life, all damage is dealt to you as though its source had infect.",
     3,
   );
+  assertHasCap(counterThresholdExtraTurnEngine, 'has-counters');
+  assertNoCap(counterBurdenPreventionShield, 'has-counters');
+  assertNoCap(delayedCounterShield, 'has-counters');
+  assertNoCap(depletionCounterspellLockpiece, 'has-counters');
+  assertHasFamily(freeProliferator, counterThresholdExtraTurnEngine, 'proliferate→counters');
+  assertNoFamily(freeProliferator, delayedCounterShield, 'proliferate→counters');
+  assertNoFamily(freeCounterDoubler, depletionCounterspellLockpiece, 'counter-multiplier');
   const ageCounterPreventionSource = node(
     'Age Counter Prevention Source',
     'Land',
@@ -713,6 +769,17 @@ When Gilded Goose enters, create a Food token.
   assertHasFamily(winota, bladeHistorian, 'tribal-payoff→tribe');
   assertHasEvent(winota, bladeHistorian, 'tribal');
   assertNoCap(parasiticGrasp, 'is-tribal-payoff');
+
+  const goblinChieftain = node('Goblin Chieftain', 'Creature — Goblin', 'Haste. Other Goblin creatures you control get +1/+1 and have haste.');
+  const goblinToken = node('Goblin Token', 'Creature — Goblin', '');
+  const bearCub = node('Bear Cub', 'Creature — Bear', '');
+  const genericAnthem = node('Generic Team Anthem', 'Enchantment', 'Creatures you control get +1/+1.');
+  const bastionProtector = node('Bastion Protector', 'Creature — Human Soldier', 'Commander creatures you control get +2/+2 and have indestructible.');
+  assertHasCap(goblinChieftain, 'is-typed-lord');
+  assertHasFamily(goblinChieftain, goblinToken, 'lord→tribe');
+  assertNoFamily(goblinChieftain, bearCub, 'lord→tribe');
+  assertNoFamily(genericAnthem, bearCub, 'lord→tribe');
+  assertNoFamily(bastionProtector, bearCub, 'lord→tribe');
 
   const deadeyeNavigator = node('Deadeye Navigator', 'Creature — Spirit', 'Soulbond (You may pair this creature with another unpaired creature when either enters. They remain paired for as long as you control both of them.)\nAs long as Deadeye Navigator is paired with another creature, each of those creatures has "{1}{U}: Exile this creature, then return it to the battlefield under your control."');
   const peregrineDrake = node('Peregrine Drake', 'Creature — Drake', 'Flying\nWhen this creature enters, untap up to five lands.');

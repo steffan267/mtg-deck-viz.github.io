@@ -61,4 +61,30 @@ describe('buildDeckGuideMetrics', () => {
     expect(buildDeckGuideMetrics(elevenRamp, null).find(metric => metric.id === 'ramp')).toMatchObject({ status: '11/10', currentLabel: '11', targetLabel: '10', overRecommended: false })
     expect(buildDeckGuideMetrics(twelveRamp, null).find(metric => metric.id === 'ramp')).toMatchObject({ status: '12/10', currentLabel: '12', targetLabel: '10', overRecommended: true })
   })
+
+  it('uses deck-plan analysis for the headline plan guideline when available', () => {
+    const metrics = buildDeckGuideMetrics([], null, {
+      score: 82,
+      label: 'Focused plan',
+      summary: 'Tap/free-cast reset engine is the clearest detected plan.',
+      primaryPlan: 'Tap/free-cast reset engine',
+      primaryFamily: 'tap-free-cast→untap-engine',
+      planDensity: 42,
+      engineCardCount: 6,
+      supportCardCount: 8,
+      offPlanCount: 1,
+      packages: [],
+      coreEngine: [],
+      supportShell: [],
+      weakSpots: [],
+      offPlanCards: [],
+      signals: [],
+    })
+
+    expect(metrics.find(metric => metric.id === 'deck-plan')).toMatchObject({
+      value: 82,
+      title: 'Tap/free-cast reset engine is the clearest detected plan.',
+      tone: 'ok',
+    })
+  })
 })

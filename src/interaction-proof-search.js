@@ -2130,6 +2130,44 @@ function proveImprintUntapSpellLoop(cards) {
   ]);
 }
 
+function cheapUntapSpellCanResetEngine(untapSpell, engine) {
+  const type = String(engine.type || engine.type_line || '').toLowerCase();
+  if (hasCap(untapSpell, 'untap-spell-target:permanent')) return true;
+  if (hasCap(untapSpell, 'untap-spell-target:nonland') && !/\bland\b/.test(type)) return true;
+  if (hasCap(untapSpell, 'untap-spell-target:artifact') && /\bartifact\b/.test(type)) return true;
+  if (hasCap(untapSpell, 'untap-spell-target:creature') && /\bcreature\b/.test(type)) return true;
+  return false;
+}
+
+function proveTapFreeCastUntapEngine(cards) {
+  const engine = find(cards, c => hasCap(c, 'is-tap-free-cast-engine'));
+  const untapSpell = find(cards, c => c !== engine && hasCap(c, 'is-cheap-instant-engine-untap-spell'));
+  if (!engine || !untapSpell) return null;
+  if (!cheapUntapSpellCanResetEngine(untapSpell, engine)) {
+    return failure('proof:tap-free-cast-untap-target-mismatch:' + sorted([engine.id, untapSpell.id]).join('|'), [engine, untapSpell], 'cheap untap spell cannot legally reset the tap/free-cast engine target', {
+      engineType: engine.type || engine.type_line || '',
+      untapTargets: (untapSpell.caps || []).filter(cap => cap.startsWith('untap-spell-target:')),
+    });
+  }
+  return success('proof:tap-free-cast-untap-engine:' + sorted([engine.id, untapSpell.id]).join('|'), 'tap-free-cast→untap-engine', [engine, untapSpell], {
+    requiredFacts: [
+      fact(engine, 'is-tap-free-cast-engine'),
+      fact(untapSpell, 'is-cheap-instant-engine-untap-spell'),
+    ],
+    steps: [
+      { card: engine.id, action: 'activates a tapped ability that turns a later spell into a free cast from the library or exile' },
+      { card: untapSpell.id, action: 'untaps the engine so the same commander-centric line can be assembled again' },
+      { card: engine.id, action: 'the engine remains the deck-plan hub rather than an isolated mana sink' },
+    ],
+    assumptions: ['the pilot can supply the activation mana and a suitable next spell to trigger the free-cast ability'],
+    limitingClauses: ['this is a value/plan engine signal, not proof of a deterministic infinite loop'],
+    repeatability: { status: 'value-engine', reason: 'the package resets a tap/free-cast engine but still depends on spell sequencing and available mana' },
+  }, [
+    { resource: 'engineResets', min: 1, max: 1 },
+    { resource: 'freeCastAccess', delta: 'enabled' },
+  ]);
+}
+
 function proveSelfUntapAbilityCopyLoop(cards) {
   const copier = find(cards, c => hasCap(c, 'is-activated-ability-copier'));
   const selfUntapper = find(cards, c => c !== copier && hasCap(c, 'is-self-untapper') && hasCap(c, 'taps-for-mana'));
@@ -4115,6 +4153,7 @@ function bespokeProofs(cards) {
     proveTokenModifierPayoff(cards),
     proveLibraryExileWin(cards),
     proveImprintUntapSpellLoop(cards),
+    proveTapFreeCastUntapEngine(cards),
     proveSelfUntapAbilityCopyLoop(cards),
     proveHastyCopyEtbUntapLoop(cards),
     proveCombatCopyTokenExtraCombatLoop(cards),

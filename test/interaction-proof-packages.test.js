@@ -45,6 +45,8 @@ const fixtures = [
   { id: 'Empty Library Oracle', type_line: 'Creature — Merfolk Wizard', oracle_text: 'When this creature enters, look at the top X cards of your library, where X is your devotion to blue. If X is greater than or equal to the number of cards in your library, you win the game.', cmc: 2 },
   { id: 'Nonland Untap Spell', type_line: 'Instant', oracle_text: 'Untap all nonland permanents you control.', cmc: 2 },
   { id: 'Repeatable Instant Caster', type_line: 'Artifact', oracle_text: 'Imprint — When this artifact enters, you may exile an instant card with mana value 2 or less from your hand. {2}, {T}: You may copy the exiled card. If you do, you may cast the copy without paying its mana cost.', cmc: 2 },
+  { id: 'Codie-Style Engine', type_line: 'Legendary Artifact Creature — Construct', oracle_text: '{4}, {T}: Add {W}{U}{B}{R}{G}. When you cast your next spell this turn, exile cards from the top of your library until you exile an instant or sorcery card with lesser mana value. Until end of turn, you may cast that card without paying its mana cost.', cmc: 3 },
+  { id: 'Twiddle-Style Spell', type_line: 'Instant', oracle_text: 'You may tap or untap target artifact, creature, or land.', cmc: 1 },
   { id: 'Ability Copier', type_line: 'Artifact', oracle_text: "Whenever you activate an ability, if it isn't a mana ability, you may pay {2}. If you do, copy that ability.", cmc: 3 },
   { id: 'Self Untap Mana Rock', type_line: 'Artifact', oracle_text: '{T}: Add {C}{C}{C}. {3}: Untap this artifact.', cmc: 3 },
   { id: 'Hasty Copy Engine', type_line: 'Legendary Creature — Goblin Shaman', oracle_text: "{T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste.", cmc: 5 },
@@ -277,6 +279,7 @@ assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Delayed Mill E
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'ETB Creature Blinker|ETB Permanent Blinker'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Creature-Token Replacement Outlet|Death Mana Payoff'));
 assert.ok(seeded.some(candidate => candidate.cards.includes('Artifact Top Caster') && candidate.cards.includes('Artifact Spell Reducer') && candidate.cards.includes('Self Top Draw Artifact')));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Codie-Style Engine|Twiddle-Style Spell'));
 
 const packages = buildInteractionProofPackages(fixtures, { maxProofPackages: 512 });
 const byFamily = new Map(packages.map(pkg => [pkg.family, pkg]));
@@ -315,6 +318,7 @@ assert.ok(byFamily.has('recursive-body-sacrifice-mana-loop'));
 assert.ok(byFamily.has('exile-recast-creature-mana-loop'));
 assert.ok(byFamily.has('library-exile-empty-library-win'));
 assert.ok(byFamily.has('imprint-untap-spell-loop'));
+assert.ok(byFamily.has('tap-free-cast→untap-engine'));
 assert.ok(byFamily.has('self-untap-mana→ability-copy-loop'));
 assert.ok(byFamily.has('hasty-copy→etb-untap-loop'));
 assert.ok(byFamily.has('combat-copy-token→extra-combat-loop'));

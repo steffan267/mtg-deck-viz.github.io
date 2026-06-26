@@ -1,4 +1,5 @@
 import type { DeckMetrics, GraphNode } from '../types'
+import type { DeckPlanAnalysis } from './deckPlanAnalysis'
 
 export interface DeckMetricStatus {
   id: string
@@ -14,16 +15,16 @@ export interface DeckMetricStatus {
   overRecommended: boolean
 }
 
-export function buildDeckGuideMetrics(nodes: readonly GraphNode[], metrics: DeckMetrics | null): DeckMetricStatus[] {
+export function buildDeckGuideMetrics(nodes: readonly GraphNode[], metrics: DeckMetrics | null, plan: DeckPlanAnalysis | null = null): DeckMetricStatus[] {
   const cards = nodes.filter(node => node.role !== 'zone')
   const landCount = countCards(cards, node => node.role === 'land')
   const rampCount = countCards(cards, isRampCard)
   const drawCount = countCards(cards, isDrawCard)
   const removalCount = countCards(cards, isTargetedRemovalCard)
   const wipeCount = countCards(cards, isBoardWipeCard)
-  const planScore = Math.round((((metrics?.winTuningScore || 0) + (metrics?.cohesionScore || 0)) / 2) || 0)
+  const planScore = plan?.score ?? Math.round((((metrics?.winTuningScore || 0) + (metrics?.cohesionScore || 0)) / 2) || 0)
   return [
-    minMetric('deck-plan', 'Deck plan', planScore, 70, `${planScore}`, '100', 'Measured from win tuning and cohesion: a focused plan should be visible in both the score and graph.', { warnOverage: false }),
+    minMetric('deck-plan', 'Deck plan', planScore, 70, `${planScore}`, '100', plan?.summary || 'Measured from win tuning and cohesion: a focused plan should be visible in both the score and graph.', { warnOverage: false }),
     rangeMetric('mana-base', 'Land / mana base', landCount, 36, 38, `${landCount}`, '36–38', 'The reference guideline suggests roughly 36–38 lands before deck-specific adjustments.'),
     minMetric('ramp', 'Mana ramp', rampCount, 10, `${rampCount}`, '10', 'The reference guideline suggests about 10 dedicated mana ramp cards.'),
     minMetric('card-draw', 'Card draw', drawCount, 10, `${drawCount}`, '10', 'The reference guideline suggests about 10 card draw or card-flow cards.'),

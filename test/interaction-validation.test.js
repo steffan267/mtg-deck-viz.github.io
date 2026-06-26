@@ -67,7 +67,7 @@ assert.equal(coverageById.get('negative-near-misses').caseCount, 22);
 assert.equal(coverageById.get('precon-sample-100').deckCount, 100);
 assert.equal(coverageById.get('precon-sample-100').comboDeckCount, 1);
 assert.equal(coverageById.get('precon-sample-100').comboPairCount, 4);
-assert.equal(coverageById.get('moxfield-bracket-464').deckCount, 464);
+assert.equal(coverageById.get('moxfield-bracket-464').deckCount, 461);
 assert.deepEqual(coverageById.get('moxfield-bracket-464').brackets, [1, 2, 3, 4, 5]);
 assert.equal(coverageById.get('casual-synergy-audit-96').evaluationCount, 96);
 
@@ -78,8 +78,8 @@ assert.ok(report.manualAudit.suspiciousHubs.some(hub => hub.family === 'draw' &&
 assert.ok(report.manualAudit.suspiciousHubs.some(hub => hub.family === 'ramp→sink' && hub.count === 42));
 
 assert.equal(report.deckSmoke[0].status, 'ok');
-assert.equal(report.deckSmoke[0].edgeCount, 154);
-assert.equal(report.deckSmoke[0].weakInteractionShare, 0.91);
+assert.equal(report.deckSmoke[0].edgeCount, 144);
+assert.equal(report.deckSmoke[0].weakInteractionShare, 0.891);
 
 const markdown = renderMarkdown(report);
 assert.match(markdown, /## Source coverage/);

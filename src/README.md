@@ -167,6 +167,19 @@ browser runtime code treats that file as a Node/static-build boundary.
 For maintenance rules, ontology definitions, budgets, and the contribution
 checklist, read `src/INTERACTION_ENGINE.md`.
 
+## Deck plan analysis
+
+The browser breakdown page now includes a deck-level plan model that sits on top
+of the graph and proof layers. It identifies the clearest engine package, core
+engine cards, support shell, weak spots, and unlinked off-plan review cards, then
+feeds the same plan score into the sidebar guideline row. The current flow and
+completed implementation notes live in `src/DECK_PLAN_ANALYSIS.md`.
+
+For corpus work, `npm run report:score-corpus` prints the compact score summary
+from whichever local sample artifacts are available. Ignored caches under
+`analysis/` or `work/` are valid inputs during model development; they do not
+need to be promoted into checked-in `data/` before they are useful.
+
 ## In the browser
 
 - **+ Add Moxfield deck** — paste a URL to fetch and add a deck live.

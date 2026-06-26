@@ -29,8 +29,8 @@ Pass criteria:
 ## Aggregate snapshot
 
 - Decks: 3
-- Total edges: 173
-- Total interactions: 195
+- Total edges: 163
+- Total interactions: 185
 - Combo-critical pairs: 10
 - Combo-critical triples: 1
 - Golden fixtures: 10
@@ -47,11 +47,11 @@ Pass criteria:
 - Kind/source: representative-local-deck; data/sample-decklist.txt
 - Cards/nonlands: 92/63
 - Missing: Valley of Gorgoroth
-- Edges/interactions: 154/166
+- Edges/interactions: 144/156
 - Combo-critical pairs/triples: 5/0
-- Cohesion/win tuning: 27 (Pile of good-stuff) / 91 (Highly tuned)
+- Cohesion/win tuning: 28 (Pile of good-stuff) / 92 (Highly tuned)
 - Bracket hint: Bracket 5 · cEDH
-- Review warnings: weak share 0.91; high-degree nodes 0; high fan-out families 2
+- Review warnings: weak share 0.891; high-degree nodes 0; high fan-out families 2
 - Top hubs:
   - Sheoldred, the Apocalypse: degree 15; draw 15, opponent-draw-punisher-win 1
   - Waste Not: degree 15; discard 6, combat→payoff 4, ramp→sink 3, death→drain 2, death→tokens 1
@@ -67,7 +67,7 @@ Pass criteria:
 - Missing: none
 - Edges/interactions: 16/26
 - Combo-critical pairs/triples: 4/0
-- Cohesion/win tuning: 49 (Loosely connected) / 34 (Untuned)
+- Cohesion/win tuning: 49 (Loosely connected) / 35 (Untuned)
 - Bracket hint: Bracket 3 · Upgraded
 - Review warnings: weak share 0.538; high-degree nodes 0; high fan-out families 0
 - Top hubs:

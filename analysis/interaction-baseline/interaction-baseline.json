@@ -4,9 +4,9 @@
   "generatedBy": "scripts/audit-interaction-baseline.js",
   "deterministic": true,
   "dataFingerprint": {
-    "data/out/commander-search.json": "fabedcc40580935457988afc91c0463685cfd2fcf3f7a8d614344a9d392831a0",
-    "data/out/oracle-cards.json": "be2b173f68cf8d5bd9f8e232ed641af58a98f88290b98f4b4aa84408ef5ce493",
-    "data/sample-decklist.txt": "553ac145fd894e5feb89f36e778b42abc51d1f67e28cddfcc85f4d34e152951c"
+    "data/out/commander-search.json": "bc04020fae158649bb5bbce188842508f0e46af83cdcedfb93c1442131975689",
+    "data/out/oracle-cards.json": "c00cb9a19cd024ebd956fef078dd86aa82f5d51702f5ffb630bbe5c42cc966f5",
+    "data/sample-decklist.txt": "a795e0bb19ee333c4ea44381179688d581a1aeaee16eadc312dd9ef7a4d50d8b"
   },
   "thresholds": {
     "goldenFixtureFailuresAllowed": 0,
@@ -35,8 +35,8 @@
   },
   "aggregate": {
     "deckCount": 3,
-    "totalEdges": 173,
-    "totalInteractions": 195,
+    "totalEdges": 163,
+    "totalInteractions": 185,
     "totalComboCriticalPairs": 10,
     "totalComboCriticalTriples": 1,
     "familyCounts": {
@@ -56,7 +56,7 @@
       "exiled-card-access": 1,
       "goad": 9,
       "goad→punisher": 3,
-      "graveyard": 12,
+      "graveyard-fuel→recursion": 2,
       "library-exile→empty-library-win": 1,
       "lifegain": 3,
       "lifegain→lifeloss-loop": 2,
@@ -88,6 +88,7 @@
       "enable:etb→blink": 2,
       "enable:exiled-card-access": 1,
       "enable:goad→punisher": 3,
+      "enable:graveyard-fuel→recursion": 2,
       "enable:library-exile→empty-library-win": 1,
       "enable:lifegain→lifeloss-loop": 2,
       "enable:lifeloss→lifegain-loop": 2,
@@ -95,7 +96,6 @@
       "enable:opponent-draw-punisher-win": 5,
       "enable:token-production→amplifier": 3,
       "goad": 9,
-      "graveyard": 12,
       "lifegain": 3,
       "lifeloss": 2,
       "mana": 42,
@@ -127,9 +127,9 @@
       "missing": [
         "Valley of Gorgoroth"
       ],
-      "edgeCount": 154,
+      "edgeCount": 144,
       "zoneEdgeCount": 87,
-      "interactionCount": 166,
+      "interactionCount": 156,
       "familyCounts": {
         "attack": 1,
         "cast": 3,
@@ -142,7 +142,7 @@
         "draw": 42,
         "goad": 9,
         "goad→punisher": 3,
-        "graveyard": 12,
+        "graveyard-fuel→recursion": 2,
         "mill→graveyard-payoff": 1,
         "opponent-draw-punisher-win": 5,
         "ramp→sink": 42,
@@ -162,10 +162,10 @@
         "enable:death→drain": 4,
         "enable:death→tokens": 2,
         "enable:goad→punisher": 3,
+        "enable:graveyard-fuel→recursion": 2,
         "enable:mill→graveyard-payoff": 1,
         "enable:opponent-draw-punisher-win": 5,
         "goad": 9,
-        "graveyard": 12,
         "mana": 42,
         "sacrifice": 3,
         "steal": 1,
@@ -174,13 +174,13 @@
       },
       "strengthCounts": {
         "combo-critical": 5,
-        "moderate": 10,
-        "weak": 151
+        "moderate": 12,
+        "weak": 139
       },
       "kindCounts": {
         "enablement": 11,
-        "reaction": 95,
-        "synergy": 60
+        "reaction": 83,
+        "synergy": 62
       },
       "combos": {
         "mutualEnablementLoops": [],
@@ -354,22 +354,6 @@
           ]
         },
         {
-          "id": "Necropotence",
-          "role": "utility",
-          "degree": 11,
-          "cmc": 3,
-          "topFamilies": [
-            {
-              "family": "discard",
-              "count": 8
-            },
-            {
-              "family": "graveyard",
-              "count": 3
-            }
-          ]
-        },
-        {
           "id": "Scrawling Crawler",
           "role": "payoff",
           "degree": 11,
@@ -384,10 +368,34 @@
               "count": 1
             }
           ]
+        },
+        {
+          "id": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+          "role": "ramp",
+          "degree": 8,
+          "cmc": 3,
+          "topFamilies": [
+            {
+              "family": "cast",
+              "count": 3
+            },
+            {
+              "family": "ramp→sink",
+              "count": 3
+            },
+            {
+              "family": "cost-reduction→ability",
+              "count": 1
+            },
+            {
+              "family": "discard",
+              "count": 1
+            }
+          ]
         }
       ],
       "reviewWarnings": {
-        "weakInteractionShare": 0.91,
+        "weakInteractionShare": 0.891,
         "weakInteractionShareExceedsThreshold": true,
         "highDegreeNodes": [],
         "highFamilyFanout": [
@@ -412,28 +420,24 @@
           {
             "family": "discard",
             "count": 14
-          },
-          {
-            "family": "graveyard",
-            "count": 12
           }
         ],
         "comboCriticalPairCountExceedsThreshold": false
       },
       "metricsSnapshot": {
-        "cohesionScore": 27,
+        "cohesionScore": 28,
         "cohesionBand": "Pile of good-stuff",
         "selfSufficiencyScore": 70,
-        "winTuningScore": 91,
+        "winTuningScore": 92,
         "winTuningBand": "Highly tuned",
         "bracketHint": 5,
         "bracketLabel": "Bracket 5 · cEDH",
-        "pctInteractive": 90,
-        "pctMeaningful": 21,
-        "largestWebShare": 90,
-        "avgDegree": 4.78,
-        "satWeightedAvgDegree": 0.87,
-        "islandCount": 6
+        "pctInteractive": 87,
+        "pctMeaningful": 22,
+        "largestWebShare": 86,
+        "avgDegree": 4.51,
+        "satWeightedAvgDegree": 0.85,
+        "islandCount": 8
       }
     },
     {
@@ -700,7 +704,7 @@
         "cohesionScore": 49,
         "cohesionBand": "Loosely connected",
         "selfSufficiencyScore": 28,
-        "winTuningScore": 34,
+        "winTuningScore": 35,
         "winTuningBand": "Untuned",
         "bracketHint": 3,
         "bracketLabel": "Bracket 3 · Upgraded",
