@@ -1421,8 +1421,23 @@
       // spell-copy/self-copy does not trigger arbitrary ETB cards.
       if (/copy (target|that)/.test(e) || /create a token that.?s a copy/.test(e) || /token that.?s a copy/.test(e) || /copy it/.test(e)) {
         caps.add("is-copy");
-        if (/copy target (creature|permanent)|copy of (up to one )?(other )?target|copy of target creature|copy of (a|another) creature|copy of a permanent/.test(e))
+        const permanentCopy =
+          /copy target (creature|permanent|artifact)|copy of (?:up to one )?(?:other )?target|copy of target (?:nonlegendary |nontoken )?(?:artifact or )?creature|copy of (?:a|another) creature|copy of a permanent/.test(e);
+        if (permanentCopy) {
           caps.add("is-permanent-copy");
+          if (/creature/.test(e) || /equipped creature|enchanted creature/.test(effectAndRaw))
+            caps.add("permanent-copy-target:creature");
+          else if (/artifact/.test(e))
+            caps.add("permanent-copy-target:artifact");
+          else
+            caps.add("permanent-copy-target:permanent");
+          if (s.kind === "activated"
+              || (s.kind === "triggered"
+                && !/when\b.{0,80}\benters\b/.test(s.trigger)
+                && /\b(whenever|at the beginning of|at the end of)\b/.test(s.trigger))) {
+            caps.add("is-repeatable-permanent-copy");
+          }
+        }
       }
       if (s.kind === "activated"
           && /\bdiscard your hand\b/.test(c)
@@ -2560,7 +2575,7 @@
     { family: "cost-reduction→ability", from: "is-creature-ability-cost-reducer", to: "has-creature-activated-ability", kind: "enablement", strength: "weak" },
     { family: "cost-reduction→ability", from: "is-cost-reducer", to: "has-nonmana-activated-ability", kind: "enablement", strength: "weak" },
     { family: "cost-reduction→ability", from: "is-artifact-activated-ability-cost-reducer", to: "has-nonmana-activated-ability", kind: "enablement", strength: "weak" },
-    { family: "copy→trigger",      from: "is-permanent-copy", to: "has-etb",     kind: "synergy",     strength: "moderate" },
+    { family: "copy→trigger",      from: "is-repeatable-permanent-copy", to: "has-etb",     kind: "synergy",     strength: "moderate" },
     { family: "etb-doubler",       from: "is-etb-doubler", to: "has-etb",       kind: "synergy",     strength: "strong" },
     { family: "token-production→amplifier", from: "is-token-producer", to: "is-token-doubler", kind: "synergy", strength: "strong" },
     { family: "token-production→replacement", from: "is-token-producer", to: "is-token-replacement-modifier", kind: "synergy", strength: "moderate" },
@@ -2700,6 +2715,18 @@
     if (!faceCompatibleCaps(target, requiredCaps)) return false;
     if (!target?.faceFacts?.length && requiredCaps.includes("is-creature-permanent") && !isCreaturePermanent(target)) return false;
     return true;
+  };
+  const canPermanentCopyEtbTarget = (copier, target) => {
+    const scopes = capSuffixes(copier, "permanent-copy-target:");
+    if (!scopes.length) return false;
+    if (scopes.includes("permanent")) return true;
+    if (scopes.includes("creature")) {
+      if (faceCompatibleCaps(target, ["is-creature-permanent"])) return true;
+      return !target?.faceFacts?.length && isCreaturePermanent(target);
+    }
+    if (scopes.includes("artifact"))
+      return faceCompatibleCaps(target, ["is-artifact-permanent"]) || /\bartifact\b/i.test(target.type || target._type || "");
+    return false;
   };
   const counterTokenColors = (node) => capSuffixes(node, "counter-token-color:");
   const etbCounterGranterColors = (node) => capSuffixes(node, "etb-counter-granter-token-color:");
@@ -2876,6 +2903,16 @@
             const targetIsArtifact = /\bartifact\b/i.test(dst.type || dst._type || "");
             evidence = { from: f.from, to: f.to, targetIsArtifact };
             if (!targetIsArtifact) continue;
+          }
+          if (f.family === "copy→trigger") {
+            evidence = {
+              from: f.from,
+              to: f.to,
+              copyTargetScopes: capSuffixes(src, "permanent-copy-target:"),
+              targetIsCreature: isCreaturePermanent(dst),
+              targetLegal: canPermanentCopyEtbTarget(src, dst),
+            };
+            if (!evidence.targetLegal) continue;
           }
           // Repeatable blink + ETB land untap is capability-based. If the
           // land-untapper refreshes at least enough lands to pay the blink

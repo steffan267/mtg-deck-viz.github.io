@@ -678,10 +678,19 @@ When Gilded Goose enters, create a Food token.
   const satya = node('Satya, Aetherflux Genius', 'Legendary Creature — Human Artificer', 'Whenever Satya attacks, create a tapped and attacking token that’s a copy of up to one other target nontoken creature you control. You get {E}{E}.');
   assertHasCap(satya, 'is-copy');
   assertHasCap(satya, 'is-permanent-copy');
+  assertHasCap(satya, 'is-repeatable-permanent-copy');
+  assertHasCap(satya, 'permanent-copy-target:creature');
   const reverberate = node('Reverberate', 'Instant', 'Copy target instant or sorcery spell. You may choose new targets for the copy.');
   assertHasCap(reverberate, 'is-copy');
   assertNoCap(reverberate, 'is-permanent-copy');
   assertNoEvent(reverberate, wallOfOmens, 'enable:copy→trigger');
+  const enchantmentEtb = node('Banishing Light Stand-In', 'Enchantment', 'When this enchantment enters the battlefield, exile target nonland permanent an opponent controls until this enchantment leaves the battlefield.');
+  const oneShotCreatureCopy = node('One-Shot Creature Copy Spell', 'Sorcery', 'Create a token that’s a copy of target creature you control.');
+  assertHasFamily(satya, wallOfOmens, 'copy→trigger');
+  assertNoEvent(satya, enchantmentEtb, 'enable:copy→trigger');
+  assertHasCap(oneShotCreatureCopy, 'is-permanent-copy');
+  assertNoCap(oneShotCreatureCopy, 'is-repeatable-permanent-copy');
+  assertNoEvent(oneShotCreatureCopy, wallOfOmens, 'enable:copy→trigger');
 
   const dauthi = node('Dauthi Voidwalker', 'Creature — Dauthi Rogue', "Shadow. If a card would be put into an opponent's graveyard from anywhere, instead exile it with a void counter on it. {T}, Sacrifice this creature: Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its mana cost.");
   const jeskasWill = node('Jeska\'s Will', 'Sorcery', "Choose one. If you control a commander as you cast this spell, you may choose both instead. Add {R} for each card in target opponent's hand. Exile the top three cards of your library. You may play them this turn.");

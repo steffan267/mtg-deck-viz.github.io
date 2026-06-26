@@ -57,6 +57,14 @@ separate win, cohesion, and self-sufficiency scores.
   dropped watched `attach` edges from 412 to 18 in the precon corpus and from
   2781 to 2 in the Moxfield bracket corpus, with validation recall and sampled
   precision still at 1.0 and bracket accuracy unchanged.
+- Tightened `copy→trigger` so only repeatable permanent-copy sources can feed
+  ETB cards, and only when the copied target type is legal. Creature-only copy
+  engines no longer connect to enchantment/artifact ETBs, and one-shot copy
+  spells stay out of the generic ETB-value family while dedicated combo
+  proof families remain available. In the follow-up 2026-06-26 score-corpus
+  run this dropped watched `copy→trigger` edges from 270 to 62 in the precon
+  corpus and from 1201 to 263 in the Moxfield bracket corpus, with validation
+  recall and sampled precision still at 1.0 and bracket accuracy unchanged.
 
 ## Data flow
 
