@@ -1841,6 +1841,96 @@ function proveEscapeWheelManaLoop(cards) {
   ]);
 }
 
+function proveEscapeMillManaLoop(cards) {
+  const escapeEnabler = find(cards, c => hasCap(c, 'is-graveyard-escape-enabler'));
+  const manaSource = find(cards, c => c !== escapeEnabler && hasCap(c, 'is-discard-hand-sac-mana-source'));
+  const millSpell = find(cards, c => c !== escapeEnabler && c !== manaSource && hasCap(c, 'is-mill-spell'));
+  if (!escapeEnabler || !manaSource || !millSpell) {
+    if (escapeEnabler || manaSource || millSpell) {
+      return failure(
+        'proof:escape-mill-mana-missing-role:' + sorted(cards.map(c => c.id)).join('|'),
+        cards,
+        'escape mill loop needs a graveyard escape enabler, a discard-hand sacrifice mana source, and an instant/sorcery mill spell',
+        {
+          hasEscapeEnabler: Boolean(escapeEnabler),
+          hasDiscardHandSacMana: Boolean(manaSource),
+          hasMillSpell: Boolean(millSpell),
+        },
+      );
+    }
+    return null;
+  }
+
+  const mana = manaProductionProfileFromCaps(manaSource, 'discard-hand-sac-mana');
+  const manaSourceCost = manaCostProfileFromCaps(manaSource, 'discard-hand-sac-source');
+  const millCost = manaCostProfileFromCaps(millSpell, 'mill-spell');
+  const escapeFuel = Math.max(1, maxCapNumber(escapeEnabler, 'graveyard-escape-extra-card-cost'));
+  const millCount = maxCapNumber(millSpell, 'mill-count');
+  const hasStorm = hasCap(millSpell, 'has-storm');
+  const totalCastCost = addCostProfiles(manaSourceCost, millCost);
+  if (!canPayRecursiveCost(totalCastCost, mana)) {
+    return failure(
+      'proof:escape-mill-mana-cost:' + sorted([escapeEnabler.id, manaSource.id, millSpell.id]).join('|'),
+      [escapeEnabler, manaSource, millSpell],
+      'discard-hand sacrifice mana cannot pay the escaped mana source plus mill spell costs',
+      { produced: mana, manaSourceCost, millCost, totalCastCost },
+    );
+  }
+
+  // Non-storm mill has to refill both recurring escape casts by itself.
+  // Storm mill is different: the loop's own cast velocity creates extra copies,
+  // so the base mill spell only needs to cover one escape-fuel payment once the
+  // steady-state loop is established.
+  const requiredFuel = hasStorm ? escapeFuel : escapeFuel * 2;
+  if (millCount < requiredFuel || (!hasStorm && millCount === requiredFuel)) {
+    return failure(
+      'proof:escape-mill-mana-fuel:' + sorted([escapeEnabler.id, manaSource.id, millSpell.id]).join('|'),
+      [escapeEnabler, manaSource, millSpell],
+      hasStorm
+        ? 'storm mill count does not cover enough graveyard fuel to bootstrap recurring escape casts'
+        : 'mill count does not replenish enough graveyard fuel to escape both recurring cards',
+      { millCount, escapeFuel, requiredFuel, hasStorm },
+    );
+  }
+
+  const proofCards = [escapeEnabler, manaSource, millSpell];
+  const netMana = mana.total - totalCastCost.total;
+  const steadyStateMill = hasStorm ? millCount * 2 : millCount;
+  return success('proof:escape-mill-mana:' + sorted(proofCards.map(card => card.id)).join('|'), 'escape-mill-mana-loop', proofCards, {
+    requiredFacts: [
+      fact(escapeEnabler, 'is-graveyard-escape-enabler'),
+      fact(escapeEnabler, 'graveyard-escape-extra-card-cost'),
+      fact(manaSource, 'is-discard-hand-sac-mana-source'),
+      fact(manaSource, 'discard-hand-sac-mana-produced'),
+      fact(manaSource, 'discard-hand-sac-source-cost'),
+      fact(millSpell, 'is-mill-spell'),
+      fact(millSpell, 'mill-count'),
+      fact(millSpell, 'mill-spell-cost'),
+      ...(hasStorm ? [fact(millSpell, 'has-storm')] : []),
+    ],
+    steps: [
+      { card: manaSource.id, action: 'escape and sacrifice the hand-discard mana source', delta: { mana: mana.total, selfDiscard: 1 } },
+      { card: millSpell.id, action: 'spend that mana to escape the mill spell', cost: { mana: millCost.total, colors: millCost.colors, colorless: millCost.colorless } },
+      { card: millSpell.id, action: hasStorm ? 'storm copies convert repeated casts into extra mill fuel' : 'the mill spell replenishes enough graveyard fuel for both recurring escape casts', delta: { mill: steadyStateMill } },
+      { card: escapeEnabler.id, action: 'escape permission remains available for the same nonland cards in the graveyard' },
+      { action: 'the mana source and mill spell return to the graveyard after use, and the abstract state repeats with fresh fuel' },
+    ],
+    assumptions: [
+      'the loop has enough initial nonland graveyard cards to pay the first escape costs',
+      ...(hasStorm ? ['the loop has enough initial storm/cast velocity to reach the steady-state storm copy count'] : []),
+      'milled cards include enough legal nonland escape fuel over repeated iterations',
+      'the discard-hand sacrifice mana ability can be activated at a timing point that supplies mana for the mill spell cast',
+    ],
+    repeatability: { status: netMana > 0 ? 'repeatable-positive-mana' : 'repeatable-break-even', reason: 'mill fuel and local mana cover the repeated escape costs' },
+  }, [
+    { resource: 'casts', min: 2, max: Infinity },
+    { resource: 'storm', min: hasStorm ? 2 : 0, max: Infinity },
+    { resource: 'mill', min: steadyStateMill, max: Infinity },
+    { resource: 'selfDiscards', min: 1, max: Infinity },
+    ...(netMana > 0 ? [{ resource: 'mana', min: netMana, max: netMana }] : []),
+  ]);
+}
+
 function proveExileRecastCreatureMana(cards) {
   const outlet = find(cards, c => hasCap(c, 'is-creature-exile-cast-mana-outlet'));
   const body = find(cards, c => c !== outlet && hasCap(c, 'is-recursive-exile-cast-body') && MODEL.faceCompatibleCaps(c, ['is-creature-permanent', 'is-recursive-exile-cast-body']));
@@ -4145,6 +4235,7 @@ function bespokeProofs(cards) {
     proveRecursiveBodySacrificeMana(cards),
     proveLifePaidTreasureRecursiveDrain(cards),
     proveEscapeWheelManaLoop(cards),
+    proveEscapeMillManaLoop(cards),
     proveExileRecastCreatureMana(cards),
     proveMutualEtbBlinkReset(cards),
     proveTokenReplacementSacrificeMana(cards),

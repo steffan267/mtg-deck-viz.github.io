@@ -18,6 +18,7 @@ export const ComboFamilyId: {
   readonly DrawDamageFeedbackLoop: 'draw-damage-feedback-loop'
   readonly SelfCopySpellMagecraftDrainLoop: 'self-copy-spell→magecraft-drain-loop'
   readonly EscapeWheelManaLoop: 'escape-wheel-mana-loop'
+  readonly EscapeMillManaLoop: 'escape-mill-mana-loop'
   readonly BuybackCopyRitualLoop: 'buyback-copy-ritual-loop'
   readonly LifelinkCounterDamageLoop: 'lifelink-counter-damage-loop'
   readonly CounterTokenEtbCounterLoop: 'counter-token→etb-counter-loop'

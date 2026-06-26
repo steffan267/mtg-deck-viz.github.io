@@ -116,6 +116,17 @@ classified-but-not-proven to `recursive-body-sacrifice-mana-loop` proofs while
 leaving separate side axes such as scry, counters, damage, and mill unclaimed
 unless another proof/family explains them.
 
+The next proof-family iteration added an escape/mill/mana loop for graveyard
+escape permission plus a discard-hand sacrifice mana source plus an
+instant/sorcery mill spell. This treats loop speed as part of the resource
+proof: repeated casts and storm copies can create enough mill fuel to pay future
+escape costs, but simple partial edges such as escape plus a mill spell are not
+allowed to claim mana, discard, or mill result-credit by themselves. On the
+same 9,000-row slice, strict proofs moved from 677 to 678 and proof-only
+coverage rounded from 8.9% to 9.0%, with `escape-mill-mana-loop` proving the
+full three-role storm-mill package while leaving incomplete packages as graph
+evidence only.
+
 
 ## Current full-corpus baseline
 

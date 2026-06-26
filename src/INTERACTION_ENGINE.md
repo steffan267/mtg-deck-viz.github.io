@@ -128,6 +128,13 @@ The current combo corpus work established these reusable constraints:
   payoff pays the recursive body cost, and the recursive body restores the
   starting state. This keeps generalized multi-step search behind the same
   package-local proof bridge before promoting broader graph behavior.
+- **Speed is part of proof, but not proof by itself.** Mana acceleration,
+  repeated casting, storm count, deck thinning/filtering, and tutoring all tune
+  how quickly a deck reaches or sustains its plan. The proof layer may use those
+  signals when they close a local loop, such as escape fuel supplied by repeated
+  storm-mill casts. The evaluator must not give full result-class credit to
+  partial pair edges unless a complete family or strict proof accounts for the
+  missing mana, fuel, tutor, or card-flow roles.
 - **Fresh-token combat/turn loops need freshness and axis guards.** Hasty
   copy-token loops are only a proof when the token is created before attacker
   declaration, survives copy/legend restrictions on the same compatible face,

@@ -406,6 +406,38 @@ const COMBO_FAMILIES = [
     uiExplanation: 'A graveyard-wide escape effect can loop a self-sacrificing discard-hand mana source with an instant/sorcery wheel when the wheel refills enough fuel to escape both cards again.',
   },
   {
+    id: 'escape-mill-mana-loop',
+    title: 'Graveyard escape plus discard-hand mana and mill fuel',
+    maxCards: 3,
+    confidenceGate: 'pattern',
+    requiredFacts: [
+      { role: 'escapeEnabler', kind: 'capability', predicate: 'is-graveyard-escape-enabler' },
+      { role: 'manaSource', kind: 'capability', predicate: 'is-discard-hand-sac-mana-source' },
+      { role: 'millSpell', kind: 'capability', predicate: 'is-mill-spell' },
+      { role: 'millSpell', kind: 'capability', predicate: 'mill-count' },
+    ],
+    optionalAccelerants: [
+      { kind: 'capability', predicate: 'has-storm', note: 'storm converts repeated casting speed into extra mill copies and lowers the steady-state fuel threshold' },
+      { kind: 'resource', resource: 'initial graveyard fuel', note: 'the first loop still needs enough nonland cards to pay escape before the mill spell becomes fuel-positive' },
+    ],
+    disqualifiers: [
+      { kind: 'cost', rule: 'discard-hand sacrifice mana must pay the escaped mana source plus mill spell mana costs' },
+      { kind: 'fuel', rule: 'non-storm mill must replenish enough graveyard cards to escape both recurring cards' },
+      { kind: 'fuel', rule: 'storm mill must at least cover one escape fuel payment so loop speed can scale into fuel-positive casts' },
+    ],
+    repeatability: { rule: 'escape the mana source and mill spell, sacrifice the mana source for mill-spell mana, then mill enough cards to fuel the next escape cycle' },
+    payoffCriteria: [{ event: 'cast', comparator: 'repeats' }, { resource: 'mill', comparator: '>=', threshold: 1 }],
+    resultClasses: ['infinite-cast', 'mill'],
+    proofDeltaResultClasses: ['infinite-mana', 'infinite-self-discard'],
+    examples: [{ name: 'escape enabler + discard-hand mana artifact + storm mill spell', cards: ['Graveyard Escape Enabler', 'Discard-Hand Mana Source', 'Storm Mill Spell'] }],
+    negativeFixtures: [
+      { name: 'escape enabler + discard-hand mana + small non-storm mill', cards: ['Graveyard Escape Enabler', 'Discard-Hand Mana Source', 'Small Mill Spell'], reason: 'mill count does not replenish enough escape fuel' },
+      { name: 'escape enabler + underpowered mana source + mill spell', cards: ['Graveyard Escape Enabler', 'Two-Mana Discard Source', 'Storm Mill Spell'], reason: 'local mana cannot cover the repeated escape casts' },
+    ],
+    knownFalsePositives: ['one-shot mill spells with too little fuel and no storm scaling', 'mana sources that require external mana to replay', 'graveyard escape permissions that do not apply to the recurring mill spell'],
+    uiExplanation: 'A graveyard-wide escape effect can loop a self-sacrificing discard-hand mana source with a mill spell when the package produces both the mana and graveyard fuel needed to escape them again.',
+  },
+  {
     id: 'buyback-copy-ritual-loop',
     title: 'Buyback spell-copy plus ritual mana loop',
     maxCards: 3,

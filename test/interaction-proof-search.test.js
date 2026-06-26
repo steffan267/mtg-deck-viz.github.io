@@ -199,6 +199,36 @@ const underpoweredEscapeManaNearMiss = provePackage([
 assert.equal(underpoweredEscapeManaNearMiss.status, 'not-repeatable');
 assert.ok(underpoweredEscapeManaNearMiss.rejections.some(rejection => /cannot pay/.test(rejection.reason)));
 
+const escapeStormMillManaLoop = provePackage([
+  card('Graveyard Escape Enabler', 'Enchantment', "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exiling three other cards from your graveyard.", 2, '{1}{R}'),
+  card('Discard-Hand Mana Source', 'Artifact', '{T}, Discard your hand, Sacrifice this artifact: Add three mana of any one color.', 0, '{0}'),
+  card('Storm Mill Spell', 'Sorcery', 'Target player mills three cards.\nStorm', 2, '{1}{U}'),
+]);
+assert.equal(escapeStormMillManaLoop.status, 'proven');
+const escapeStormMillProof = proofByFamily(escapeStormMillManaLoop, 'escape-mill-mana-loop');
+assert.ok(escapeStormMillProof);
+assert.ok(escapeStormMillProof.positiveDeltas.some(delta => delta.resource === 'casts'));
+assert.ok(escapeStormMillProof.positiveDeltas.some(delta => delta.resource === 'storm'));
+assert.ok(escapeStormMillProof.positiveDeltas.some(delta => delta.resource === 'mill'));
+assert.ok(escapeStormMillProof.positiveDeltas.some(delta => delta.resource === 'selfDiscards'));
+assert.ok(escapeStormMillProof.proof.assumptions.some(text => /storm/.test(text)));
+
+const smallNonStormEscapeMillNearMiss = provePackage([
+  card('Graveyard Escape Enabler', 'Enchantment', "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exiling three other cards from your graveyard.", 2, '{1}{R}'),
+  card('Discard-Hand Mana Source', 'Artifact', '{T}, Discard your hand, Sacrifice this artifact: Add three mana of any one color.', 0, '{0}'),
+  card('Small Mill Spell', 'Sorcery', 'Target player mills three cards.', 2, '{1}{U}'),
+]);
+assert.equal(smallNonStormEscapeMillNearMiss.status, 'not-repeatable');
+assert.ok(smallNonStormEscapeMillNearMiss.rejections.some(rejection => /graveyard fuel|mill count/.test(rejection.reason)));
+
+const underpoweredEscapeMillManaNearMiss = provePackage([
+  card('Graveyard Escape Enabler', 'Enchantment', "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exiling three other cards from your graveyard.", 2, '{1}{R}'),
+  card('One-Mana Discard Source', 'Artifact', '{T}, Discard your hand, Sacrifice this artifact: Add one mana of any color.', 0, '{0}'),
+  card('Storm Mill Spell', 'Sorcery', 'Target player mills three cards.\nStorm', 2, '{1}{U}'),
+]);
+assert.equal(underpoweredEscapeMillManaNearMiss.status, 'not-repeatable');
+assert.ok(underpoweredEscapeMillManaNearMiss.rejections.some(rejection => /cannot pay/.test(rejection.reason)));
+
 const buybackRitualReducerLoop = provePackage([
   card('Buyback Spell Copy', 'Instant', 'Buyback {3}. Copy target instant or sorcery spell. You may choose new targets for the copy.', 3, '{1}{R}{R}'),
   card('Five-Mana Ritual', 'Instant', 'Add {R}{R}{R}{R}{R}.', 3, '{2}{R}'),

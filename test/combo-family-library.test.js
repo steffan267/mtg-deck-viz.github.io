@@ -186,6 +186,9 @@ assert.deepEqual(getComboFamily('self-copy-spell→magecraft-drain-loop').result
 assert.deepEqual(getComboFamily('escape-wheel-mana-loop').resultClasses, ['infinite-cast', 'infinite-draw', 'infinite-looting']);
 assert.deepEqual(getComboFamily('escape-wheel-mana-loop').proofDeltaResultClasses, ['infinite-mana', 'infinite-self-discard']);
 assert.ok(getComboFamily('escape-wheel-mana-loop').requiredFacts.some(fact => fact.predicate === 'is-graveyard-escape-enabler'));
+assert.deepEqual(getComboFamily('escape-mill-mana-loop').resultClasses, ['infinite-cast', 'mill']);
+assert.deepEqual(getComboFamily('escape-mill-mana-loop').proofDeltaResultClasses, ['infinite-mana', 'infinite-self-discard']);
+assert.ok(getComboFamily('escape-mill-mana-loop').optionalAccelerants.some(fact => fact.predicate === 'has-storm'));
 assert.deepEqual(getComboFamily('buyback-copy-ritual-loop').resultClasses, ['infinite-cast']);
 assert.deepEqual(getComboFamily('buyback-copy-ritual-loop').proofDeltaResultClasses, ['infinite-mana']);
 assert.ok(getComboFamily('buyback-copy-ritual-loop').optionalAccelerants.some(fact => fact.predicate === 'is-spell-cost-reducer'));

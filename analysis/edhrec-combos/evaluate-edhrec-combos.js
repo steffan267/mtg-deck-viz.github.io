@@ -411,6 +411,12 @@ function detectCapabilityFamilies(nodes) {
   if (cards.some(c => hasCap(c, 'is-mass-opponent-draw-source')) && cards.some(c => hasCap(c, 'is-opponent-draw-punisher'))) families.add('opponent-draw-punisher-win');
   if (cards.some(c => hasCap(c, 'is-half-library-mill-source')) && cards.some(c => hasCap(c, 'is-mill-multiplier'))) families.add('mill-multiplier-finite-mill');
   if (cards.some(c => hasCap(c, 'is-half-library-mill-source')) && cards.some(c => hasCap(c, 'is-delayed-same-turn-mill-payoff'))) families.add('delayed-mill-equalizer-finite-mill');
+  if (cards.some(c => hasCap(c, 'is-graveyard-escape-enabler'))
+      && cards.some(c => hasCap(c, 'is-discard-hand-sac-mana-source'))
+      && cards.some(c => hasCap(c, 'is-wheel-draw-discard-spell'))) families.add('escape-wheel-mana-loop');
+  if (cards.some(c => hasCap(c, 'is-graveyard-escape-enabler'))
+      && cards.some(c => hasCap(c, 'is-discard-hand-sac-mana-source'))
+      && cards.some(c => hasCap(c, 'is-mill-spell'))) families.add('escape-mill-mana-loop');
   if (hasMutualEtbBlinkReset(cards)) families.add('mutual-etb-blink-reset-loop');
   if (hasAmplifiedSelfUntapLoop(cards)) families.add('self-untap-mana-loop');
   if (hasTokenReplacementSacrificeManaLoop(cards)) families.add('token-replacement-sacrifice-mana-loop');

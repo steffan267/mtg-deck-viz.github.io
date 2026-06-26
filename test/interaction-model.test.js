@@ -1398,6 +1398,7 @@ When Gilded Goose enters, create a Food token.
   const graveyardEscapeEnabler = node('Graveyard Escape Enabler', 'Enchantment', "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exiling three other cards from your graveyard.");
   const discardHandManaSource = node('Discard-Hand Mana Source', 'Artifact', '{T}, Discard your hand, Sacrifice this artifact: Add three mana of any one color.', 0, '{0}');
   const sevenCardWheel = node('Seven-Card Wheel', 'Sorcery', 'Each player discards their hand, then draws seven cards.', 3, '{2}{R}');
+  const stormMillSpell = node('Storm Mill Spell', 'Sorcery', 'Target player mills three cards.\nStorm', 2, '{1}{U}');
   const permanentWheel = node('Permanent Wheel', 'Artifact', '{T}, Sacrifice this artifact: Each player discards their hand, then draws seven cards.', 3, '{3}');
   assertHasCap(graveyardEscapeEnabler, 'is-graveyard-escape-enabler');
   assertHasCap(graveyardEscapeEnabler, 'graveyard-escape-extra-card-cost:3');
@@ -1407,6 +1408,11 @@ When Gilded Goose enters, create a Food token.
   assertHasCap(discardHandManaSource, 'discard-hand-sac-source-cost:0');
   assertHasCap(sevenCardWheel, 'is-wheel-draw-discard-spell');
   assertHasCap(sevenCardWheel, 'wheel-draw-count:7');
+  assertHasCap(stormMillSpell, 'is-mill-source');
+  assertHasCap(stormMillSpell, 'is-mill-spell');
+  assertHasCap(stormMillSpell, 'mill-count:3');
+  assertHasCap(stormMillSpell, 'mill-spell-cost:2');
+  assertHasCap(stormMillSpell, 'has-storm');
   assertNoCap(permanentWheel, 'is-wheel-draw-discard-spell');
   assertHasFamily(graveyardEscapeEnabler, sevenCardWheel, 'escape-wheel-mana-loop');
   assertHasFamily(graveyardEscapeEnabler, discardHandManaSource, 'escape-wheel-mana-loop');

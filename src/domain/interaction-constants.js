@@ -29,6 +29,7 @@ const ComboFamilyId = freeze({
   DrawDamageFeedbackLoop: 'draw-damage-feedback-loop',
   SelfCopySpellMagecraftDrainLoop: 'self-copy-spell→magecraft-drain-loop',
   EscapeWheelManaLoop: 'escape-wheel-mana-loop',
+  EscapeMillManaLoop: 'escape-mill-mana-loop',
   BuybackCopyRitualLoop: 'buyback-copy-ritual-loop',
   LifelinkCounterDamageLoop: 'lifelink-counter-damage-loop',
   CounterTokenEtbCounterLoop: 'counter-token→etb-counter-loop',

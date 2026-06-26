@@ -2421,9 +2421,22 @@
           addManaCostCaps(caps, "ritual-spell", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
         }
       }
-      // MILL as engine: opponent-mill source + graveyard-size payoff
-      if (/(target (player|opponent)|each opponent|that player) (mills?|puts? the top)/.test(e) || /\bmills? (a|an|\d+|that many)/.test(e))
+      // MILL as engine: opponent/self-mill can be fuel, a win axis, or both.
+      // Preserve explicit counts for proof search; "mill three" is very
+      // different from "mill half" when escape fuel has to close locally.
+      {
+        const millCount = e.match(/\bmills? (one|two|three|four|five|six|seven|eight|nine|ten|\d+) cards?\b/)
+          || e.match(/\bputs? the top (one|two|three|four|five|six|seven|eight|nine|ten|\d+) cards? .* into (?:your|their|that player'?s?|a) graveyard\b/);
+        if (millCount) caps.add("mill-count:" + numberWordValue(millCount[1]));
+      }
+      if (/\bstorm\b/.test(s.raw)) caps.add("has-storm");
+      if (/(target (player|opponent)|each opponent|that player) (mills?|puts? the top)/.test(e) || /\bmills? (a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|that many)/.test(e)) {
         caps.add("is-mill-source");
+        if (/\b(instant|sorcery)\b/.test(typeText)) {
+          caps.add("is-mill-spell");
+          addManaCostCaps(caps, "mill-spell", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
+        }
+      }
       if (/\bmills?\b|\bsurveil\b|put .* (top|cards?) .* into (your|a) graveyard/.test(e))
         caps.add("is-graveyard-fuel");
       if (/return .* from (your|a|their) graveyard|return .* graveyard .* battlefield|put .* creature card .* graveyard onto the battlefield|cast .* from your graveyard|play .* from your graveyard|you may (cast|play) .* from your graveyard/.test(effectAndRaw))
@@ -2684,6 +2697,8 @@
     { family: "escape-wheel-mana-loop", from: "is-graveyard-escape-enabler", to: "is-wheel-draw-discard-spell", kind: "enablement", strength: "strong" },
     { family: "escape-wheel-mana-loop", from: "is-graveyard-escape-enabler", to: "is-discard-hand-sac-mana-source", kind: "enablement", strength: "strong" },
     { family: "escape-wheel-mana-loop", from: "is-discard-hand-sac-mana-source", to: "is-wheel-draw-discard-spell", kind: "enablement", strength: "strong" },
+    { family: "escape-mill-mana-loop", from: "is-graveyard-escape-enabler", to: "is-mill-spell", kind: "enablement", strength: "strong" },
+    { family: "escape-mill-mana-loop", from: "is-discard-hand-sac-mana-source", to: "is-mill-spell", kind: "enablement", strength: "strong" },
     { family: "life-paid-damage-lifeloss-recovery-loop", from: "is-life-paid-damage-source", to: "is-lifegain-from-opponent-lifeloss", kind: "enablement", strength: "combo-critical" },
     { family: "exile-recast-creature-mana-loop", from: "is-creature-exile-cast-mana-outlet", to: "is-recursive-exile-cast-body", kind: "enablement", strength: "combo-critical" },
     { family: "counter-token→etb-counter-loop", from: "is-counter-to-creature-token-engine", to: "is-creature-etb-counter-granter", kind: "enablement", strength: "combo-critical" },
@@ -3256,6 +3271,7 @@
   EVENT_LABEL["enable:spell-copy-etb→creature-copy-spell-loop"] = "ETB spell copy → creature-copy spell loop";
   EVENT_LABEL["enable:death-copy-spell-etb-copy-loop"] = "ETB spell copy → death-copy creature spell loop";
   EVENT_LABEL["enable:self-copy-spell→magecraft-drain-loop"] = "self-copying spell → magecraft drain loop";
+  EVENT_LABEL["enable:escape-mill-mana-loop"] = "escape mill fuel → mana/cast loop";
   EVENT_LABEL["enable:life-paid-damage-lifeloss-recovery-loop"] = "life-paid damage → opponent-loss lifegain recovery";
   EVENT_LABEL["enable:exile-recast-creature-mana-loop"] = "exile creature for creature-cast mana → exile recast loop";
   EVENT_LABEL["enable:counter-token→etb-counter-loop"] = "+1/+1 counter token engine → creature-ETB counter loop";
