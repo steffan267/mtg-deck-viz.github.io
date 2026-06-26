@@ -21,6 +21,7 @@ dist/
 src/web/generated/
 
 # local-only analysis/improvement scratch outputs
+analysis/calibration-report.json
 analysis/bracket/*.json
 analysis/bracket/*.md
 analysis/**/out/

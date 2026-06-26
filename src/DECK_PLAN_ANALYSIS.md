@@ -158,6 +158,27 @@ from the local sample/corpus files that exist, including ignored bracket caches
 such as `analysis/bracket/moxfield-reference-decks.json` and
 `analysis/bracket/moxfield-bracket-corpus.json`.
 
+Use `npm run report:calibration -- --out analysis/calibration-report.json --quiet`
+when judging whether a model change made the benchmark healthier. The
+calibration report is the long-form yardstick: it rebuilds the current precon
+and Moxfield reference caches, compares them against saved baselines, reports
+Commander Bracket exact/within-one/coarse accuracy, tracks precon band
+distribution, summarizes audit decks by `too-low` / `too-high` / `accurate`,
+keeps watched false-positive inflation families separate, and counts coverage
+for real engine families that we intentionally added.
+
+We treat an implementation as a higher-confidence improvement when it does at
+least one of these without a matching regression:
+
+- Increases real-engine coverage on known archetypes or motivating decks.
+- Improves audit-tracked `too-low` decks without pushing `too-high` decks up.
+- Reduces watched inflation-family edges or keeps them isolated from headline
+  score gains.
+- Improves Commander Bracket exact, within-one, or coarse accuracy on the
+  Moxfield bracket corpus.
+- Moves precons into more plausible cohesion/self/win bands without making the
+  strongest precons define tuned public-deck thresholds.
+
 Known false-positive inflation families are tracked in
 `analysis/interaction-inflation-watchlist.json`. The score-corpus report
 summarizes those families separately when reference deck caches are available,
@@ -174,5 +195,6 @@ graveyard cliques, or broad lord/anthem wiring.
   related families point together.
 - Expand the review queue into actionable suggestions once recommendations can
   score cards against a detected plan family.
-- Add corpus reporting for plan labels and off-plan counts so model changes can
-  be audited across many public decks instead of only hand fixtures.
+- Add corpus reporting for plan labels and off-plan counts to the calibration
+  report so deck-plan changes can be audited across many public decks instead
+  of only hand fixtures.

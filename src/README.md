@@ -180,6 +180,12 @@ from whichever local sample artifacts are available. Ignored caches under
 `analysis/` or `work/` are valid inputs during model development; they do not
 need to be promoted into checked-in `data/` before they are useful.
 
+For benchmark health, run
+`npm run report:calibration -- --out analysis/calibration-report.json --quiet`.
+That report compares current rebuilt precon/Moxfield reference scores against
+saved baselines, bracket labels, audit verdicts, watched false-positive
+inflation families, and the real engine families we are intentionally adding.
+
 ## In the browser
 
 - **+ Add Moxfield deck** — paste a URL to fetch and add a deck live.
