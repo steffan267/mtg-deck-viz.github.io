@@ -1281,6 +1281,18 @@
         caps.add("has-death-untap-self");
       // blink/flicker: exile then return to the battlefield
       if (/exile .* return (it|them|that card|those cards|the exiled)/.test(e) && /battlefield/.test(e)) caps.add("is-blink");
+      if (/\b(instant|sorcery)\b/.test(typeText)
+          && /exile (?:up to )?(two|three|four|five|six|seven|eight|nine|ten|\d+) target [^.]{0,100}/.test(effectAndRaw)
+          && /return (those cards|them|the exiled cards) to the battlefield/.test(effectAndRaw)) {
+        const targetCount = effectAndRaw.match(/exile (?:up to )?(two|three|four|five|six|seven|eight|nine|ten|\d+) target/);
+        caps.add("is-multi-target-blink-spell");
+        caps.add("blink-target-count:" + numberWordValue(targetCount && targetCount[1]));
+        if (/\btarget [^.]{0,80}\bcreatures?\b/.test(effectAndRaw)) caps.add("blink-spell-target:creature");
+        if (/\btarget [^.]{0,80}\bartifacts?\b/.test(effectAndRaw)) caps.add("blink-spell-target:artifact");
+        if (/\btarget [^.]{0,80}\blands?\b/.test(effectAndRaw)) caps.add("blink-spell-target:land");
+        if (/\bdraw a card\b/.test(effectAndRaw)) caps.add("blink-spell-draw-count:1");
+        addManaCostCaps(caps, "blink-spell", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
+      }
       if (s.kind === "activated" && /\buntap enchanted creature\b/.test(e)) {
         caps.add("is-attached-creature-untapper");
         caps.add("attached-untap-target:enchanted-creature");
@@ -2442,6 +2454,13 @@
         caps.add("is-graveyard-fuel");
       if (/return .* from (your|a|their) graveyard|return .* graveyard .* battlefield|put .* creature card .* graveyard onto the battlefield|cast .* from your graveyard|play .* from your graveyard|you may (cast|play) .* from your graveyard/.test(effectAndRaw))
         caps.add("is-graveyard-recursion");
+      if (s.kind === "etb"
+          && /return (?:up to (?:one|two|\d+) )?target (?:instant (?:and\/or|or) sorcery |instant |sorcery )?cards? from your graveyard to your hand/.test(effectAndRaw)) {
+        caps.add("is-etb-spell-recursion-to-hand");
+        if (/return target card from your graveyard/.test(effectAndRaw)) caps.add("etb-recursion-target:any-card");
+        if (/instant (?:and\/or|or) sorcery/.test(effectAndRaw) || /target instant /.test(effectAndRaw)) caps.add("etb-recursion-target:instant");
+        if (/instant (?:and\/or|or) sorcery/.test(effectAndRaw) || /target sorcery /.test(effectAndRaw)) caps.add("etb-recursion-target:sorcery");
+      }
       if (/if (an|a) opponent would mill|if .* would mill one or more cards?.*mill twice that many|mills? twice that many cards? instead/.test(effectAndRaw))
         caps.add("is-mill-multiplier");
       if (/beginning of each end step/.test(effectAndRaw)

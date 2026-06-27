@@ -846,6 +846,10 @@ When Gilded Goose enters, create a Food token.
   const peregrineDrake = node('Peregrine Drake', 'Creature — Drake', 'Flying\nWhen this creature enters, untap up to five lands.');
   const cloudOfFaeries = node('Cloud of Faeries', 'Creature — Faerie', 'Flying\nWhen this creature enters, untap up to two lands.\nCycling {2} ({2}, Discard this card: Draw a card.)');
   const ephemerate = node('Ephemerate', 'Instant', 'Exile target creature you control, then return it to the battlefield under its owner\'s control.');
+  const ghostlyFlicker = node('Ghostly Flicker', 'Instant', 'Exile two target artifacts, creatures, and/or lands you control, then return those cards to the battlefield under your control.', 3, '{2}{U}');
+  const illusionistsStratagem = node('Illusionist\'s Stratagem', 'Instant', 'Exile up to two target creatures you control, then return those cards to the battlefield under their owner\'s control. Draw a card.', 4, '{3}{U}');
+  const archaeomancer = node('Archaeomancer', 'Creature — Human Wizard', 'When this creature enters, return target instant or sorcery card from your graveyard to your hand.');
+  const scholarOfTheAges = node('Scholar of the Ages', 'Creature — Human Wizard', 'When this creature enters, return up to two target instant and/or sorcery cards from your graveyard to your hand.');
   assertHasCap(deadeyeNavigator, 'is-repeatable-blink');
   assertHasCap(deadeyeNavigator, 'blink-cost:2');
   assertHasCap(peregrineDrake, 'etb-untaps-land:5');
@@ -857,6 +861,17 @@ When Gilded Goose enters, create a Food token.
     it => it.family === 'blink→land-untap-etb' && it.strength === 'combo-critical',
     'Deadeye Navigator + Cloud of Faeries should be a combo-critical repeatable blink/land-untap loop');
   assertNoCap(ephemerate, 'is-repeatable-blink');
+  assertNoCap(ephemerate, 'is-multi-target-blink-spell');
+  assertHasCap(ghostlyFlicker, 'is-multi-target-blink-spell');
+  assertHasCap(ghostlyFlicker, 'blink-target-count:2');
+  assertHasCap(ghostlyFlicker, 'blink-spell-target:creature');
+  assertHasCap(ghostlyFlicker, 'blink-spell-cost:3');
+  assertHasCap(illusionistsStratagem, 'blink-spell-draw-count:1');
+  assertHasCap(archaeomancer, 'is-etb-spell-recursion-to-hand');
+  assertHasCap(archaeomancer, 'etb-recursion-target:instant');
+  assertHasCap(archaeomancer, 'etb-recursion-target:sorcery');
+  assertHasCap(scholarOfTheAges, 'is-etb-spell-recursion-to-hand');
+  assertHasCap(scholarOfTheAges, 'etb-recursion-target:instant');
   assertHasFamily(ephemerate, peregrineDrake, 'etb→blink');
   assertNoEvent(ephemerate, peregrineDrake, 'enable:blink→land-untap-etb');
 

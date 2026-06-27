@@ -310,6 +310,13 @@ candidate closures in sub-millisecond time after index construction.
 - Ordinary bodies are not infinite aristocrat fodder. A sacrifice package is not
   repeatable unless the body is replenished by the package.
 - One-shot blink plus ETB untap is a near miss, not a loop.
+- A one-shot blink spell becomes repeatable only when the package proves that
+  the spell can target every required ETB role, resolves into the graveyard,
+  is returned to hand by one of those ETB roles, and the refreshed lands repay
+  its full mana cost. Generic recursion and single-target blink are not enough.
+  These three roles are seeded in both the semantic candidate index and the
+  product proof-package path so deck analysis can surface the same proof that
+  the offline corpus evaluator measures.
 - Library-exile plus empty-library win is a finite win package, not a loop; keep
   it proof-backed with explicit threshold assumptions.
 - Target-restricted copy loops must prove the copied permanent is legal

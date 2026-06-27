@@ -105,6 +105,14 @@ function seedCandidates(indexes, options) {
     capabilityIdsStartingWith(indexes, 'etb-untaps-land:'),
   );
 
+  for (const blink of capabilityIds(indexes, 'is-multi-target-blink-spell')) {
+    for (const untapper of capabilityIds(indexes, 'etb-untaps-land')) {
+      for (const recursion of capabilityIds(indexes, 'is-etb-spell-recursion-to-hand')) {
+        addCandidate(candidates, [blink, untapper, recursion]);
+      }
+    }
+  }
+
   pairCandidates(
     candidates,
     capabilityIds(indexes, 'is-lifegain-from-opponent-lifeloss'),

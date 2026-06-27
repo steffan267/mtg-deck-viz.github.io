@@ -1248,6 +1248,89 @@ function proveBlinkUntap(cards) {
   }, [{ resource: 'mana', min: untapCount - blinkCost, max: untapCount - blinkCost }]);
 }
 
+function proveBlinkSpellRecursionLandUntap(cards) {
+  const blinkSpells = cards.filter(card => hasCap(card, 'is-multi-target-blink-spell')
+    && hasCap(card, 'blink-spell-target:creature')
+    && maxCapNumber(card, 'blink-target-count') >= 2);
+  const untappers = cards.filter(card => hasCap(card, 'etb-untaps-land'));
+  const recursors = cards.filter(card => hasCap(card, 'is-etb-spell-recursion-to-hand')
+    && (hasCap(card, 'etb-recursion-target:any-card') || hasCap(card, 'etb-recursion-target:instant')));
+  if (!blinkSpells.length || !untappers.length || !recursors.length) return null;
+
+  const failures = [];
+  for (const blink of blinkSpells) {
+    for (const untapper of untappers) {
+      for (const recursor of recursors) {
+        if (blink === untapper || blink === recursor || untapper === recursor) continue;
+        const spellCost = minCapNumber(blink, 'blink-spell-cost');
+        const untapCount = maxCapNumber(untapper, 'etb-untaps-land');
+        if (untapCount < spellCost) {
+          failures.push(failure(
+            'proof:blink-spell-recursion-land-untap-mana:' + sorted([blink.id, untapper.id, recursor.id]).join('|'),
+            [blink, untapper, recursor],
+            'ETB land untap cannot repay the recovered blink spell',
+            { spellCost, untapCount },
+          ));
+          continue;
+        }
+        const netMana = untapCount - spellCost;
+        const drawCount = maxCapNumber(blink, 'blink-spell-draw-count');
+        const proofCards = [blink, untapper, recursor];
+        return success(
+          'proof:blink-spell-recursion-land-untap:' + sorted(proofCards.map(card => card.id)).join('|'),
+          'blink-spell-recursion-land-untap-loop',
+          proofCards,
+          {
+            requiredFacts: [
+              fact(blink, 'is-multi-target-blink-spell'),
+              fact(blink, 'blink-spell-target:creature'),
+              { card: blink.id, kind: 'target-legality', predicate: 'blink-target-count', value: 2 },
+              fact(untapper, 'etb-untaps-land'),
+              fact(recursor, 'is-etb-spell-recursion-to-hand'),
+              fact(recursor, hasCap(recursor, 'etb-recursion-target:any-card') ? 'etb-recursion-target:any-card' : 'etb-recursion-target:instant'),
+              ...(drawCount > 0 ? [fact(blink, 'blink-spell-draw-count')] : []),
+              { card: blink.id, kind: 'precondition', predicate: 'minimum-available-lands', value: spellCost },
+              { card: blink.id, kind: 'precondition', predicate: 'lands-can-pay-blink-spell-colors' },
+            ],
+            steps: [
+              { card: blink.id, action: `pay ${spellCost} mana and cast the blink spell targeting both ETB creatures`, cost: { mana: spellCost } },
+              { card: blink.id, action: 'exile both creatures, return them immediately, then put the resolved spell into the graveyard', delta: { casts: 1, blinks: 2, etbTriggers: 2, ltbTriggers: 2, ...(drawCount > 0 ? { cards: drawCount } : {}) } },
+              { card: untapper.id, action: `resolve its ETB trigger and untap up to ${untapCount} lands`, delta: { untaps: untapCount, mana: untapCount } },
+              { card: recursor.id, action: 'resolve its ETB trigger targeting the blink spell and return that spell from the graveyard to hand' },
+              { action: netMana > 0 ? `the spell and both creatures are restored with ${netMana} net mana` : 'the spell, both creatures, and spent mana are restored at break-even' },
+            ],
+            assumptions: [
+              `at least ${spellCost} lands are available and can produce the blink spell's required colors`,
+              'the spell-recursion ETB trigger is ordered after the blink spell has resolved into the graveyard',
+            ],
+            limitingClauses: [
+              'the proof requires two legal creature targets and immediate battlefield return',
+              'generic graveyard recursion does not qualify unless it explicitly returns the resolved spell to hand',
+              'no extra ETB payoff or deterministic win condition is inferred',
+            ],
+            repeatability: { status: netMana > 0 ? 'repeatable' : 'repeatable-break-even', reason: 'each iteration restores the blink spell, both ETB creatures, and enough land mana to cast the spell again' },
+          },
+          [
+            { resource: 'casts', min: 1, max: Infinity },
+            { resource: 'etbTriggers', min: 2, max: Infinity },
+            { resource: 'ltbTriggers', min: 2, max: Infinity },
+            { resource: 'untaps', min: untapCount, max: Infinity },
+            ...(drawCount > 0 ? [{ resource: 'cards', min: drawCount, max: Infinity }] : []),
+            ...(netMana > 0 ? [{ resource: 'mana', min: netMana, max: Infinity }] : []),
+          ],
+        );
+      }
+    }
+  }
+  if (failures.length === 1) return failures[0];
+  return failures.length ? failure(
+    'proof:blink-spell-recursion-land-untap-all-rejected:' + sorted(cards.map(card => card.id)).join('|'),
+    cards,
+    'no multi-target blink, ETB untap, and spell-recursion assembly closed its mana payment',
+    { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
+  ) : null;
+}
+
 function proveLifeLoop(cards) {
   const gainFromLoss = find(cards, c => hasCap(c, 'is-lifegain-from-opponent-lifeloss'));
   const lossFromGain = find(cards, c => hasCap(c, 'is-lifeloss-from-your-lifegain'));
@@ -4215,6 +4298,7 @@ function bespokeProofs(cards) {
   return [
     proveDirectSelfLoop(cards),
     proveBlinkUntap(cards),
+    proveBlinkSpellRecursionLandUntap(cards),
     proveLifeLoop(cards),
     proveMillLifeLossLoop(cards),
     proveDrawDamageFeedback(cards),

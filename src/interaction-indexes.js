@@ -269,6 +269,13 @@ function candidateTriples(cardOrId, indexes, options = {}) {
   if (artifactReducers.includes(seed)) combineTriples(map, 'artifact-top-cost-reduction-loop', seed, topPieces, topCasters, (topPiece, caster) => ({ role: 'cost-reducer', topPiece, caster }), limit);
   if (topCasters.includes(seed)) combineTriples(map, 'artifact-top-cost-reduction-loop', seed, topPieces, artifactReducers, (topPiece, reducer) => ({ role: 'cast-from-top', topPiece, reducer }), limit);
 
+  const multiTargetBlinkSpells = capabilityIds(indexes, 'is-multi-target-blink-spell');
+  const etbLandUntappers = capabilityIds(indexes, 'etb-untaps-land');
+  const etbSpellRecursors = capabilityIds(indexes, 'is-etb-spell-recursion-to-hand');
+  if (multiTargetBlinkSpells.includes(seed)) combineTriples(map, 'blink-spell-recursion-land-untap-loop', seed, etbLandUntappers, etbSpellRecursors, (untapper, recursion) => ({ role: 'blink-spell', untapper, recursion }), limit);
+  if (etbLandUntappers.includes(seed)) combineTriples(map, 'blink-spell-recursion-land-untap-loop', seed, multiTargetBlinkSpells, etbSpellRecursors, (blink, recursion) => ({ role: 'etb-land-untapper', blink, recursion }), limit);
+  if (etbSpellRecursors.includes(seed)) combineTriples(map, 'blink-spell-recursion-land-untap-loop', seed, multiTargetBlinkSpells, etbLandUntappers, (blink, untapper) => ({ role: 'etb-spell-recursion', blink, untapper }), limit);
+
   const tokenSources = capabilityIds(indexes, 'is-token-producer');
   const tokenDoublers = indexes.modifiers.tokenDoublers.tokens || [];
   const tokenPayoffs = unionIds(indexes.byConsumedEvent.tokens || [], capabilityIds(indexes, 'is-combat-payoff'), capabilityIds(indexes, 'is-width-payoff'));

@@ -13,6 +13,8 @@ const fixtures = [
   { id: 'Self Untap Dork', type_line: 'Creature — Elf Druid', oracle_text: '{T}: Add {G}{G}. {0}: Untap this creature.', cmc: 2 },
   { id: 'Deadeye Navigator', type_line: 'Creature — Spirit', oracle_text: '{1}{U}: Exile another target creature you control, then return it to the battlefield under your control.', cmc: 6 },
   { id: 'Peregrine Drake', type_line: 'Creature — Drake', oracle_text: 'Flying When this creature enters, untap up to five lands.', cmc: 5 },
+  { id: 'Ghostly Flicker', type_line: 'Instant', oracle_text: 'Exile two target artifacts, creatures, and/or lands you control, then return those cards to the battlefield under your control.', cmc: 3, mana_cost: '{2}{U}' },
+  { id: 'Archaeomancer', type_line: 'Creature — Human Wizard', oracle_text: 'When this creature enters, return target instant or sorcery card from your graveyard to your hand.', cmc: 4, mana_cost: '{2}{U}{U}' },
   { id: 'Sanguine Bond', type_line: 'Enchantment', oracle_text: 'Whenever you gain life, target opponent loses that much life.', cmc: 5 },
   { id: 'Fixed Gain Converts To Loss', type_line: 'Creature — Cleric', oracle_text: 'Whenever you gain life, each opponent loses 1 life.', cmc: 3 },
   { id: 'Exquisite Blood', type_line: 'Enchantment', oracle_text: 'Whenever an opponent loses life, you gain that much life.', cmc: 5 },
@@ -172,6 +174,7 @@ const indexes = buildInteractionIndexes(fixtures);
 const seeded = seedCandidates(indexes, { perCardTripleLimit: 8 });
 assert.ok(seeded.some(candidate => candidate.cards.length === 1 && candidate.cards.includes('Self Untap Dork')));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Deadeye Navigator|Peregrine Drake'));
+assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Archaeomancer|Ghostly Flicker|Peregrine Drake'));
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Damage Draw Aura|Draw Damage Engine'));
 assert.equal(seeded.some(candidate => candidate.cards.join('|') === 'Damage Draw Aura|Opponent Draw Damage Engine'), false, 'opponent-draw punishers should not seed draw-damage feedback packages that draw only you');
 assert.ok(seeded.some(candidate => candidate.cards.join('|') === 'Counter Damage Creature|Lifelink Counter Engine'));
@@ -808,5 +811,15 @@ assert.equal(
   false,
   'proof packages must not assemble intrinsic ping and death-untap roles from different creatures',
 );
+
+const blinkRecursionPackages = buildInteractionProofPackages([
+  fixtures.find(card => card.id === 'Ghostly Flicker'),
+  fixtures.find(card => card.id === 'Peregrine Drake'),
+  fixtures.find(card => card.id === 'Archaeomancer'),
+]);
+const blinkRecursionPackage = blinkRecursionPackages.find(pkg => pkg.family === 'blink-spell-recursion-land-untap-loop');
+assert.ok(blinkRecursionPackage, 'product proof packages should surface multi-target blink spell recursion loops');
+assert.deepEqual(blinkRecursionPackage.cards, ['Archaeomancer', 'Ghostly Flicker', 'Peregrine Drake']);
+assert.ok(blinkRecursionPackage.resourceDeltas.some(delta => delta.resource === 'mana'));
 
 process.stdout.write('Interaction proof package tests passed\n');

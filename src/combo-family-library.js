@@ -85,6 +85,38 @@ const COMBO_FAMILIES = [
     uiExplanation: 'A repeatable blink engine resets a land-untap ETB creature; the loop is valid only when the blink can be paid again.',
   },
   {
+    id: 'blink-spell-recursion-land-untap-loop',
+    title: 'Multi-target blink spell recursion plus ETB land untap',
+    maxCards: 3,
+    confidenceGate: 'pattern',
+    requiredFacts: [
+      { role: 'blink', kind: 'capability', predicate: 'is-multi-target-blink-spell' },
+      { role: 'blink', kind: 'capability', predicate: 'blink-target-count' },
+      { role: 'untapper', kind: 'capability', predicate: 'etb-untaps-land' },
+      { role: 'recursion', kind: 'capability', predicate: 'is-etb-spell-recursion-to-hand' },
+    ],
+    optionalAccelerants: [
+      { kind: 'resource', resource: 'lands', note: 'land untap beyond the spell cost produces positive mana each iteration' },
+      { kind: 'capability', predicate: 'blink-spell-draw-count', note: 'a blink spell that draws also produces repeatable card draw' },
+    ],
+    disqualifiers: [
+      { kind: 'target-legality', rule: 'the blink spell must immediately return and legally target both ETB creatures' },
+      { kind: 'cost', rule: 'the ETB land untap count must cover the blink spell mana value' },
+      { kind: 'zone', rule: 'the recursion ETB must return the resolved instant or sorcery from graveyard to hand' },
+    ],
+    repeatability: { rule: 'cast the two-target blink spell, return both creatures, untap lands, and recover the resolved spell before repeating' },
+    payoffCriteria: [{ event: 'cast', comparator: 'repeats' }, { event: 'blink', comparator: 'repeats' }, { event: 'etb', comparator: 'repeats' }, { event: 'ltb', comparator: 'repeats' }],
+    resultClasses: ['infinite-blink', 'infinite-cast', 'infinite-etb', 'infinite-ltb', 'infinite-untap'],
+    proofDeltaResultClasses: ['infinite-draw', 'infinite-mana'],
+    examples: [{ name: 'Ghostly Flicker + Peregrine Drake + Archaeomancer', cards: ['Ghostly Flicker', 'Peregrine Drake', 'Archaeomancer'] }],
+    negativeFixtures: [
+      { name: 'single-target blink spell', cards: ['Ephemerate', 'Peregrine Drake', 'Archaeomancer'], reason: 'one spell target cannot reset both ETB roles' },
+      { name: 'insufficient land untap', cards: ['Three-Mana Double Blink', 'Two-Land Untapper', 'Spell Recursion Creature'], reason: 'the loop cannot repay the blink spell' },
+    ],
+    knownFalsePositives: ['single-target blink spells', 'delayed-return blink effects', 'generic graveyard recursion that cannot recover the spell to hand', 'land untappers that do not repay the spell cost'],
+    uiExplanation: 'A multi-target blink spell can reset a land untapper and an ETB spell recursor together, restoring both the mana and spell needed for the next iteration.',
+  },
+  {
     id: 'mutual-etb-blink-reset-loop',
     title: 'Mutual ETB blink reset loop',
     maxCards: 2,

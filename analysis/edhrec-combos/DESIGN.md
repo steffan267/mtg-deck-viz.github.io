@@ -134,6 +134,21 @@ trigger. No new family was needed: those cards now flow into the existing
 On the same 9,000-row slice, strict proofs moved from 678 to 686 while the
 moved rows stayed confined to counter/token/ETB/lifegain result classes.
 
+The next routing-slip family closes multi-target blink-spell recursion packages.
+It requires a spell that immediately blinks at least two legal creatures, an
+ETB land untapper that repays the spell cost, and an ETB recursor that can
+return the resolved instant from the graveyard to hand. This deliberately does
+not promote single-target blink, delayed return, generic graveyard recursion,
+or mana-negative assemblies. Infinite mana is result credit only when the
+per-iteration land untap exceeds the spell cost; cast/blink/ETB/LTB/untap axes
+come from the closed family contract. Optional text on the recovered blink spell
+may add a separately fact-gated output such as repeated card draw. Landfall is
+not credited merely because the package untaps lands. On the same 9,000-row
+slice, strict proofs moved from 686 to 710 and proof-only expected-result
+coverage moved from 9.0% to 9.3%. All 24 newly proved rows belonged to the
+intended blink-spell/ETB-untap/ETB-recursion family; no unrelated family moved
+to proved.
+
 
 ## Current full-corpus baseline
 

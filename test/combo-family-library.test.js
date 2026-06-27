@@ -36,6 +36,9 @@ for (const family of COMBO_FAMILIES) {
 
 assert.ok(getComboFamily(ComboFamilyId.ArtifactTopCostReductionLoop).requiredFacts.some(fact => fact.predicate === 'is-self-top-draw-artifact'));
 assert.ok(getComboFamily(ComboFamilyId.BlinkEtbLandUntapLoop).negativeFixtures.some(fixture => fixture.cards.includes('Ephemerate')));
+assert.deepEqual(getComboFamily(ComboFamilyId.BlinkSpellRecursionLandUntapLoop).resultClasses, ['infinite-blink', 'infinite-cast', 'infinite-etb', 'infinite-ltb', 'infinite-untap']);
+assert.deepEqual(getComboFamily(ComboFamilyId.BlinkSpellRecursionLandUntapLoop).proofDeltaResultClasses, ['infinite-draw', 'infinite-mana']);
+assert.ok(getComboFamily(ComboFamilyId.BlinkSpellRecursionLandUntapLoop).knownFalsePositives.some(text => /single-target/i.test(text)));
 assert.ok(getComboFamily('cost-reducer-activated-output-payoff').knownFalsePositives.some(text => /scoped/i.test(text)));
 assert.ok(getComboFamily('token-source-modifier-payoff').requiredFacts.some(fact => fact.kind === 'event.consumes' && fact.event === 'tokens'));
 assert.deepEqual(getComboFamily(ComboFamilyId.HastyCopyEtbUntapLoop).resultClasses, [ResultClass.InfiniteEtb, ResultClass.InfiniteLtb, ResultClass.InfiniteTokens, ResultClass.InfiniteUntap]);

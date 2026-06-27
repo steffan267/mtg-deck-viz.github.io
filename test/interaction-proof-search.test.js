@@ -83,6 +83,49 @@ const nearMiss = provePackage([ephemerate, drake]);
 assert.equal(nearMiss.status, 'not-repeatable');
 assert.ok(nearMiss.rejections.some(rejection => /not repeatable|blink effect is not repeatable/.test(rejection.reason)));
 
+const ghostlyFlicker = card(
+  'Ghostly Flicker',
+  'Instant',
+  'Exile two target artifacts, creatures, and/or lands you control, then return those cards to the battlefield under your control.',
+  3,
+  '{2}{U}',
+);
+const archaeomancer = card(
+  'Archaeomancer',
+  'Creature — Human Wizard',
+  'When this creature enters, return target instant or sorcery card from your graveyard to your hand.',
+  4,
+  '{2}{U}{U}',
+);
+const blinkSpellRecursionLoop = provePackage([ghostlyFlicker, drake, archaeomancer]);
+assert.equal(blinkSpellRecursionLoop.status, 'proven');
+const blinkSpellRecursionProof = proofByFamily(blinkSpellRecursionLoop, ComboFamilyId.BlinkSpellRecursionLandUntapLoop);
+assert.ok(blinkSpellRecursionProof);
+assert.ok(blinkSpellRecursionProof.positiveDeltas.some(delta => delta.resource === 'casts'));
+assert.ok(blinkSpellRecursionProof.positiveDeltas.some(delta => delta.resource === 'mana' && delta.min === 2));
+assert.ok(blinkSpellRecursionProof.proof.requiredFacts.some(item => item.predicate === 'blink-target-count' && item.value === 2));
+assert.ok(blinkSpellRecursionProof.proof.requiredFacts.some(item => item.predicate === 'minimum-available-lands' && item.value === 3));
+
+const cantripBlinkRecursionLoop = provePackage([
+  card('Cantrip Double Blink', 'Instant', 'Exile up to two target creatures you control, then return those cards to the battlefield under their owner\'s control. Draw a card.', 4, '{3}{U}'),
+  drake,
+  archaeomancer,
+]);
+const cantripBlinkRecursionProof = proofByFamily(cantripBlinkRecursionLoop, ComboFamilyId.BlinkSpellRecursionLandUntapLoop);
+assert.ok(cantripBlinkRecursionProof);
+assert.ok(cantripBlinkRecursionProof.positiveDeltas.some(delta => delta.resource === 'cards' && delta.min === 1));
+
+const singleTargetBlinkRecursionNearMiss = provePackage([ephemerate, drake, archaeomancer]);
+assert.equal(proofByFamily(singleTargetBlinkRecursionNearMiss, ComboFamilyId.BlinkSpellRecursionLandUntapLoop), undefined);
+
+const underfundedBlinkRecursionNearMiss = provePackage([
+  ghostlyFlicker,
+  card('Two-Land Untapper Again', 'Creature — Drake', 'When this creature enters, untap up to two lands.', 4, '{3}{U}'),
+  archaeomancer,
+]);
+assert.equal(proofByFamily(underfundedBlinkRecursionNearMiss, ComboFamilyId.BlinkSpellRecursionLandUntapLoop), undefined);
+assert.ok(underfundedBlinkRecursionNearMiss.rejections.some(rejection => /cannot repay the recovered blink spell/.test(rejection.reason)));
+
 const sanguineBond = card(
   'Sanguine Bond',
   'Enchantment',
