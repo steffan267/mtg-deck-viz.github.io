@@ -208,7 +208,7 @@ function main() {
   assert.deepEqual(earlyCombo.commanderBracket.flags.earlyComboPairs[0].cards, ['Cheap Engine A', 'Cheap Engine B']);
 
   const topLoopCombo = METRICS.compute(graph([
-    card({ id: 'Self Top Draw Artifact', cmc: 1, text: '{1}: Draw a card, then put this artifact on top of its owner’s library.', edh: null }),
+    card({ id: 'Self Top Draw Artifact', cmc: 1, text: '{T}: Draw a card, then put this artifact on top of its owner’s library.', edh: null }),
     card({ id: 'Artifact Spell Reducer', cmc: 2, text: 'Artifact spells you cast cost {1} less to cast.', edh: null }),
     card({ id: 'Artifact Top Caster', cmc: 4, text: 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', edh: null }),
     card({ id: 'Island', role: 'land', qty: 97, edh: null }),

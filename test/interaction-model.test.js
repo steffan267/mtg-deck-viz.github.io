@@ -1126,16 +1126,28 @@ When Gilded Goose enters, create a Food token.
   assertNoEvent(legendaryEtbSpellCopier, deathCopyCreatureSpell, 'enable:death-copy-spell-etb-copy-loop');
   assertNoEvent(artifactEtbSpellCopier, hastyCreatureCopySpell, 'enable:spell-copy-etb→creature-copy-spell-loop');
 
-  const topDrawArtifact = node('Self Top Draw Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.');
+  const topDrawArtifact = node('Self Top Draw Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}');
   const artifactReducer = node('Artifact Spell Reducer', 'Artifact Creature — Vedalken Artificer', 'Artifact spells you cast cost {1} less to cast.');
   const castFromTop = node('Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.');
   const historicReducer = node('Historic Spell Reducer', 'Artifact Creature — Construct', 'Historic spells you cast cost {1} less to cast.');
   const flexibleCastFromTop = node('Flexible Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells and colorless spells from the top of your library.');
+  const attachedCastFromTop = node('Attached Top Caster', 'Legendary Artifact Creature — Equipment', 'You may look at the top card of your library any time. As long as this artifact is attached to a creature, you may play lands and cast spells from the top of your library.');
+  const lifePaymentCastFromTop = node('Life Payment Top Caster', 'Legendary Artifact', 'You may look at the top card of your library any time. You may play lands and cast spells from the top of your library. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost.');
+  const additionalCostCastFromTop = node('Additional Cost Top Caster', 'Legendary Creature', 'You may look at the top card of your library any time. You may cast spells from the top of your library by removing a counter from a creature you control in addition to paying their other costs.');
+  const costedTopDrawArtifact = node('Costed Self Top Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}');
   assertHasCap(topDrawArtifact, 'is-self-top-draw-artifact');
+  assertHasCap(topDrawArtifact, 'self-top-artifact-cost:1');
+  assertNoCap(costedTopDrawArtifact, 'is-self-top-draw-artifact');
   assertHasCap(artifactReducer, 'is-artifact-spell-cost-reducer');
   assertHasCap(castFromTop, 'is-artifact-cast-from-top-enabler');
   assertHasCap(historicReducer, 'is-artifact-spell-cost-reducer');
   assertHasCap(flexibleCastFromTop, 'is-artifact-cast-from-top-enabler');
+  assertHasCap(attachedCastFromTop, 'is-artifact-cast-from-top-enabler');
+  assertHasCap(attachedCastFromTop, 'cast-from-top-requires-attached-creature');
+  assertNoCap(lifePaymentCastFromTop, 'is-artifact-cast-from-top-enabler');
+  assertHasCap(lifePaymentCastFromTop, 'is-life-payment-cast-from-top-enabler');
+  assertNoCap(additionalCostCastFromTop, 'is-artifact-cast-from-top-enabler');
+  assertHasCap(additionalCostCastFromTop, 'is-additional-cost-cast-from-top-enabler');
   assertHasInteraction(artifactReducer, topDrawArtifact,
     it => it.family === 'artifact-cost-reduction→top-loop-piece' && it.strength === 'strong',
     'artifact cost reducer should link to a self-top draw artifact as one half of a three-card loop');

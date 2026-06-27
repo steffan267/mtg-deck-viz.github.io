@@ -35,8 +35,8 @@
   },
   "aggregate": {
     "deckCount": 3,
-    "totalEdges": 163,
-    "totalInteractions": 185,
+    "totalEdges": 158,
+    "totalInteractions": 180,
     "totalComboCriticalPairs": 10,
     "totalComboCriticalTriples": 1,
     "familyCounts": {
@@ -49,7 +49,6 @@
       "cost-reduction→ability": 8,
       "death→drain": 4,
       "death→tokens": 2,
-      "destroy": 5,
       "discard": 14,
       "draw": 43,
       "etb→blink": 2,
@@ -75,7 +74,6 @@
     "eventCounts": {
       "attack": 1,
       "cast": 3,
-      "destroy": 5,
       "discard": 14,
       "draw": 43,
       "enable:artifact-cost-reduction→top-loop-piece": 1,
@@ -127,9 +125,9 @@
       "missing": [
         "Valley of Gorgoroth"
       ],
-      "edgeCount": 144,
+      "edgeCount": 139,
       "zoneEdgeCount": 87,
-      "interactionCount": 156,
+      "interactionCount": 151,
       "familyCounts": {
         "attack": 1,
         "cast": 3,
@@ -137,7 +135,6 @@
         "cost-reduction→ability": 6,
         "death→drain": 4,
         "death→tokens": 2,
-        "destroy": 5,
         "discard": 14,
         "draw": 42,
         "goad": 9,
@@ -154,7 +151,6 @@
       "eventCounts": {
         "attack": 1,
         "cast": 3,
-        "destroy": 5,
         "discard": 14,
         "draw": 42,
         "enable:combat→payoff": 8,
@@ -175,11 +171,11 @@
       "strengthCounts": {
         "combo-critical": 5,
         "moderate": 12,
-        "weak": 139
+        "weak": 134
       },
       "kindCounts": {
         "enablement": 11,
-        "reaction": 83,
+        "reaction": 78,
         "synergy": 62
       },
       "combos": {
@@ -395,7 +391,7 @@
         }
       ],
       "reviewWarnings": {
-        "weakInteractionShare": 0.891,
+        "weakInteractionShare": 0.887,
         "weakInteractionShareExceedsThreshold": true,
         "highDegreeNodes": [],
         "highFamilyFanout": [
@@ -432,12 +428,12 @@
         "winTuningBand": "Highly tuned",
         "bracketHint": 5,
         "bracketLabel": "Bracket 5 · cEDH",
-        "pctInteractive": 87,
+        "pctInteractive": 83,
         "pctMeaningful": 22,
-        "largestWebShare": 86,
-        "avgDegree": 4.51,
-        "satWeightedAvgDegree": 0.85,
-        "islandCount": 8
+        "largestWebShare": 81,
+        "avgDegree": 4.37,
+        "satWeightedAvgDegree": 0.83,
+        "islandCount": 11
       }
     },
     {

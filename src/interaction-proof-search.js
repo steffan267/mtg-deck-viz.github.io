@@ -1817,16 +1817,54 @@ function proveTopLoop(cards) {
   const reducer = find(cards, c => hasCap(c, 'is-artifact-spell-cost-reducer'));
   const caster = find(cards, c => hasCap(c, 'is-artifact-cast-from-top-enabler'));
   if (!topPiece || !reducer || !caster) return null;
+  const spellCost = manaCostProfileFromCaps(topPiece, 'self-top-artifact');
+  const genericCost = maxCapNumber(topPiece, 'self-top-artifact-generic-cost');
+  const reduction = maxCapNumber(reducer, 'spell-cost-reduction');
+  const nonGenericCost = Math.max(0, spellCost.total - genericCost);
+  if (nonGenericCost > 0 || reduction < genericCost) {
+    return failure(
+      'proof:artifact-top-loop-payment:' + sorted([topPiece.id, reducer.id, caster.id]).join('|'),
+      [topPiece, reducer, caster],
+      'artifact spell cost reduction does not make the self-top artifact free to recast',
+      { spellCost, genericCost, reduction },
+    );
+  }
+  let attachmentTarget = null;
+  if (hasCap(caster, 'cast-from-top-requires-attached-creature')) {
+    attachmentTarget = find(cards, card => card !== caster && MODEL.faceCompatibleCaps(card, ['is-creature-permanent']));
+    if (!attachmentTarget) {
+      return failure(
+        'proof:artifact-top-loop-attachment:' + sorted([topPiece.id, reducer.id, caster.id]).join('|'),
+        [topPiece, reducer, caster],
+        'conditional cast-from-top permission has no package-local creature attachment target',
+        { caster: caster.id },
+      );
+    }
+  }
   return success('proof:artifact-top-loop:' + sorted([topPiece.id, reducer.id, caster.id]).join('|'), 'artifact-top-cost-reduction-loop', [topPiece, reducer, caster], {
-    requiredFacts: [fact(topPiece, 'is-self-top-draw-artifact'), fact(reducer, 'is-artifact-spell-cost-reducer'), fact(caster, 'is-artifact-cast-from-top-enabler')],
+    requiredFacts: [
+      fact(topPiece, 'is-self-top-draw-artifact'),
+      fact(topPiece, 'self-top-artifact-cost'),
+      fact(reducer, 'is-artifact-spell-cost-reducer'),
+      fact(reducer, 'spell-cost-reduction'),
+      ...(hasCap(reducer, 'artifact-spell-reducer-requires-artifact-choice') ? [fact(reducer, 'artifact-spell-reducer-requires-artifact-choice')] : []),
+      fact(caster, 'is-artifact-cast-from-top-enabler'),
+      ...(attachmentTarget ? [fact(caster, 'cast-from-top-requires-attached-creature'), fact(attachmentTarget, 'is-creature-permanent')] : []),
+    ],
     steps: [
-      { card: reducer.id, action: 'reduces the artifact loop piece cost' },
-      { card: caster.id, action: 'casts the loop piece from the top of the library' },
-      { card: topPiece.id, action: 'draws a card and returns itself to library top' },
+      ...(attachmentTarget ? [{ card: caster.id, action: `remain attached to ${attachmentTarget.id} so cast-from-top permission is active` }] : []),
+      { card: reducer.id, action: `reduces the artifact loop piece's ${genericCost} generic mana cost by ${reduction}` },
+      { card: caster.id, action: 'casts the now-free loop piece from the top of the library', delta: { casts: 1 } },
+      { card: topPiece.id, action: 'activate its free draw ability and return it to library top', delta: { cards: 1 } },
       { action: 'library-top abstract state repeats' },
     ],
-    repeatability: { status: 'repeatable-candidate', reason: 'same top-card state repeats; exact payment proof remains bounded by assumptions' },
-  }, [{ resource: 'cards', min: 1, max: 1 }]);
+    assumptions: [
+      ...(attachmentTarget ? ['the cast-from-top permanent is already attached to the package-local creature'] : []),
+      ...(hasCap(reducer, 'artifact-spell-reducer-requires-artifact-choice') ? ['the reducer chose artifact as its applicable spell type'] : []),
+    ],
+    limitingClauses: ['alternate life-payment cast permission does not qualify for this cost-reduction family', 'the draw-and-return activation must itself be free'],
+    repeatability: { status: 'repeatable', reason: 'the artifact is recast for zero, activates for zero, draws, and restores itself to library top' },
+  }, [{ resource: 'cards', min: 1, max: Infinity }, { resource: 'casts', min: 1, max: Infinity }]);
 }
 
 function proveRecursiveBodySacrificeMana(cards) {

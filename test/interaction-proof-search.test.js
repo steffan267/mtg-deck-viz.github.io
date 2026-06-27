@@ -1374,7 +1374,7 @@ assert.notEqual(replacementOnlyCreatureTokens.status, 'proven');
 assert.equal(proofByFamily(replacementOnlyCreatureTokens, 'token-replacement-sacrifice-mana-loop'), undefined);
 
 const topLoop = provePackage([
-  card('Self Top Draw Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.', 1),
+  card('Self Top Draw Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}'),
   card('Artifact Spell Reducer', 'Artifact Creature — Vedalken Artificer', 'Artifact spells you cast cost {1} less to cast.', 2),
   card('Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', 4),
 ]);
@@ -1383,12 +1383,53 @@ assert.ok(proofByFamily(topLoop, 'artifact-top-cost-reduction-loop'));
 assert.ok(topLoop.hyperedges.some(edge => edge.family === 'artifact-top-cost-reduction-loop'));
 
 const topLoopVariant = provePackage([
-  card('Self Top Draw Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.', 1),
+  card('Self Top Draw Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}'),
   card('Historic Spell Reducer', 'Artifact Creature — Construct', 'Historic spells you cast cost {1} less to cast.', 2),
   card('Flexible Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells and colorless spells from the top of your library.', 4),
 ]);
 assert.equal(topLoopVariant.status, 'proven');
 assert.ok(proofByFamily(topLoopVariant, 'artifact-top-cost-reduction-loop'));
+
+const attachedTopLoop = provePackage([
+  card('Self Top Draw Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}'),
+  card('Artifact Creature Reducer', 'Artifact Creature — Vedalken Artificer', 'Artifact spells you cast cost {1} less to cast.', 2, '{1}{U}'),
+  card('Attached Top Caster', 'Legendary Artifact Creature — Equipment', 'You may look at the top card of your library any time. As long as this artifact is attached to a creature, you may play lands and cast spells from the top of your library.', 2, '{1}{U}'),
+]);
+const attachedTopProof = proofByFamily(attachedTopLoop, ComboFamilyId.ArtifactTopCostReductionLoop);
+assert.ok(attachedTopProof);
+assert.ok(attachedTopProof.proof.requiredFacts.some(item => item.predicate === 'cast-from-top-requires-attached-creature'));
+assert.ok(attachedTopProof.proof.requiredFacts.some(item => item.card === 'Artifact Creature Reducer' && item.predicate === 'is-creature-permanent'));
+assert.ok(attachedTopProof.positiveDeltas.some(delta => delta.resource === 'casts'));
+
+const attachedTopMissingCreatureNearMiss = provePackage([
+  card('Self Top Draw Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}'),
+  card('Noncreature Artifact Reducer', 'Artifact', 'Artifact spells you cast cost {1} less to cast.', 2, '{2}'),
+  card('Attached Top Caster', 'Legendary Artifact Creature — Equipment', 'You may look at the top card of your library any time. As long as this artifact is attached to a creature, you may play lands and cast spells from the top of your library.', 2, '{1}{U}'),
+]);
+assert.equal(proofByFamily(attachedTopMissingCreatureNearMiss, ComboFamilyId.ArtifactTopCostReductionLoop), undefined);
+assert.ok(attachedTopMissingCreatureNearMiss.rejections.some(rejection => /attachment target/.test(rejection.reason)));
+
+const insufficientTopReductionNearMiss = provePackage([
+  card('Two-Mana Self Top Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 2, '{2}'),
+  card('One-Mana Artifact Reducer', 'Artifact Creature', 'Artifact spells you cast cost {1} less to cast.', 2, '{2}'),
+  card('Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', 4, '{4}'),
+]);
+assert.equal(proofByFamily(insufficientTopReductionNearMiss, ComboFamilyId.ArtifactTopCostReductionLoop), undefined);
+assert.ok(insufficientTopReductionNearMiss.rejections.some(rejection => /does not make.*free/.test(rejection.reason)));
+
+const costedTopActivationNearMiss = provePackage([
+  card('Costed Self Top Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}'),
+  card('Artifact Spell Reducer', 'Artifact Creature', 'Artifact spells you cast cost {1} less to cast.', 2, '{2}'),
+  card('Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', 4, '{4}'),
+]);
+assert.equal(proofByFamily(costedTopActivationNearMiss, ComboFamilyId.ArtifactTopCostReductionLoop), undefined);
+
+const lifePaymentTopNearMiss = provePackage([
+  card('Self Top Draw Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}'),
+  card('Artifact Spell Reducer', 'Artifact Creature', 'Artifact spells you cast cost {1} less to cast.', 2, '{2}'),
+  card('Life Payment Top Caster', 'Legendary Artifact', 'You may look at the top card of your library any time. You may play lands and cast spells from the top of your library. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost.', 6, '{3}{B}{B}{B}'),
+]);
+assert.equal(proofByFamily(lifePaymentTopNearMiss, ComboFamilyId.ArtifactTopCostReductionLoop), undefined);
 
 const recursiveSacLoop = provePackage([
   card('Recursive Body', 'Creature — Zombie', 'You may cast this card from your graveyard.', 1, '{B}'),

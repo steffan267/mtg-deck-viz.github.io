@@ -41,7 +41,7 @@ const fixtures = [
   { id: 'Death Untap Equipment', type_line: 'Artifact — Equipment', oracle_text: 'Equipped creature has "Whenever a creature dies, untap this creature." Equip {4}', cmc: 2 },
   { id: 'Once-Per-Turn Death Untap Equipment', type_line: 'Artifact — Equipment', oracle_text: 'Equipped creature has "Whenever a creature dies, untap this creature. This ability triggers only once each turn." Equip {4}', cmc: 2 },
   { id: 'Costed Ping Equipment', type_line: 'Artifact — Equipment', oracle_text: 'Equipped creature has "{1}, {T}: This creature deals 1 damage to any target." Equip {2}', cmc: 1 },
-  { id: 'Self Top Draw Artifact', type_line: 'Artifact', oracle_text: '{1}: Draw a card, then put this artifact on top of its owner’s library.', cmc: 1 },
+  { id: 'Self Top Draw Artifact', type_line: 'Artifact', oracle_text: '{T}: Draw a card, then put this artifact on top of its owner’s library.', cmc: 1, mana_cost: '{1}' },
   { id: 'Artifact Spell Reducer', type_line: 'Artifact Creature — Vedalken Artificer', oracle_text: 'Artifact spells you cast cost {1} less to cast.', cmc: 2 },
   { id: 'Artifact Top Caster', type_line: 'Artifact', oracle_text: 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', cmc: 4 },
   { id: 'Recursive Body', type_line: 'Creature — Zombie', oracle_text: 'You may cast this card from your graveyard.', cmc: 1, mana_cost: '{B}' },
@@ -846,5 +846,15 @@ assert.ok(foodFeedbackPackage, 'product proof packages should surface Food sacri
 assert.deepEqual(foodFeedbackPackage.cards, ['Food Draw Replacer', 'Food Sacrifice Token Source']);
 assert.ok(foodFeedbackPackage.resourceDeltas.some(delta => delta.resource === 'cards'));
 assert.equal(foodFeedbackPackage.resourceDeltas.some(delta => delta.resource === 'mana'), false);
+
+const attachedTopPackages = buildInteractionProofPackages([
+  { id: 'Self Top Draw Artifact', type_line: 'Artifact', oracle_text: '{T}: Draw a card, then put this artifact on top of its owner’s library.', cmc: 1, mana_cost: '{1}' },
+  { id: 'Artifact Creature Reducer', type_line: 'Artifact Creature — Vedalken Artificer', oracle_text: 'Artifact spells you cast cost {1} less to cast.', cmc: 2, mana_cost: '{1}{U}' },
+  { id: 'Attached Top Caster', type_line: 'Legendary Artifact Creature — Equipment', oracle_text: 'You may look at the top card of your library any time. As long as this artifact is attached to a creature, you may play lands and cast spells from the top of your library.', cmc: 2, mana_cost: '{1}{U}' },
+]);
+const attachedTopPackage = attachedTopPackages.find(pkg => pkg.family === 'artifact-top-cost-reduction-loop');
+assert.ok(attachedTopPackage, 'product proof packages should surface attached generic cast-from-top loops');
+assert.ok(attachedTopPackage.assumptions.some(text => /attached/.test(text)));
+assert.ok(attachedTopPackage.resourceDeltas.some(delta => delta.resource === 'casts'));
 
 process.stdout.write('Interaction proof package tests passed\n');

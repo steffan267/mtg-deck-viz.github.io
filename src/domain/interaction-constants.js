@@ -245,6 +245,8 @@ const Capability = freeze({
   IsFoodSacrificeDrawEngine: 'is-food-sacrifice-draw-engine',
   IsFoodTokenReplacement: 'is-food-token-replacement',
   IsFoodSacrificeTokenTrigger: 'is-food-sacrifice-token-trigger',
+  IsArtifactCastFromTopEnabler: 'is-artifact-cast-from-top-enabler',
+  CastFromTopRequiresAttachedCreature: 'cast-from-top-requires-attached-creature',
   EtbUntapsLand: 'etb-untaps-land',
   IsEtbBlink: 'is-etb-blink',
   IsBody: 'is-body',

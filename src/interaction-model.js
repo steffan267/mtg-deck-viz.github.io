@@ -1208,8 +1208,16 @@
             caps.add("life-paid-damage-can-hit-opponent");
           }
         }
-        if (s.kind === "activated" && /\bartifact\b/.test(classified._type || "") && /draw a card/.test(e) && /put .* on top of (its owner.?s|your) library/.test(e + " " + c))
+        if (s.kind === "activated"
+            && /\bartifact\b/.test(classified._type || "")
+            && !/\bcreature\b/.test(classified._type || "")
+            && manaCostValue(c) === 0
+            && !/\bsacrifice\b|\bpay\b|\bdiscard\b|\bexile\b|\bremove\b/.test(c)
+            && /draw a card/.test(e)
+            && /put .* on top of (its owner.?s|your) library/.test(e + " " + c)) {
           caps.add("is-self-top-draw-artifact");
+          addManaCostCaps(caps, "self-top-artifact", manaCostProfile(classified._manaCost, Math.max(0, cmc == null ? 0 : cmc)));
+        }
         // activated ability on a creature. Creature-scoped reducers must not
         // fan out to mana rocks merely because those artifacts have tap abilities.
         if (s.kind === "activated" && /\bcreature\b/.test(classified._type || "")) caps.add("has-creature-activated-ability");
@@ -1485,6 +1493,8 @@
           || /\bhistoric spells? you cast cost \{?\d* ?[^ ]* ?less/.test(e)
           || /choose .*artifact.{0,80}spells? you cast of the chosen type cost \{?\d* ?[^ ]* ?less/.test(effectAndRaw))
         caps.add("is-artifact-spell-cost-reducer");
+      if (/choose .*artifact.{0,80}spells? you cast of the chosen type cost \{?\d* ?[^ ]* ?less/.test(effectAndRaw))
+        caps.add("artifact-spell-reducer-requires-artifact-choice");
       if (/whenever you tap (a|an) (permanent|artifact) for \{c\}|whenever you tap (a|an) (permanent|artifact) for colorless mana/.test(effectAndRaw)
           || /(?:tap|tapped).{0,80}(?:permanent|artifact).{0,80}(?:\{c\}|colorless mana).{0,80}(?:add an additional \{c\}|add one additional colorless mana|produces? an additional \{c\})/.test(effectAndRaw)
           || /whenever you tap (a|an) nonland permanent for mana.{0,80}add one mana of any type that permanent produced/.test(effectAndRaw)) {
@@ -1866,10 +1876,28 @@
         const pay = e.match(/pay \{([^}]+)\}/);
         caps.add("ability-copy-cost:" + (pay ? manaCostValue("{" + pay[1] + "}") : 0));
       }
+      const normalArtifactTopCast =
+        /\bcast\b.{0,100}\bartifact spells?\b.{0,120}\b(from|off) the top of your library\b/.test(effectAndRaw)
+        || /\bplay artifact cards? from the top of your library\b/.test(effectAndRaw)
+        || /\b(?:play lands and )?cast spells from the top of your library\b/.test(effectAndRaw);
+      const replacesManaWithLife = /\bpay life equal to its mana value rather than pay its mana cost\b/.test(effectAndRaw);
+      const hasAdditionalTopCastCost = /\bcast spells from the top of your library by [^.]{0,120}\bin addition to paying\b/.test(effectAndRaw);
       if (/\b(look at|play with) the top card of your library\b/.test(effectAndRaw)
-          && (/\bcast\b.{0,100}\bartifact spells?\b.{0,120}\b(from|off) the top of your library\b/.test(effectAndRaw)
-              || /\bplay artifact cards? from the top of your library\b/.test(effectAndRaw)))
+          && normalArtifactTopCast
+          && !replacesManaWithLife
+          && !hasAdditionalTopCastCost) {
         caps.add("is-artifact-cast-from-top-enabler");
+        if (/\bas long as [^.]{0,80} is attached to a creature\b/.test(effectAndRaw))
+          caps.add("cast-from-top-requires-attached-creature");
+      }
+      if (/\b(look at|play with) the top card of your library\b/.test(effectAndRaw)
+          && normalArtifactTopCast
+          && replacesManaWithLife)
+        caps.add("is-life-payment-cast-from-top-enabler");
+      if (/\b(look at|play with) the top card of your library\b/.test(effectAndRaw)
+          && normalArtifactTopCast
+          && hasAdditionalTopCastCost)
+        caps.add("is-additional-cost-cast-from-top-enabler");
       if (/\beach nonland card in your graveyard has escape\b/.test(effectAndRaw)) {
         const escapeFuel = effectAndRaw.match(/\b(?:exile|exiling) (one|two|three|four|five|six|seven|eight|nine|ten|\d+) other cards? from your graveyard\b/);
         caps.add("is-graveyard-escape-enabler");

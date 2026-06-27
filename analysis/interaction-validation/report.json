@@ -575,6 +575,7 @@
       "pass": true,
       "confidence": 0,
       "rejectionReasons": [
+        "escape mill loop needs a graveyard escape enabler, a discard-hand sacrifice mana source, and an instant/sorcery mill spell",
         "mill source is not a half-library threshold effect"
       ]
     },
@@ -813,7 +814,7 @@
       "status": "ok",
       "source": "analysis/interaction-baseline/interaction-baseline.json",
       "baselineDeckId": "sample-xantcha",
-      "edgeCount": 144,
+      "edgeCount": 139,
       "comboCriticalPairCount": 5,
       "comboCriticalTripleCount": 0,
       "highFanoutFamilies": [
@@ -826,7 +827,7 @@
           "count": 42
         }
       ],
-      "weakInteractionShare": 0.891
+      "weakInteractionShare": 0.887
     }
   ],
   "manualAudit": {

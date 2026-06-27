@@ -53,8 +53,9 @@ const ABSTRACT_CARDS = {
   'Self Top Draw Artifact': resolvedCard(
     'Self Top Draw Artifact',
     'Artifact',
-    '{1}: Draw a card, then put this artifact on top of its owner’s library.',
+    '{T}: Draw a card, then put this artifact on top of its owner’s library.',
     1,
+    { mana_cost: '{1}' },
   ),
   'Artifact Spell Reducer': resolvedCard(
     'Artifact Spell Reducer',

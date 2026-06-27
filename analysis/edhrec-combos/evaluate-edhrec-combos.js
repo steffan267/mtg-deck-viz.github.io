@@ -101,17 +101,12 @@ const EDGE_RESULT_CLASS_MAP = {
   'land-recursion→landfall': ['infinite-etb', 'infinite-landfall'],
   'ramp→sink': ['infinite-mana'],
   'untap→tap-ability': ['infinite-mana', 'infinite-untap'],
-  counters: ['infinite-counters', 'infinite-pump'],
-  'counter-multiplier': ['infinite-counters', 'infinite-pump'],
-  'proliferate→counters': ['infinite-counters', 'infinite-proliferate'],
   draw: ['infinite-draw'],
   scry: ['infinite-scry'],
   discard: ['infinite-self-discard'],
   graveyard: ['mill'],
   cast: ['infinite-cast'],
   magecraft: ['infinite-cast'],
-  'artifact-cost-reduction→top-loop-piece': ['infinite-cast', 'infinite-draw'],
-  'cast-from-top→top-loop-piece': ['infinite-cast', 'infinite-draw'],
   bounce: ['bounce-loop'],
 };
 

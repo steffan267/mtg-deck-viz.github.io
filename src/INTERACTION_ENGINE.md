@@ -328,6 +328,12 @@ candidate closures in sub-millisecond time after index construction.
   event, and the replacement must restore at least one Food per event. Batched
   "one or more" triggers and once-per-turn clauses do not qualify. Restored
   Foods close the loop; only the base trigger tokens count as surplus.
+- Artifact top-recast loops require three closed roles: a free draw-and-return
+  activation on a noncreature artifact, enough generic artifact spell
+  reduction to make its full recast cost zero, and normal-payment permission to
+  cast it from library top. Conditional attachment must use a package-local
+  creature. Life-instead-of-mana permission is not reduced by artifact cost
+  reducers and belongs to a different proof family.
 - Library-exile plus empty-library win is a finite win package, not a loop; keep
   it proof-backed with explicit threshold assumptions.
 - Target-restricted copy loops must prove the copied permanent is legal

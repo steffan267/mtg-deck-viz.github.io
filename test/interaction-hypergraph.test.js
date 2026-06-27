@@ -9,7 +9,7 @@ function card(id, type, text, cmc = 0) {
 }
 
 const cards = [
-  card('Self Top Draw Artifact', 'Artifact', '{1}: Draw a card, then put this artifact on top of its owner’s library.', 1),
+  card('Self Top Draw Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}'),
   card('Artifact Spell Reducer', 'Artifact Creature — Vedalken Artificer', 'Artifact spells you cast cost {1} less to cast.', 2),
   card('Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', 4),
   card('Raise the Alarm', 'Instant', 'Create two 1/1 white Soldier creature tokens.', 2),

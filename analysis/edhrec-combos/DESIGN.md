@@ -174,6 +174,28 @@ two intended two-card rows became strict proofs, and the product package finder
 also found the proven pair inside one four-card row while the full package
 correctly remained `bounded-out`. No unrelated family or result axis moved.
 
+The artifact-top iteration completes the existing three-role family rather
+than introducing a parallel detector. Ordinary-payment permission to cast
+artifacts from library top now includes generic "cast spells from the top"
+wording, while alternate life payment remains separate. Strict proof requires
+the self-top artifact activation to be free, the reducer to erase its full
+generic recast cost, and conditional attachment permission to have a
+package-local creature target. Partial `reducer -> Top` and `cast-from-top ->
+Top` edges remain discovery evidence but no longer receive evaluator
+result-class credit by themselves; neither edge closes the loop without the
+third role. The same calibration removes result-class credit from generic
+counter and counter-multiplier edges: counter interaction is not proof that
+counters or power accumulate, especially when a strict threshold loop consumes
+those counters for another result such as extra turns. Generic
+proliferate-to-counter edges follow the same rule: they remain discovery
+evidence and receive result credit only through a closed repeatable proof.
+On the 9,000-row slice, strict proofs moved from 717 to 732 and proof-only
+covered rows moved from 835 to 850 of 8,877 considered rows (9.4% to 9.6%).
+All 15 newly proved rows are intended artifact-top loops and no prior proof was
+dropped. The calibration separately removed 229 partial-edge-only result
+matches, moving broad signal coverage from 36.9% to 34.4%. This is an explicit
+false-positive correction, not a loss of strict coverage.
+
 
 ## Current full-corpus baseline
 

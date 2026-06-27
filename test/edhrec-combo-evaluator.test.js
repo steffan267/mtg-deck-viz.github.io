@@ -19,6 +19,9 @@ const idx = {
   'loss from gain': card('Loss From Gain', 'Enchantment', 'Whenever you gain life, target opponent loses that much life.', 5),
   'fixed loss from gain': card('Fixed Loss From Gain', 'Creature — Cleric', 'Whenever you gain life, each opponent loses 1 life.', 3),
   'blank rock': card('Blank Rock', 'Artifact', '{T}: Add {C}.', 2),
+  'self top draw artifact': card('Self Top Draw Artifact', 'Artifact', '{T}: Draw a card, then put this artifact on top of its owner’s library.', 1, '{1}'),
+  'artifact spell reducer': card('Artifact Spell Reducer', 'Artifact Creature — Vedalken Artificer', 'Artifact spells you cast cost {1} less to cast.', 2, '{1}{U}'),
+  'artifact top caster': card('Artifact Top Caster', 'Artifact', 'You may look at the top card of your library any time. You may cast artifact spells from the top of your library.', 4, '{4}'),
   'draw damage engine': card('Draw Damage Engine', 'Legendary Creature — Wizard', 'Whenever you draw a card, this creature deals 1 damage to any target.', 6),
   'damage draw aura': card('Damage Draw Aura', 'Enchantment — Aura', 'Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.', 1),
   'paired creature damage draw': card('Paired Creature Damage Draw', 'Creature — Human Scout', 'Soulbond. As long as this creature is paired with another creature, each of those creatures has "Whenever this creature deals damage to an opponent, draw a card."', 3),
@@ -1908,11 +1911,10 @@ const edgeBridgedSacrificeInteraction = evaluateCombo({
   metadata: { deckCount: 1 },
 }, idx);
 assert.equal(edgeBridgedSacrificeInteraction.proofStatus, 'no-proof');
-assert.equal(edgeBridgedSacrificeInteraction.bucket, 'classified-not-proven');
-assert.ok(edgeBridgedSacrificeInteraction.edgeSignalFamilies.includes('sac-fodder→outlet'));
-assert.ok(edgeBridgedSacrificeInteraction.edgeSignalClasses.includes('infinite-sacrifice'));
-assert.ok(edgeBridgedSacrificeInteraction.edgeSignalClasses.includes('infinite-ltb'));
-assert.equal(edgeBridgedSacrificeInteraction.resultCoverage.coveredAny, true);
+assert.equal(edgeBridgedSacrificeInteraction.bucket, 'missed');
+assert.deepEqual(edgeBridgedSacrificeInteraction.edgeSignalFamilies, []);
+assert.deepEqual(edgeBridgedSacrificeInteraction.edgeSignalClasses, []);
+assert.equal(edgeBridgedSacrificeInteraction.resultCoverage.coveredAny, false);
 
 const edgeBridgeNegative = evaluateCombo({
   id: 'edge-bridge-negative',
@@ -1924,9 +1926,38 @@ const edgeBridgeNegative = evaluateCombo({
   categories: ['test'],
   metadata: { deckCount: 1 },
 }, idx);
-assert.equal(edgeBridgeNegative.bucket, 'classified-not-proven');
-assert.ok(edgeBridgeNegative.edgeSignalFamilies.includes('sac-fodder→outlet'));
+assert.equal(edgeBridgeNegative.bucket, 'missed');
+assert.deepEqual(edgeBridgeNegative.edgeSignalFamilies, []);
 assert.equal(edgeBridgeNegative.resultCoverage.coveredAny, false, 'sacrifice edge signals must not imply unrelated mana results');
+
+const partialTopEdgeNoResultCredit = evaluateCombo({
+  id: 'partial-top-edge-no-result-credit',
+  detailPath: '/combos/test/partial-top-edge-no-result-credit',
+  url: 'https://example.test/partial-top-edge-no-result-credit',
+  cards: ['Self Top Draw Artifact', 'Artifact Spell Reducer'],
+  cardCount: 2,
+  results: ['Infinite card draw', 'Infinite storm count'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.notEqual(partialTopEdgeNoResultCredit.bucket, 'proved');
+assert.ok(partialTopEdgeNoResultCredit.edgeFamilies.includes('artifact-cost-reduction→top-loop-piece'));
+assert.deepEqual(partialTopEdgeNoResultCredit.edgeSignalFamilies, []);
+assert.equal(partialTopEdgeNoResultCredit.resultCoverage.coveredAny, false);
+
+const closedTopLoopResultCredit = evaluateCombo({
+  id: 'closed-top-loop-result-credit',
+  detailPath: '/combos/test/closed-top-loop-result-credit',
+  url: 'https://example.test/closed-top-loop-result-credit',
+  cards: ['Self Top Draw Artifact', 'Artifact Spell Reducer', 'Artifact Top Caster'],
+  cardCount: 3,
+  results: ['Infinite card draw', 'Infinite storm count'],
+  categories: ['test'],
+  metadata: { deckCount: 1 },
+}, idx);
+assert.equal(closedTopLoopResultCredit.bucket, 'proved');
+assert.ok(closedTopLoopResultCredit.proofFamilies.includes('artifact-top-cost-reduction-loop'));
+assert.deepEqual(closedTopLoopResultCredit.proofOnlyResultCoverage.covered, ['infinite-cast', 'infinite-draw']);
 
 const summary = summarizeEvaluations([
   lifeLoop,
