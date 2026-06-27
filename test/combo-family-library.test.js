@@ -42,6 +42,8 @@ assert.ok(getComboFamily(ComboFamilyId.BlinkSpellRecursionLandUntapLoop).knownFa
 assert.deepEqual(getComboFamily(ComboFamilyId.BlinkSpellRecursionManaArtifactLoop).resultClasses, ['infinite-blink', 'infinite-cast', 'infinite-etb', 'infinite-ltb']);
 assert.deepEqual(getComboFamily(ComboFamilyId.BlinkSpellRecursionManaArtifactLoop).proofDeltaResultClasses, ['infinite-draw', 'infinite-mana']);
 assert.ok(getComboFamily(ComboFamilyId.BlinkSpellRecursionManaArtifactLoop).knownFalsePositives.some(text => /colored pips/i.test(text)));
+assert.deepEqual(getComboFamily(ComboFamilyId.FoodSacrificeTokenFeedbackLoop).resultClasses, ['infinite-draw', 'infinite-etb', 'infinite-ltb', 'infinite-sacrifice', 'infinite-tokens']);
+assert.ok(getComboFamily(ComboFamilyId.FoodSacrificeTokenFeedbackLoop).knownFalsePositives.some(text => /one-or-more/i.test(text)));
 assert.ok(getComboFamily('cost-reducer-activated-output-payoff').knownFalsePositives.some(text => /scoped/i.test(text)));
 assert.ok(getComboFamily('token-source-modifier-payoff').requiredFacts.some(fact => fact.kind === 'event.consumes' && fact.event === 'tokens'));
 assert.deepEqual(getComboFamily(ComboFamilyId.HastyCopyEtbUntapLoop).resultClasses, [ResultClass.InfiniteEtb, ResultClass.InfiniteLtb, ResultClass.InfiniteTokens, ResultClass.InfiniteUntap]);

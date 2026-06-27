@@ -121,6 +121,13 @@ function seedCandidates(indexes, options) {
     }
   }
 
+  for (const engine of capabilityIds(indexes, 'is-food-sacrifice-draw-engine')) {
+    if (!capabilityIds(indexes, 'is-food-token-replacement').includes(engine)) continue;
+    for (const source of capabilityIds(indexes, 'is-food-sacrifice-token-trigger')) {
+      addCandidate(candidates, [engine, source]);
+    }
+  }
+
   pairCandidates(
     candidates,
     capabilityIds(indexes, 'is-lifegain-from-opponent-lifeloss'),

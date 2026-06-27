@@ -162,6 +162,18 @@ are the intended mana-artifact family; the other three are `Scholar of the
 Ages` variants captured by the already-generalized multi-card spell-recursion
 predicate. No moved row introduced an unrelated result axis.
 
+The Food-sacrifice token-feedback family models an explicit threshold stack:
+consume the draw engine's Food count, resolve one token trigger per sacrificed
+Food, and apply a replacement that adds one Food to every token-creation event.
+The branch closes only when restored Foods meet the original threshold.
+One-or-more batching and once-per-turn clauses are excluded, restored Foods are
+not counted as surplus, and tapped Treasure is not credited as immediate mana.
+On the 9,000-row slice, strict proofs moved from 715 to 717. Proof-only covered
+rows moved from 832 to 835 of 8,877 considered rows (still 9.4% rounded): the
+two intended two-card rows became strict proofs, and the product package finder
+also found the proven pair inside one four-card row while the full package
+correctly remained `bounded-out`. No unrelated family or result axis moved.
+
 
 ## Current full-corpus baseline
 

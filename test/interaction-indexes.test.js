@@ -28,6 +28,8 @@ const cards = [
   card('ETB Land Untapper', 'Creature — Drake', 'When this creature enters, untap up to five lands.', 5, '{4}{U}'),
   card('ETB Spell Recursor', 'Creature — Wizard', 'When this creature enters, return target instant or sorcery card from your graveyard to your hand.', 4, '{2}{U}{U}'),
   card('Resettable Mana Artifact', 'Artifact', '{T}: Add three mana of any one color.', 5, '{5}'),
+  card('Food Draw Replacer', 'Legendary Creature', 'If one or more tokens would be created under your control, those tokens plus an additional Food token are created instead. Sacrifice three Foods: Draw a card.', 3),
+  card('Food Sacrifice Token Source', 'Artifact', 'Whenever you sacrifice a Food, create a tapped Treasure token.', 4),
 ];
 
 const indexes = buildInteractionIndexes(cards);
@@ -36,7 +38,8 @@ assert.equal(indexes.stats.cardCount, cards.length);
 assert.ok(indexes.stats.producedEventKinds > 0);
 assert.ok(indexes.stats.consumedEventKinds > 0);
 assert.ok(indexes.stats.capabilityKinds > 0);
-assert.deepEqual(indexes.modifiers.tokenDoublers.tokens, ['Token Doubler']);
+assert.ok(indexes.modifiers.tokenDoublers.tokens.includes('Token Doubler'));
+assert.ok(indexes.modifiers.tokenDoublers.tokens.includes('Food Draw Replacer'));
 assert.deepEqual(indexes.modifiers.costReducers['creature-activated-ability'], ['Heartstone']);
 assert.ok(indexes.byCapability['is-self-top-draw-artifact'].includes('Self Top Draw Artifact'));
 assert.ok(indexes.byProducedEvent.tokens.includes('Raise the Alarm'));
@@ -90,12 +93,17 @@ assert.ok(candidateTriples('Resettable Mana Artifact', indexes).some(triple =>
 ));
 assert.ok(candidateTriples('Heartstone', indexes, { limit: 2 }).length <= 2);
 assert.ok(candidatePairs('Heartstone', indexes, { limit: 2 }).length <= 2);
+assert.ok(candidatePairs('Food Draw Replacer', indexes).some(pair =>
+  pair.cards.join('|') === 'Food Draw Replacer|Food Sacrifice Token Source'
+  && pair.reasons.some(reason => reason.family === 'food-sacrifice-token-feedback-loop')
+));
 
 const closures = candidateClosures([
   { kind: 'event.produces', event: 'tokens' },
   { kind: 'capability', predicate: 'is-token-doubler' },
 ], indexes);
-assert.deepEqual(closures.capabilities['is-token-doubler'], ['Token Doubler']);
+assert.ok(closures.capabilities['is-token-doubler'].includes('Token Doubler'));
+assert.ok(closures.capabilities['is-token-doubler'].includes('Food Draw Replacer'));
 assert.ok(closures.producedEvents.tokens.includes('Token Payoff'));
 assert.ok(closures.candidates.includes('Token Doubler'));
 assert.ok(closures.candidates.includes('Token Payoff'));

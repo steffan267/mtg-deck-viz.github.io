@@ -165,6 +165,30 @@ const drawingManaArtifactProof = proofByFamily(drawingManaArtifactLoop, ComboFam
 assert.ok(drawingManaArtifactProof);
 assert.ok(drawingManaArtifactProof.positiveDeltas.some(delta => delta.resource === 'cards' && delta.min === 3));
 
+const foodSacrificeFeedbackLoop = provePackage([
+  card('Food Draw Replacer', 'Legendary Creature — Halfling', 'If one or more tokens would be created under your control, those tokens plus an additional Food token are created instead. Sacrifice three Foods: Draw a card.', 3),
+  card('Food Sacrifice Token Source', 'Artifact', 'Whenever you sacrifice a Food, create a tapped Treasure token.', 4),
+]);
+assert.equal(foodSacrificeFeedbackLoop.status, 'proven');
+const foodSacrificeFeedbackProof = proofByFamily(foodSacrificeFeedbackLoop, ComboFamilyId.FoodSacrificeTokenFeedbackLoop);
+assert.ok(foodSacrificeFeedbackProof);
+assert.ok(foodSacrificeFeedbackProof.positiveDeltas.some(delta => delta.resource === 'cards' && delta.min === 1));
+assert.ok(foodSacrificeFeedbackProof.positiveDeltas.some(delta => delta.resource === 'tokens' && delta.min === 3));
+assert.ok(foodSacrificeFeedbackProof.proof.requiredFacts.some(item => item.predicate === 'established-food-count-at-loop-entry' && item.value === 3));
+assert.equal(foodSacrificeFeedbackProof.positiveDeltas.some(delta => delta.resource === 'mana'), false, 'tapped Treasure is not immediate loop mana');
+
+const batchedFoodTriggerNearMiss = provePackage([
+  card('Food Draw Replacer', 'Legendary Creature — Halfling', 'If one or more tokens would be created under your control, those tokens plus an additional Food token are created instead. Sacrifice three Foods: Draw a card.', 3),
+  card('Batched Food Source', 'Artifact', 'Whenever you sacrifice one or more Foods, create a tapped Treasure token.', 4),
+]);
+assert.equal(proofByFamily(batchedFoodTriggerNearMiss, ComboFamilyId.FoodSacrificeTokenFeedbackLoop), undefined);
+
+const oncePerTurnFoodTriggerNearMiss = provePackage([
+  card('Food Draw Replacer', 'Legendary Creature — Halfling', 'If one or more tokens would be created under your control, those tokens plus an additional Food token are created instead. Sacrifice three Foods: Draw a card.', 3),
+  card('Limited Food Source', 'Artifact', 'Whenever you sacrifice a Food, create a tapped Treasure token. This ability triggers only once each turn.', 4),
+]);
+assert.equal(proofByFamily(oncePerTurnFoodTriggerNearMiss, ComboFamilyId.FoodSacrificeTokenFeedbackLoop), undefined);
+
 const sanguineBond = card(
   'Sanguine Bond',
   'Enchantment',

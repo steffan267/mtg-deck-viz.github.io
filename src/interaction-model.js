@@ -913,6 +913,14 @@
     return numberWordValue(count && count[1]);
   }
 
+  function createdTokenCount(text) {
+    let best = 0;
+    for (const match of String(text || "").toLowerCase().matchAll(/\bcreate (a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+) [^.]{0,120}\btokens?\b/g)) {
+      best = Math.max(best, numberWordValue(match[1]));
+    }
+    return best;
+  }
+
   function artifactTokenCountFor(text) {
     const s = String(text || "").toLowerCase();
     let total = 0;
@@ -1361,6 +1369,35 @@
         if (/\badd \{|\badd (one|two|three|x|an amount)/.test(e)) {
           caps.add("is-mana-sac-outlet");
           addProducedManaCaps(caps, "sac-outlet", producedManaProfile(e));
+        }
+      }
+      {
+        const foodSacrificeDraw = c.match(/\bsacrifice (one|two|three|four|five|six|seven|eight|nine|ten|\d+) foods?\b/);
+        if (s.kind === "activated"
+            && foodSacrificeDraw
+            && /\bdraw (a|one|two|three|four|five|six|seven|eight|nine|ten|\d+) cards?\b/.test(e)
+            && !/activate only once (each|per) turn/.test(effectAndRaw)) {
+          const drawCount = e.match(/\bdraw (a|one|two|three|four|five|six|seven|eight|nine|ten|\d+) cards?\b/);
+          caps.add("is-food-sacrifice-draw-engine");
+          caps.add("food-sacrifice-count:" + numberWordValue(foodSacrificeDraw[1]));
+          caps.add("food-sacrifice-draw-count:" + numberWordValue(drawCount && drawCount[1]));
+        }
+      }
+      if (/\bif one or more tokens would be created under your control\b/.test(effectAndRaw)
+          && /\bthose tokens plus (?:an|one) additional food token (?:is|are) created instead\b/.test(effectAndRaw)) {
+        caps.add("is-food-token-replacement");
+        caps.add("food-replacement-extra-count:1");
+      }
+      if ((s.kind === "triggered" || /\bwhenever\b/.test(s.trigger))
+          && /\bwhenever you sacrifice a food\b/.test(s.trigger)
+          && !/\bwhenever you sacrifice one or more foods?\b/.test(s.trigger)
+          && /\bcreate\b/.test(e)
+          && /\btokens?\b/.test(e)
+          && !/only once (each|per) turn|triggers? only once/.test(effectAndRaw)) {
+        const tokenCount = createdTokenCount(e);
+        if (tokenCount > 0) {
+          caps.add("is-food-sacrifice-token-trigger");
+          caps.add("food-sacrifice-trigger-token-count:" + tokenCount);
         }
       }
       const artifactExtraTurnSacMatch = c.match(/\bsacrifice (one|two|three|four|five|six|seven|eight|nine|ten|\d+) artifacts?\b/);

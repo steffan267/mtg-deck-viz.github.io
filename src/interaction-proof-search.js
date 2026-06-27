@@ -1415,6 +1415,60 @@ function proveBlinkSpellRecursionManaArtifact(cards) {
   ) : null;
 }
 
+function proveFoodSacrificeTokenFeedback(cards) {
+  const engine = find(cards, card => hasCap(card, 'is-food-sacrifice-draw-engine') && hasCap(card, 'is-food-token-replacement'));
+  const source = find(cards, card => card !== engine && hasCap(card, 'is-food-sacrifice-token-trigger'));
+  if (!engine || !source) return null;
+
+  const sacrificeCount = maxCapNumber(engine, 'food-sacrifice-count');
+  const drawCount = maxCapNumber(engine, 'food-sacrifice-draw-count');
+  const replacementCount = maxCapNumber(engine, 'food-replacement-extra-count');
+  const baseTokenCount = maxCapNumber(source, 'food-sacrifice-trigger-token-count');
+  const restoredFoods = sacrificeCount * replacementCount;
+  if (!(sacrificeCount > 0 && drawCount > 0 && replacementCount > 0 && baseTokenCount > 0)) return null;
+  if (restoredFoods < sacrificeCount) {
+    return failure(
+      'proof:food-sacrifice-token-feedback-shortfall:' + sorted([engine.id, source.id]).join('|'),
+      [engine, source],
+      'Food sacrifice token triggers do not restore the full Food activation threshold',
+      { sacrificeCount, replacementCount, restoredFoods },
+    );
+  }
+
+  const tokenSurplus = sacrificeCount * baseTokenCount;
+  return success('proof:food-sacrifice-token-feedback:' + sorted([engine.id, source.id]).join('|'), 'food-sacrifice-token-feedback-loop', [engine, source], {
+    requiredFacts: [
+      fact(engine, 'is-food-sacrifice-draw-engine'),
+      fact(engine, 'is-food-token-replacement'),
+      fact(engine, 'food-sacrifice-count'),
+      fact(engine, 'food-sacrifice-draw-count'),
+      fact(engine, 'food-replacement-extra-count'),
+      fact(source, 'is-food-sacrifice-token-trigger'),
+      fact(source, 'food-sacrifice-trigger-token-count'),
+      { card: engine.id, kind: 'precondition', predicate: 'established-food-count-at-loop-entry', value: sacrificeCount },
+    ],
+    steps: [
+      { card: engine.id, action: `begin with ${sacrificeCount} Foods and sacrifice them to draw ${drawCount} card(s)`, delta: { sacrifices: sacrificeCount, cards: drawCount, foods: -sacrificeCount } },
+      { card: source.id, action: `each Food sacrifice triggers separately, creating ${baseTokenCount} base token(s) per trigger`, delta: { tokens: tokenSurplus } },
+      { card: engine.id, action: `replace each of the ${sacrificeCount} token-creation events with the same tokens plus ${replacementCount} Food`, delta: { foods: restoredFoods } },
+      { action: `the ${sacrificeCount}-Food threshold is restored while ${tokenSurplus} non-Food token(s) and ${drawCount} card(s) accumulate` },
+    ],
+    assumptions: [`the loop begins with ${sacrificeCount} Foods on the battlefield`],
+    limitingClauses: [
+      'the sacrifice trigger must fire once per Food, not once for one-or-more Foods',
+      'restored Foods close the resource loop but are not counted as token surplus',
+      'tapped Treasure created by the source is not treated as immediate mana',
+    ],
+    repeatability: { status: 'repeatable-threshold', reason: 'each sacrificed Food creates a separate replacement event that restores one Food and preserves the full activation threshold' },
+  }, [
+    { resource: 'cards', min: drawCount, max: Infinity },
+    { resource: 'tokens', min: tokenSurplus, max: Infinity },
+    { resource: 'sacrifices', min: sacrificeCount, max: Infinity },
+    { resource: 'etbTriggers', min: sacrificeCount * (baseTokenCount + replacementCount), max: Infinity },
+    { resource: 'ltbTriggers', min: sacrificeCount, max: Infinity },
+  ]);
+}
+
 function proveLifeLoop(cards) {
   const gainFromLoss = find(cards, c => hasCap(c, 'is-lifegain-from-opponent-lifeloss'));
   const lossFromGain = find(cards, c => hasCap(c, 'is-lifeloss-from-your-lifegain'));
@@ -4384,6 +4438,7 @@ function bespokeProofs(cards) {
     proveBlinkUntap(cards),
     proveBlinkSpellRecursionLandUntap(cards),
     proveBlinkSpellRecursionManaArtifact(cards),
+    proveFoodSacrificeTokenFeedback(cards),
     proveLifeLoop(cards),
     proveMillLifeLossLoop(cards),
     proveDrawDamageFeedback(cards),

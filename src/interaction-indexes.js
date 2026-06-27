@@ -228,6 +228,16 @@ function candidatePairs(cardOrId, indexes, options = {}) {
       for (const other of capabilityIds(indexes, rule.from)) addPairCandidate(map, other, id, { kind: rule.kind, family: rule.family, from: rule.from, to: rule.to, strength: rule.strength }, limit);
     }
   }
+  if (hasCap(card, 'is-food-sacrifice-draw-engine') && hasCap(card, 'is-food-token-replacement')) {
+    for (const other of capabilityIds(indexes, 'is-food-sacrifice-token-trigger')) {
+      addPairCandidate(map, id, other, { kind: 'feedback', family: 'food-sacrifice-token-feedback-loop' }, limit);
+    }
+  }
+  if (hasCap(card, 'is-food-sacrifice-token-trigger')) {
+    const engines = capabilityIds(indexes, 'is-food-sacrifice-draw-engine')
+      .filter(other => hasCap(indexes.cardsById[other], 'is-food-token-replacement'));
+    for (const other of engines) addPairCandidate(map, other, id, { kind: 'feedback', family: 'food-sacrifice-token-feedback-loop' }, limit);
+  }
   return [...map.values()]
     .map(entry => ({ id: entry.id, cards: entry.cards, reasons: entry.reasons.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))) }))
     .sort((a, b) => a.id.localeCompare(b.id))

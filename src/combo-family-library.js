@@ -150,6 +150,33 @@ const COMBO_FAMILIES = [
     uiExplanation: 'A two-target blink spell can reset a noncreature mana artifact and an ETB spell recursor when the refreshed artifact pays the exact colored spell cost.',
   },
   {
+    id: 'food-sacrifice-token-feedback-loop',
+    title: 'Food sacrifice token feedback',
+    maxCards: 2,
+    confidenceGate: 'pattern',
+    requiredFacts: [
+      { role: 'engine', kind: 'capability', predicate: 'is-food-sacrifice-draw-engine' },
+      { role: 'engine', kind: 'capability', predicate: 'is-food-token-replacement' },
+      { role: 'source', kind: 'capability', predicate: 'is-food-sacrifice-token-trigger' },
+    ],
+    optionalAccelerants: [{ kind: 'capability', predicate: 'food-sacrifice-trigger-token-count', note: 'additional base tokens increase the accumulating token delta' }],
+    disqualifiers: [
+      { kind: 'trigger', rule: '"one or more Foods" triggers fire only once for a batch sacrifice and do not restore every Food' },
+      { kind: 'timing', rule: 'once-per-turn draw or sacrifice triggers cannot sustain the loop' },
+      { kind: 'threshold', rule: 'the loop begins with the explicit Food count required by the draw activation' },
+    ],
+    repeatability: { rule: 'sacrifice the threshold number of Foods to draw; each individual sacrifice creates a token event whose replacement recreates one Food' },
+    payoffCriteria: [{ resource: 'cards', comparator: '>', threshold: 0 }, { resource: 'tokens', comparator: '>', threshold: 0 }],
+    resultClasses: ['infinite-draw', 'infinite-etb', 'infinite-ltb', 'infinite-sacrifice', 'infinite-tokens'],
+    examples: [{ name: 'Peregrin Took + Nuka-Cola Vending Machine', cards: ['Peregrin Took', 'Nuka-Cola Vending Machine'] }],
+    negativeFixtures: [
+      { name: 'batched Food trigger', cards: ['Food Draw Replacer', 'Whenever One Or More Foods Source'], reason: 'three sacrificed Foods create only one replacement Food' },
+      { name: 'once-per-turn Food trigger', cards: ['Food Draw Replacer', 'Once Per Turn Food Source'], reason: 'trigger does not repeat within the loop' },
+    ],
+    knownFalsePositives: ['batching one-or-more sacrifice triggers', 'once-per-turn clauses', 'assuming the initial Food threshold is already satisfied without surfacing it', 'counting restored Foods as accumulating token surplus'],
+    uiExplanation: 'A Food draw engine loops when each Food sacrifice creates a separate token event and the replacement effect restores one Food for every Food consumed.',
+  },
+  {
     id: 'mutual-etb-blink-reset-loop',
     title: 'Mutual ETB blink reset loop',
     maxCards: 2,

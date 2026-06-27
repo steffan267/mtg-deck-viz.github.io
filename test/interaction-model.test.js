@@ -113,6 +113,20 @@ When Gilded Goose enters, create a Food token.
   assertNoCap(sam, 'is-cost-reducer');
   assertNoEvent(sam, gildedGoose, 'enable:cost-reduction→ability');
 
+  const foodDrawReplacer = node('Food Draw Replacer', 'Legendary Creature — Halfling', 'If one or more tokens would be created under your control, those tokens plus an additional Food token are created instead. Sacrifice three Foods: Draw a card.');
+  const foodSacrificeTokenSource = node('Food Sacrifice Token Source', 'Artifact', 'Whenever you sacrifice a Food, create a tapped Treasure token.');
+  const batchedFoodSource = node('Batched Food Source', 'Artifact', 'Whenever you sacrifice one or more Foods, create a tapped Treasure token.');
+  const limitedFoodSource = node('Limited Food Source', 'Artifact', 'Whenever you sacrifice a Food, create a tapped Treasure token. This ability triggers only once each turn.');
+  assertHasCap(foodDrawReplacer, 'is-food-token-replacement');
+  assertHasCap(foodDrawReplacer, 'food-replacement-extra-count:1');
+  assertHasCap(foodDrawReplacer, 'is-food-sacrifice-draw-engine');
+  assertHasCap(foodDrawReplacer, 'food-sacrifice-count:3');
+  assertHasCap(foodDrawReplacer, 'food-sacrifice-draw-count:1');
+  assertHasCap(foodSacrificeTokenSource, 'is-food-sacrifice-token-trigger');
+  assertHasCap(foodSacrificeTokenSource, 'food-sacrifice-trigger-token-count:1');
+  assertNoCap(batchedFoodSource, 'is-food-sacrifice-token-trigger');
+  assertNoCap(limitedFoodSource, 'is-food-sacrifice-token-trigger');
+
   const doomBlade = node('Doom Blade', 'Instant', 'Destroy target nonblack creature.');
   const bloodArtist = node('Blood Artist', 'Creature — Vampire', 'Whenever Blood Artist or another creature dies, target player loses 1 life and you gain 1 life.');
   const bastion = node('Bastion of Remembrance', 'Enchantment', 'When Bastion of Remembrance enters the battlefield, create a 1/1 white Human Soldier creature token. Whenever a creature you control dies, each opponent loses 1 life and you gain 1 life.');

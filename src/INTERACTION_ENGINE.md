@@ -323,6 +323,11 @@ candidate closures in sub-millisecond time after index construction.
   enters-tapped artifacts, sacrifice abilities, and restricted mana are
   excluded. Break-even loops prove repeated cast/blink/ETB/LTB but do not claim
   infinite mana or an untap event.
+- Food sacrifice feedback is threshold-based: a draw activation consumes a
+  fixed Food count, each individual Food sacrifice must create its own token
+  event, and the replacement must restore at least one Food per event. Batched
+  "one or more" triggers and once-per-turn clauses do not qualify. Restored
+  Foods close the loop; only the base trigger tokens count as surplus.
 - Library-exile plus empty-library win is a finite win package, not a loop; keep
   it proof-backed with explicit threshold assumptions.
 - Target-restricted copy loops must prove the copied permanent is legal
