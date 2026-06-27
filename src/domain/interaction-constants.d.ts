@@ -5,6 +5,7 @@ export const ComboFamilyId: {
   readonly VariableBoardCountManaLoop: 'variable-board-count-mana-loop'
   readonly BlinkEtbLandUntapLoop: 'blink-etb-land-untap-loop'
   readonly BlinkSpellRecursionLandUntapLoop: 'blink-spell-recursion-land-untap-loop'
+  readonly BlinkSpellRecursionManaArtifactLoop: 'blink-spell-recursion-mana-artifact-loop'
   readonly MutualEtbBlinkResetLoop: 'mutual-etb-blink-reset-loop'
   readonly AristocratsBodyOutletPayoff: 'aristocrats-body-outlet-payoff'
   readonly RecursiveBodySacrificeManaLoop: 'recursive-body-sacrifice-mana-loop'

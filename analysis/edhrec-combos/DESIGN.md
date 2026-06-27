@@ -149,6 +149,19 @@ coverage moved from 9.0% to 9.3%. All 24 newly proved rows belonged to the
 intended blink-spell/ETB-untap/ETB-recursion family; no unrelated family moved
 to proved.
 
+The adjacent mana-artifact routing slip replaces the ETB land untapper with a
+noncreature artifact that taps for mana and returns untapped. Its payment check
+uses the full mana profile, so three colorless mana cannot pay a blink spell
+with a blue pip even when total mana values match. Artifact creatures,
+enters-tapped artifacts, sacrifice mana abilities, and restricted mana are
+excluded. Optional artifact ETB draw becomes a proof delta; break-even reset
+loops do not receive infinite-mana or untap-event credit. On the same 9,000-row
+slice, the final rerun moved strict proofs from the previously recorded 710 to
+715 and proof-only expected-result coverage from 9.3% to 9.4%. Two moved rows
+are the intended mana-artifact family; the other three are `Scholar of the
+Ages` variants captured by the already-generalized multi-card spell-recursion
+predicate. No moved row introduced an unrelated result axis.
+
 
 ## Current full-corpus baseline
 

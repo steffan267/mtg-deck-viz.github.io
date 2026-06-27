@@ -1104,6 +1104,19 @@
           caps.add("taps-for-mana");
           caps.add("mana-produced:" + Math.max(1, maxManaProduced(e)));
           if (producedManaProfile(e).colorless > 0) caps.add("produces-colorless-mana");
+          const selfPattern = selfNamePattern(classified._name);
+          const entersTapped = /\b(?:this artifact|this permanent|it) enters (?:the battlefield )?tapped\b/.test(allText)
+            || (selfPattern && new RegExp("\\b" + selfPattern + " enters (?:the battlefield )?tapped\\b").test(allText));
+          const freeTapManaCost = /\{t\}/.test(c) && c.replace(/\{t\}/g, "").replace(/[,\s]/g, "") === "";
+          if (/\bartifact\b/.test(typeText)
+              && !/\bcreature\b/.test(typeText)
+              && freeTapManaCost
+              && !entersTapped
+              && !/\bsacrifice\b/.test(c)
+              && !/\bspend this mana only\b|\bthis mana can(?:not|'?t) be spent\b/.test(e)) {
+            caps.add("is-blink-resettable-mana-artifact");
+            addProducedManaCaps(caps, "blink-reset", producedManaProfile(e));
+          }
           const variableMana = variableManaUnitProfile(e);
           if (variableMana) {
             caps.add("is-variable-count-mana-source");
@@ -2517,6 +2530,10 @@
       if (classified.tribalRefs.some(r => r !== "creature")) caps.add("is-typed-lord");
     }
     if (!isLand && /\bcreature\b/.test(typeText)) caps.add("is-creature-permanent");
+    if (caps.has("is-blink-resettable-mana-artifact")) {
+      const etbDraw = allText.match(/\bwhen this artifact enters(?: the battlefield)?,? draw (a|one|two|three|four|five|six|seven|eight|nine|ten|\d+) cards?\b/);
+      if (etbDraw) caps.add("blink-reset-mana-etb-draw-count:" + numberWordValue(etbDraw[1]));
+    }
     if (!isLand && isPermanent) {
       if (/\blegendary\b/.test(typeText)) caps.add("is-legendary-permanent");
       else caps.add("is-nonlegendary-permanent");

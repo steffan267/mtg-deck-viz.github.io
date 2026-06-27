@@ -317,6 +317,12 @@ candidate closures in sub-millisecond time after index construction.
   These three roles are seeded in both the semantic candidate index and the
   product proof-package path so deck analysis can surface the same proof that
   the offline corpus evaluator measures.
+- A multi-target blink spell may instead reset a noncreature mana artifact and
+  its ETB spell recursor. Strict proof requires an untapped return state and a
+  mana profile that pays every colored/colorless pip; artifact creatures,
+  enters-tapped artifacts, sacrifice abilities, and restricted mana are
+  excluded. Break-even loops prove repeated cast/blink/ETB/LTB but do not claim
+  infinite mana or an untap event.
 - Library-exile plus empty-library win is a finite win package, not a loop; keep
   it proof-backed with explicit threshold assumptions.
 - Target-restricted copy loops must prove the copied permanent is legal

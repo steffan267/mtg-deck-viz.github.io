@@ -27,6 +27,7 @@ const cards = [
   card('Double Blink Spell', 'Instant', 'Exile up to two target creatures you control, then return those cards to the battlefield under their owner’s control.', 3, '{2}{U}'),
   card('ETB Land Untapper', 'Creature — Drake', 'When this creature enters, untap up to five lands.', 5, '{4}{U}'),
   card('ETB Spell Recursor', 'Creature — Wizard', 'When this creature enters, return target instant or sorcery card from your graveyard to your hand.', 4, '{2}{U}{U}'),
+  card('Resettable Mana Artifact', 'Artifact', '{T}: Add three mana of any one color.', 5, '{5}'),
 ];
 
 const indexes = buildInteractionIndexes(cards);
@@ -82,6 +83,10 @@ const blinkRecursionTriples = candidateTriples('Double Blink Spell', indexes);
 assert.ok(blinkRecursionTriples.some(triple =>
   triple.family === 'blink-spell-recursion-land-untap-loop'
   && triple.cards.join('|') === ['Double Blink Spell', 'ETB Land Untapper', 'ETB Spell Recursor'].join('|')
+));
+assert.ok(candidateTriples('Resettable Mana Artifact', indexes).some(triple =>
+  triple.family === 'blink-spell-recursion-mana-artifact-loop'
+  && triple.cards.join('|') === ['Double Blink Spell', 'ETB Spell Recursor', 'Resettable Mana Artifact'].join('|')
 ));
 assert.ok(candidateTriples('Heartstone', indexes, { limit: 2 }).length <= 2);
 assert.ok(candidatePairs('Heartstone', indexes, { limit: 2 }).length <= 2);

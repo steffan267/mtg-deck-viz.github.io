@@ -850,6 +850,11 @@ When Gilded Goose enters, create a Food token.
   const illusionistsStratagem = node('Illusionist\'s Stratagem', 'Instant', 'Exile up to two target creatures you control, then return those cards to the battlefield under their owner\'s control. Draw a card.', 4, '{3}{U}');
   const archaeomancer = node('Archaeomancer', 'Creature — Human Wizard', 'When this creature enters, return target instant or sorcery card from your graveyard to your hand.');
   const scholarOfTheAges = node('Scholar of the Ages', 'Creature — Human Wizard', 'When this creature enters, return up to two target instant and/or sorcery cards from your graveyard to your hand.');
+  const gildedLotus = node('Gilded Lotus', 'Artifact', '{T}: Add three mana of any one color.', 5, '{5}');
+  const basaltMonolith = node('Basalt Monolith', 'Artifact', 'This artifact doesn\'t untap during your untap step. {T}: Add {C}{C}{C}. {3}: Untap this artifact.', 3, '{3}');
+  const tappedManaArtifact = node('Tapped Mana Artifact', 'Artifact', 'Tapped Mana Artifact enters tapped. {T}: Add three mana of any one color.', 3, '{3}');
+  const costedManaArtifact = node('Costed Mana Artifact', 'Artifact', '{1}, {T}: Add three mana of any one color.', 3, '{3}');
+  const covetedJewel = node('Coveted Jewel', 'Artifact', 'When this artifact enters, draw three cards. {T}: Add three mana of any one color.', 6, '{6}');
   assertHasCap(deadeyeNavigator, 'is-repeatable-blink');
   assertHasCap(deadeyeNavigator, 'blink-cost:2');
   assertHasCap(peregrineDrake, 'etb-untaps-land:5');
@@ -872,6 +877,13 @@ When Gilded Goose enters, create a Food token.
   assertHasCap(archaeomancer, 'etb-recursion-target:sorcery');
   assertHasCap(scholarOfTheAges, 'is-etb-spell-recursion-to-hand');
   assertHasCap(scholarOfTheAges, 'etb-recursion-target:instant');
+  assertHasCap(gildedLotus, 'is-blink-resettable-mana-artifact');
+  assertHasCap(gildedLotus, 'blink-reset-mana-produced:3');
+  assertHasCap(gildedLotus, 'blink-reset-mana-any:3');
+  assertHasCap(basaltMonolith, 'blink-reset-mana-c:3');
+  assertNoCap(tappedManaArtifact, 'is-blink-resettable-mana-artifact');
+  assertNoCap(costedManaArtifact, 'is-blink-resettable-mana-artifact');
+  assertHasCap(covetedJewel, 'blink-reset-mana-etb-draw-count:3');
   assertHasFamily(ephemerate, peregrineDrake, 'etb→blink');
   assertNoEvent(ephemerate, peregrineDrake, 'enable:blink→land-untap-etb');
 

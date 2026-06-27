@@ -272,9 +272,13 @@ function candidateTriples(cardOrId, indexes, options = {}) {
   const multiTargetBlinkSpells = capabilityIds(indexes, 'is-multi-target-blink-spell');
   const etbLandUntappers = capabilityIds(indexes, 'etb-untaps-land');
   const etbSpellRecursors = capabilityIds(indexes, 'is-etb-spell-recursion-to-hand');
+  const blinkResetManaArtifacts = capabilityIds(indexes, 'is-blink-resettable-mana-artifact');
   if (multiTargetBlinkSpells.includes(seed)) combineTriples(map, 'blink-spell-recursion-land-untap-loop', seed, etbLandUntappers, etbSpellRecursors, (untapper, recursion) => ({ role: 'blink-spell', untapper, recursion }), limit);
   if (etbLandUntappers.includes(seed)) combineTriples(map, 'blink-spell-recursion-land-untap-loop', seed, multiTargetBlinkSpells, etbSpellRecursors, (blink, recursion) => ({ role: 'etb-land-untapper', blink, recursion }), limit);
   if (etbSpellRecursors.includes(seed)) combineTriples(map, 'blink-spell-recursion-land-untap-loop', seed, multiTargetBlinkSpells, etbLandUntappers, (blink, untapper) => ({ role: 'etb-spell-recursion', blink, untapper }), limit);
+  if (multiTargetBlinkSpells.includes(seed)) combineTriples(map, 'blink-spell-recursion-mana-artifact-loop', seed, blinkResetManaArtifacts, etbSpellRecursors, (manaArtifact, recursion) => ({ role: 'blink-spell', manaArtifact, recursion }), limit);
+  if (blinkResetManaArtifacts.includes(seed)) combineTriples(map, 'blink-spell-recursion-mana-artifact-loop', seed, multiTargetBlinkSpells, etbSpellRecursors, (blink, recursion) => ({ role: 'mana-artifact', blink, recursion }), limit);
+  if (etbSpellRecursors.includes(seed)) combineTriples(map, 'blink-spell-recursion-mana-artifact-loop', seed, multiTargetBlinkSpells, blinkResetManaArtifacts, (blink, manaArtifact) => ({ role: 'etb-spell-recursion', blink, manaArtifact }), limit);
 
   const tokenSources = capabilityIds(indexes, 'is-token-producer');
   const tokenDoublers = indexes.modifiers.tokenDoublers.tokens || [];

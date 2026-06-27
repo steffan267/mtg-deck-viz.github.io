@@ -126,6 +126,45 @@ const underfundedBlinkRecursionNearMiss = provePackage([
 assert.equal(proofByFamily(underfundedBlinkRecursionNearMiss, ComboFamilyId.BlinkSpellRecursionLandUntapLoop), undefined);
 assert.ok(underfundedBlinkRecursionNearMiss.rejections.some(rejection => /cannot repay the recovered blink spell/.test(rejection.reason)));
 
+const gildedLotus = card(
+  'Gilded Lotus',
+  'Artifact',
+  '{T}: Add three mana of any one color.',
+  5,
+  '{5}',
+);
+const manaArtifactBlinkLoop = provePackage([ghostlyFlicker, gildedLotus, archaeomancer]);
+assert.equal(manaArtifactBlinkLoop.status, 'proven');
+const manaArtifactBlinkProof = proofByFamily(manaArtifactBlinkLoop, ComboFamilyId.BlinkSpellRecursionManaArtifactLoop);
+assert.ok(manaArtifactBlinkProof);
+assert.ok(manaArtifactBlinkProof.positiveDeltas.some(delta => delta.resource === 'casts'));
+assert.equal(manaArtifactBlinkProof.positiveDeltas.some(delta => delta.resource === 'mana'), false, 'three-mana artifact and three-mana blink are break-even');
+assert.ok(manaArtifactBlinkProof.proof.requiredFacts.some(item => item.predicate === 'mana-artifact-untapped-at-loop-entry'));
+
+const colorlessManaArtifactNearMiss = provePackage([
+  ghostlyFlicker,
+  card('Three-Mana Colorless Rock', 'Artifact', '{T}: Add {C}{C}{C}.', 3, '{3}'),
+  archaeomancer,
+]);
+assert.equal(proofByFamily(colorlessManaArtifactNearMiss, ComboFamilyId.BlinkSpellRecursionManaArtifactLoop), undefined);
+assert.ok(colorlessManaArtifactNearMiss.rejections.some(rejection => /full colored cost/.test(rejection.reason)));
+
+const tappedManaArtifactNearMiss = provePackage([
+  ghostlyFlicker,
+  card('Tapped Mana Artifact', 'Artifact', 'Tapped Mana Artifact enters tapped. {T}: Add three mana of any one color.', 3, '{3}'),
+  archaeomancer,
+]);
+assert.equal(proofByFamily(tappedManaArtifactNearMiss, ComboFamilyId.BlinkSpellRecursionManaArtifactLoop), undefined);
+
+const drawingManaArtifactLoop = provePackage([
+  ghostlyFlicker,
+  card('Drawing Mana Artifact', 'Artifact', 'When this artifact enters, draw three cards. {T}: Add three mana of any one color.', 6, '{6}'),
+  archaeomancer,
+]);
+const drawingManaArtifactProof = proofByFamily(drawingManaArtifactLoop, ComboFamilyId.BlinkSpellRecursionManaArtifactLoop);
+assert.ok(drawingManaArtifactProof);
+assert.ok(drawingManaArtifactProof.positiveDeltas.some(delta => delta.resource === 'cards' && delta.min === 3));
+
 const sanguineBond = card(
   'Sanguine Bond',
   'Enchantment',

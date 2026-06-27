@@ -113,6 +113,14 @@ function seedCandidates(indexes, options) {
     }
   }
 
+  for (const blink of capabilityIds(indexes, 'is-multi-target-blink-spell')) {
+    for (const manaArtifact of capabilityIds(indexes, 'is-blink-resettable-mana-artifact')) {
+      for (const recursion of capabilityIds(indexes, 'is-etb-spell-recursion-to-hand')) {
+        addCandidate(candidates, [blink, manaArtifact, recursion]);
+      }
+    }
+  }
+
   pairCandidates(
     candidates,
     capabilityIds(indexes, 'is-lifegain-from-opponent-lifeloss'),

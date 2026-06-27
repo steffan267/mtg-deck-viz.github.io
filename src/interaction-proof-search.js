@@ -1253,8 +1253,7 @@ function proveBlinkSpellRecursionLandUntap(cards) {
     && hasCap(card, 'blink-spell-target:creature')
     && maxCapNumber(card, 'blink-target-count') >= 2);
   const untappers = cards.filter(card => hasCap(card, 'etb-untaps-land'));
-  const recursors = cards.filter(card => hasCap(card, 'is-etb-spell-recursion-to-hand')
-    && (hasCap(card, 'etb-recursion-target:any-card') || hasCap(card, 'etb-recursion-target:instant')));
+  const recursors = cards.filter(card => hasCap(card, 'is-etb-spell-recursion-to-hand'));
   if (!blinkSpells.length || !untappers.length || !recursors.length) return null;
 
   const failures = [];
@@ -1262,6 +1261,8 @@ function proveBlinkSpellRecursionLandUntap(cards) {
     for (const untapper of untappers) {
       for (const recursor of recursors) {
         if (blink === untapper || blink === recursor || untapper === recursor) continue;
+        const recoveryTarget = /\bsorcery\b/i.test(blink.type) ? 'sorcery' : 'instant';
+        if (!hasCap(recursor, 'etb-recursion-target:any-card') && !hasCap(recursor, 'etb-recursion-target:' + recoveryTarget)) continue;
         const spellCost = minCapNumber(blink, 'blink-spell-cost');
         const untapCount = maxCapNumber(untapper, 'etb-untaps-land');
         if (untapCount < spellCost) {
@@ -1287,7 +1288,7 @@ function proveBlinkSpellRecursionLandUntap(cards) {
               { card: blink.id, kind: 'target-legality', predicate: 'blink-target-count', value: 2 },
               fact(untapper, 'etb-untaps-land'),
               fact(recursor, 'is-etb-spell-recursion-to-hand'),
-              fact(recursor, hasCap(recursor, 'etb-recursion-target:any-card') ? 'etb-recursion-target:any-card' : 'etb-recursion-target:instant'),
+              fact(recursor, hasCap(recursor, 'etb-recursion-target:any-card') ? 'etb-recursion-target:any-card' : 'etb-recursion-target:' + recoveryTarget),
               ...(drawCount > 0 ? [fact(blink, 'blink-spell-draw-count')] : []),
               { card: blink.id, kind: 'precondition', predicate: 'minimum-available-lands', value: spellCost },
               { card: blink.id, kind: 'precondition', predicate: 'lands-can-pay-blink-spell-colors' },
@@ -1327,6 +1328,89 @@ function proveBlinkSpellRecursionLandUntap(cards) {
     'proof:blink-spell-recursion-land-untap-all-rejected:' + sorted(cards.map(card => card.id)).join('|'),
     cards,
     'no multi-target blink, ETB untap, and spell-recursion assembly closed its mana payment',
+    { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
+  ) : null;
+}
+
+function proveBlinkSpellRecursionManaArtifact(cards) {
+  const blinkSpells = cards.filter(card => hasCap(card, 'is-multi-target-blink-spell')
+    && hasCap(card, 'blink-spell-target:creature')
+    && hasCap(card, 'blink-spell-target:artifact')
+    && maxCapNumber(card, 'blink-target-count') >= 2);
+  const manaArtifacts = cards.filter(card => hasCap(card, 'is-blink-resettable-mana-artifact'));
+  const recursors = cards.filter(card => hasCap(card, 'is-etb-spell-recursion-to-hand'));
+  if (!blinkSpells.length || !manaArtifacts.length || !recursors.length) return null;
+
+  const failures = [];
+  for (const blink of blinkSpells) {
+    const spellCost = manaCostProfileFromCaps(blink, 'blink-spell');
+    const recoveryTarget = /\bsorcery\b/i.test(blink.type) ? 'sorcery' : 'instant';
+    for (const manaArtifact of manaArtifacts) {
+      const mana = manaProductionProfileFromCaps(manaArtifact, 'blink-reset-mana');
+      for (const recursor of recursors) {
+        if (blink === manaArtifact || blink === recursor || manaArtifact === recursor) continue;
+        if (!hasCap(recursor, 'etb-recursion-target:any-card') && !hasCap(recursor, 'etb-recursion-target:' + recoveryTarget)) continue;
+        if (!canPayManaCost(spellCost, mana)) {
+          failures.push(failure(
+            'proof:blink-spell-recursion-mana-artifact-payment:' + sorted([blink.id, manaArtifact.id, recursor.id]).join('|'),
+            [blink, manaArtifact, recursor],
+            'reset mana artifact cannot pay the recovered blink spell full colored cost',
+            { spellCost, mana },
+          ));
+          continue;
+        }
+        const netMana = mana.total - spellCost.total;
+        const drawCount = maxCapNumber(manaArtifact, 'blink-reset-mana-etb-draw-count');
+        const proofCards = [blink, manaArtifact, recursor];
+        return success(
+          'proof:blink-spell-recursion-mana-artifact:' + sorted(proofCards.map(card => card.id)).join('|'),
+          'blink-spell-recursion-mana-artifact-loop',
+          proofCards,
+          {
+            requiredFacts: [
+              fact(blink, 'is-multi-target-blink-spell'),
+              fact(blink, 'blink-spell-target:creature'),
+              fact(blink, 'blink-spell-target:artifact'),
+              { card: blink.id, kind: 'target-legality', predicate: 'blink-target-count', value: 2 },
+              fact(manaArtifact, 'is-blink-resettable-mana-artifact'),
+              fact(manaArtifact, 'blink-reset-mana-produced'),
+              fact(recursor, 'is-etb-spell-recursion-to-hand'),
+              fact(recursor, hasCap(recursor, 'etb-recursion-target:any-card') ? 'etb-recursion-target:any-card' : 'etb-recursion-target:' + recoveryTarget),
+              ...(drawCount > 0 ? [fact(manaArtifact, 'blink-reset-mana-etb-draw-count')] : []),
+              { card: manaArtifact.id, kind: 'precondition', predicate: 'mana-artifact-untapped-at-loop-entry' },
+            ],
+            steps: [
+              { card: manaArtifact.id, action: `tap the artifact for ${mana.total} mana`, delta: { mana: mana.total } },
+              { card: blink.id, action: `pay the full ${spellCost.total}-mana colored cost and cast the blink spell targeting the mana artifact and ETB recursor`, cost: { mana: spellCost.total, colors: spellCost.colors, colorless: spellCost.colorless } },
+              { card: blink.id, action: 'exile both targets, return them immediately, then put the resolved spell into the graveyard', delta: { casts: 1, blinks: 2, etbTriggers: 2, ltbTriggers: 2 } },
+              { card: manaArtifact.id, action: 'return as a new untapped noncreature artifact that can activate its mana ability again', ...(drawCount > 0 ? { delta: { cards: drawCount } } : {}) },
+              { card: recursor.id, action: 'resolve its ETB trigger and return the blink spell from the graveyard to hand' },
+              { action: netMana > 0 ? `the spell and both permanents are restored with ${netMana} net mana` : 'the spell, artifact, recursor, and spent mana are restored at break-even' },
+            ],
+            assumptions: ['the mana artifact and ETB recursor are on the battlefield and the artifact is untapped at loop entry'],
+            limitingClauses: [
+              'artifact creatures, enters-tapped artifacts, sacrifice mana abilities, and restricted mana are excluded',
+              'the mana profile must satisfy colored and explicit colorless pips, not only total mana value',
+              'no untap-trigger result is claimed because zone reset is not an untap event',
+            ],
+            repeatability: { status: netMana > 0 ? 'repeatable' : 'repeatable-break-even', reason: 'each iteration restores the blink spell, ETB recursor, and an untapped artifact whose mana can cast the spell again' },
+          },
+          [
+            { resource: 'casts', min: 1, max: Infinity },
+            { resource: 'etbTriggers', min: 2, max: Infinity },
+            { resource: 'ltbTriggers', min: 2, max: Infinity },
+            ...(drawCount > 0 ? [{ resource: 'cards', min: drawCount, max: Infinity }] : []),
+            ...(netMana > 0 ? [{ resource: 'mana', min: netMana, max: Infinity }] : []),
+          ],
+        );
+      }
+    }
+  }
+  if (failures.length === 1) return failures[0];
+  return failures.length ? failure(
+    'proof:blink-spell-recursion-mana-artifact-all-rejected:' + sorted(cards.map(card => card.id)).join('|'),
+    cards,
+    'no blink spell, mana artifact, and ETB recursion assembly closed its colored mana payment',
     { rejections: failures.map(item => ({ cards: item.cards, reason: item.reason, details: item.details })).slice(0, 12) },
   ) : null;
 }
@@ -4299,6 +4383,7 @@ function bespokeProofs(cards) {
     proveDirectSelfLoop(cards),
     proveBlinkUntap(cards),
     proveBlinkSpellRecursionLandUntap(cards),
+    proveBlinkSpellRecursionManaArtifact(cards),
     proveLifeLoop(cards),
     proveMillLifeLossLoop(cards),
     proveDrawDamageFeedback(cards),
