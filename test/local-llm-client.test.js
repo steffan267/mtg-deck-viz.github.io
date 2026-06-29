@@ -24,6 +24,12 @@ async function main() {
   assert.equal(body.format, 'json');
   assert.match(body.prompt, /Return strict JSON only/);
 
+  // A schema carrying a real JSON Schema is forwarded as Ollama's structured-output `format`.
+  const structuredSchema = { required: ['verdict'], jsonSchema: { type: 'object', required: ['verdict'], properties: { verdict: { type: 'string' } } } };
+  await client.generateJson('Return JSON', structuredSchema);
+  const structuredBody = JSON.parse(requests[1].options.body);
+  assert.deepEqual(structuredBody.format, structuredSchema.jsonSchema);
+
   const textClient = new LocalLlmClient({
     fetchImpl: async () => ({ ok: true, async json() { return { response: 'plain text' }; } }),
   });

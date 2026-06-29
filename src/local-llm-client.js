@@ -29,11 +29,14 @@ class LocalLlmClient {
 
   async generateJson(prompt, schema, options = {}) {
     const model = options.model || this.proofModel;
+    // Prefer Ollama structured outputs: a real JSON Schema in `format` constrains
+    // decoding to the required shape. Fall back to free-form JSON mode otherwise.
+    const format = schema && schema.jsonSchema ? schema.jsonSchema : 'json';
     const response = await this.postGenerate({
       model,
       prompt: promptWithJsonSchema(prompt, schema),
       stream: false,
-      format: 'json',
+      format,
     });
     if (typeof response.response !== 'string') throw new Error('Ollama response did not include a JSON text response field.');
     try {

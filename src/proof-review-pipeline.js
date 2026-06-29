@@ -47,27 +47,59 @@ const LIFECYCLE_STATUSES_TO_PRESERVE = new Set([
 ]);
 
 const LLM_DRAFT_SCHEMA_VERSION = 'proof-review-llm-draft.v1';
+const LLM_PROOF_DRAFT_REQUIRED = [
+  'cards',
+  'interaction_family',
+  'synergy_class',
+  'action_sequence',
+  'game_objects',
+  'rules_concepts',
+  'resulting_advantage',
+  'assumptions',
+  'failure_modes',
+  'confidence',
+  'explanation',
+  'why_this_is_not_stronger_classification',
+];
 const LLM_PROOF_DRAFT_SCHEMA = Object.freeze({
-  required: [
-    'cards',
-    'interaction_family',
-    'synergy_class',
-    'action_sequence',
-    'game_objects',
-    'rules_concepts',
-    'resulting_advantage',
-    'assumptions',
-    'failure_modes',
-    'confidence',
-    'explanation',
-    'why_this_is_not_stronger_classification',
-  ],
+  required: LLM_PROOF_DRAFT_REQUIRED,
+  // Real JSON Schema handed to Ollama's structured-output `format` so decoding is
+  // constrained to this shape instead of relying on the model to follow prose.
+  jsonSchema: {
+    type: 'object',
+    additionalProperties: true,
+    required: LLM_PROOF_DRAFT_REQUIRED,
+    properties: {
+      cards: { type: 'array', items: { type: 'string' } },
+      interaction_family: { type: 'string' },
+      synergy_class: { type: 'string', enum: Object.values(SynergyClass) },
+      action_sequence: { type: 'array', items: { type: 'string' } },
+      game_objects: { type: 'array' },
+      rules_concepts: { type: 'array', items: { type: 'string' } },
+      resulting_advantage: { type: 'array', items: { type: 'string' } },
+      assumptions: { type: 'array', items: { type: 'string' } },
+      failure_modes: { type: 'array', items: { type: 'string' } },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      explanation: { type: 'string' },
+      why_this_is_not_stronger_classification: { type: 'string' },
+    },
+  },
   note: 'This is an untrusted draft. It cannot accept, verify, promote, or replace deterministic proof output.',
 });
 
 const LLM_CRITIC_SCHEMA = Object.freeze({
   required: ['verdict', 'issues', 'confidence'],
   verdict_values: ['PASS', 'FAIL'],
+  jsonSchema: {
+    type: 'object',
+    additionalProperties: true,
+    required: ['verdict', 'issues', 'confidence'],
+    properties: {
+      verdict: { type: 'string', enum: ['PASS', 'FAIL'] },
+      issues: { type: 'array', items: { type: 'string' } },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+    },
+  },
   note: 'This is an untrusted critic verdict. It cannot accept, verify, promote, or replace deterministic proof output.',
 });
 
@@ -717,7 +749,15 @@ async function draftProofs(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = 
     // GENERATE
     let draft;
     try {
-      draft = validateLlmProofDraft(await client.generateJson(llmDraftPrompt(attempt, cardsByName), LLM_PROOF_DRAFT_SCHEMA, { model: generatorModel }));
+      const raw = await client.generateJson(llmDraftPrompt(attempt, cardsByName), LLM_PROOF_DRAFT_SCHEMA, { model: generatorModel });
+      // `cards` and `interaction_family` are authoritative on the deterministic
+      // attempt; backfill them when the model omits them so a draft is not lost
+      // over data it should not be inventing anyway.
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        if (!Array.isArray(raw.cards) || raw.cards.length === 0) raw.cards = (attempt.involved_cards || []).slice();
+        if (typeof raw.interaction_family !== 'string' || !raw.interaction_family) raw.interaction_family = attempt.interaction_family;
+      }
+      draft = validateLlmProofDraft(raw);
     } catch (error) {
       const record = Object.assign({}, base, {
         status: Status.Rejected,
