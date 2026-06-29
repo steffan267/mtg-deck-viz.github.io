@@ -29,8 +29,9 @@ export OLLAMA_KV_CACHE_TYPE="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
 
 DRAFT_LIMIT="${MTG_PROOF_DRAFT_LIMIT:-1}"
 EXPORT_LIMIT="${MTG_PROOF_EXPORT_LIMIT:-20}"
-SLEEP_SECONDS="${MTG_PROOF_LOOP_SLEEP_SECONDS:-300}"
-RUN_SAMPLE="${MTG_PROOF_RUN_SAMPLE:-1}"
+RUN_SAMPLE="${MTG_PROOF_RUN_SAMPLE:-auto}"
+SUCCESS_SLEEP_SECONDS="${MTG_PROOF_LOOP_SUCCESS_SLEEP_SECONDS:-0.05}"
+ERROR_LOG="analysis/proof-review/proof-loop-errors.log"
 
 start_ollama_if_needed() {
   if curl -fsS "$MTG_OLLAMA_BASE_URL/api/tags" >/dev/null 2>&1; then
@@ -72,7 +73,7 @@ print_iteration_status() {
   PROOF_LOOP_ITERATION="$iteration" \
   PROOF_LOOP_OUTCOME="$outcome" \
   PROOF_LOOP_DURATION_SECONDS="$duration_seconds" \
-  PROOF_LOOP_SLEEP_SECONDS="$SLEEP_SECONDS" \
+  PROOF_LOOP_SUCCESS_SLEEP_SECONDS="$SUCCESS_SLEEP_SECONDS" \
   node <<'NODE'
 const fs = require('fs');
 const path = require('path');
@@ -117,15 +118,18 @@ function latestCommandRun(command) {
 
 function latestExportSummary() {
   if (!fs.existsSync(storeDir)) return 'exports=none';
-  const batches = fs.readdirSync(storeDir)
-    .filter(name => /^review_batch_.*\.jsonl$/.test(name))
-    .map(name => {
-      const file = path.join(storeDir, name);
-      return { name, mtimeMs: fs.statSync(file).mtimeMs, count: readJsonl(name).length };
-    })
-    .sort((a, b) => b.mtimeMs - a.mtimeMs);
-  if (!batches.length) return 'exports=none';
-  return `latest_export=${batches[0].name} (${batches[0].count} items)`;
+  const streamFile = path.join(storeDir, 'review-batches.jsonl');
+  if (!fs.existsSync(streamFile)) return 'exports=none';
+  const rows = readJsonl('review-batches.jsonl');
+  const batches = new Map();
+  for (const row of rows) {
+    if (!row.batch_id) continue;
+    if (!batches.has(row.batch_id)) batches.set(row.batch_id, 0);
+    batches.set(row.batch_id, batches.get(row.batch_id) + 1);
+  }
+  const latest = [...batches.entries()].at(-1);
+  if (!latest) return 'exports=none';
+  return `latest_export=${latest[0]} in review-batches.jsonl (${latest[1]} items)`;
 }
 
 const latestRun = latestCommandRun('run');
@@ -150,7 +154,7 @@ const draftStatusSummary = Object.entries(draftStatuses)
   .map(([status, count]) => `${status.toLowerCase()}=${count}`)
   .join(' ');
 
-console.log(`[proof-loop] status iteration=${process.env.PROOF_LOOP_ITERATION} outcome=${process.env.PROOF_LOOP_OUTCOME} duration=${process.env.PROOF_LOOP_DURATION_SECONDS}s next_sleep=${process.env.PROOF_LOOP_SLEEP_SECONDS}s`);
+console.log(`[proof-loop] status iteration=${process.env.PROOF_LOOP_ITERATION} outcome=${process.env.PROOF_LOOP_OUTCOME} duration=${process.env.PROOF_LOOP_DURATION_SECONDS}s next_sleep=${process.env.PROOF_LOOP_SUCCESS_SLEEP_SECONDS}s`);
 console.log(`[proof-loop] overview ${runSummary}; proofs ${proofSummary}`);
 console.log(`[proof-loop] overview ${draftSummary}${draftStatusSummary ? ` (${draftStatusSummary})` : ''}; ${latestExportSummary()}`);
 NODE
@@ -161,7 +165,7 @@ run_once() {
   stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "[proof-loop] === iteration $stamp ==="
 
-  if [[ "$RUN_SAMPLE" == "1" ]]; then
+  if should_run_sample; then
     node ./bin/mtg-proofs.js sample
   fi
 
@@ -172,21 +176,64 @@ run_once() {
   echo "[proof-loop] iteration complete; review exports are under analysis/proof-review/"
 }
 
+sample_deck_exists() {
+  node <<'NODE'
+const fs = require('fs');
+const file = 'analysis/proof-review/decks.jsonl';
+if (!fs.existsSync(file)) process.exit(1);
+for (const line of fs.readFileSync(file, 'utf8').split(/\n/)) {
+  if (!line.trim()) continue;
+  try {
+    const row = JSON.parse(line);
+    if (row && row.deck_id === 'sample') process.exit(0);
+  } catch {}
+}
+process.exit(1);
+NODE
+}
+
+should_run_sample() {
+  case "$RUN_SAMPLE" in
+    1|true|yes|always)
+      return 0
+      ;;
+    once|auto)
+      ! sample_deck_exists
+      return
+      ;;
+    0|false|no|never)
+      return 1
+      ;;
+    *)
+      echo "[proof-loop] ERROR invalid MTG_PROOF_RUN_SAMPLE=$RUN_SAMPLE (expected auto, once, always, or never)" >&2
+      return 2
+      ;;
+  esac
+}
+
 start_ollama_if_needed
 ensure_model
+mkdir -p analysis/proof-review
 
 ITERATION=0
 while true; do
   ITERATION=$((ITERATION + 1))
   iteration_started_at=$(date +%s)
-  outcome="ok"
-  if ! run_once; then
-    outcome="failed"
-    echo "[proof-loop] iteration failed; continuing after sleep" >&2
+  if ! run_once 2> >(tee -a "$ERROR_LOG" >&2); then
+    iteration_finished_at=$(date +%s)
+    {
+      echo "[proof-loop] ERROR iteration=$ITERATION failed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ) duration=$((iteration_finished_at - iteration_started_at))s"
+      echo "[proof-loop] ERROR stopping after failed iteration"
+    } | tee -a "$ERROR_LOG" >&2
+    print_iteration_status "$ITERATION" "failed" "$((iteration_finished_at - iteration_started_at))" || \
+      echo "[proof-loop] ERROR status overview unavailable after failure" | tee -a "$ERROR_LOG" >&2
+    exit 1
   fi
   iteration_finished_at=$(date +%s)
-  print_iteration_status "$ITERATION" "$outcome" "$((iteration_finished_at - iteration_started_at))" || \
-    echo "[proof-loop] status overview unavailable; continuing to sleep" >&2
-  echo "[proof-loop] sleeping ${SLEEP_SECONDS}s; Ctrl-C to stop"
-  sleep "$SLEEP_SECONDS"
+  if ! print_iteration_status "$ITERATION" "ok" "$((iteration_finished_at - iteration_started_at))"; then
+    echo "[proof-loop] ERROR status overview unavailable; stopping" | tee -a "$ERROR_LOG" >&2
+    exit 1
+  fi
+  echo "[proof-loop] sleeping ${SUCCESS_SLEEP_SECONDS}s before next iteration; Ctrl-C to stop"
+  sleep "$SUCCESS_SLEEP_SECONDS"
 done

@@ -416,6 +416,90 @@ function reviewInstructions() {
     + 'Return JSONL only. Each line must include: proof_id, verdict (ACCEPTED, REJECTED, or NEEDS_CORRECTION), corrected_confidence, corrected_synergy_class, issues, corrected_proof, test_case_recommendation.';
 }
 
+const REVIEW_EXPORT_JSONL_STREAM = 'review-batches.jsonl';
+const REVIEW_EXPORT_MARKDOWN_STREAM = 'review-batches.md';
+
+function reviewExportPaths(exportDir) {
+  return {
+    jsonl_path: path.join(exportDir, REVIEW_EXPORT_JSONL_STREAM),
+    markdown_path: path.join(exportDir, REVIEW_EXPORT_MARKDOWN_STREAM),
+  };
+}
+
+function closeOpenFiles(openFiles, originalError) {
+  let firstCloseError = null;
+  for (const file of openFiles) {
+    if (file.fd === undefined) continue;
+    try {
+      fs.closeSync(file.fd);
+    } catch (closeError) {
+      if (originalError) {
+        originalError.message += '; also failed to close ' + file.path + ': ' + closeError.message;
+      } else if (!firstCloseError) {
+        firstCloseError = closeError;
+      }
+    } finally {
+      file.fd = undefined;
+    }
+  }
+  if (!originalError && firstCloseError) throw firstCloseError;
+}
+
+function appendReviewExportStreams(jsonlPath, markdownPath, batchId, rows) {
+  const openFiles = [
+    { path: markdownPath, fd: undefined },
+    { path: jsonlPath, fd: undefined },
+  ];
+  try {
+    openFiles[1].fd = fs.openSync(jsonlPath, 'a');
+    openFiles[0].fd = fs.openSync(markdownPath, 'a');
+    const rowsWithBatch = rows.map(row => Object.assign({ batch_id: batchId }, row));
+    fs.writeSync(openFiles[1].fd, rowsWithBatch.map(row => JSON.stringify(row)).join('\n') + (rowsWithBatch.length ? '\n' : ''));
+    fs.writeSync(openFiles[0].fd, renderReviewMarkdown(batchId, rows) + '\n\n');
+  } catch (error) {
+    closeOpenFiles(openFiles, error);
+    throw error;
+  } finally {
+    closeOpenFiles(openFiles);
+  }
+}
+
+function reviewExportFiles(exportDir) {
+  if (!fs.existsSync(exportDir)) return [];
+  const streamPaths = reviewExportPaths(exportDir);
+  const files = [];
+  if (fs.existsSync(streamPaths.jsonl_path)) {
+    const mtimeMs = fs.statSync(streamPaths.jsonl_path).mtimeMs;
+    const rows = STORE.readJsonl(streamPaths.jsonl_path, { skipMalformed: true });
+    const batches = new Map();
+    for (const row of rows) {
+      if (!row.batch_id) continue;
+      if (!batches.has(row.batch_id)) batches.set(row.batch_id, []);
+      batches.get(row.batch_id).push(row);
+    }
+    for (const [batchId, batchRows] of [...batches.entries()].reverse()) {
+      files.push({
+        batch_id: batchId,
+        jsonl_path: streamPaths.jsonl_path,
+        markdown_path: streamPaths.markdown_path,
+        mtimeMs,
+        rows: batchRows,
+      });
+    }
+  }
+  return files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
+
+function latestReviewExportForProofIds(exportDir, proofIds) {
+  const signature = JSON.stringify(proofIds);
+  for (const file of reviewExportFiles(exportDir)) {
+    const rows = file.rows || STORE.readJsonl(file.jsonl_path, { skipMalformed: true });
+    const rowProofIds = rows.map(row => row.proof_id);
+    if (JSON.stringify(rowProofIds) === signature) return Object.assign({}, file, { rows: undefined, count: rows.length });
+  }
+  return null;
+}
+
 function exportReview(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = {}) {
   STORE.initializeStore(storeDir);
   const limit = Number(options.limit || 20);
@@ -423,9 +507,12 @@ function exportReview(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = {}) {
   fs.mkdirSync(exportDir, { recursive: true });
   const attempts = latestAttempts(storeDir).filter(attempt => attempt.status === Status.NeedsReview).slice(0, limit);
   const cards = latestCardsByName(storeDir);
+  const streamPaths = reviewExportPaths(exportDir);
+  if (!options.force) {
+    const unchanged = latestReviewExportForProofIds(exportDir, attempts.map(attempt => attempt.proof_id));
+    if (unchanged) return Object.assign({ skipped_unchanged: true }, unchanged);
+  }
   const batchId = options.batchId || hashId('review_batch', [now(), attempts.map(item => item.proof_id)]);
-  const jsonlPath = path.join(exportDir, batchId + '.jsonl');
-  const mdPath = path.join(exportDir, batchId + '.md');
   const rows = attempts.map(attempt => ({
     schemaVersion: REVIEW_EXPORT_SCHEMA_VERSION,
     proof_id: attempt.proof_id,
@@ -434,9 +521,8 @@ function exportReview(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = {}) {
     proof: attempt,
     review_instructions: reviewInstructions(),
   }));
-  fs.writeFileSync(jsonlPath, rows.map(row => JSON.stringify(row)).join('\n') + (rows.length ? '\n' : ''));
-  fs.writeFileSync(mdPath, renderReviewMarkdown(batchId, rows));
-  return { batch_id: batchId, markdown_path: mdPath, jsonl_path: jsonlPath, count: rows.length };
+  appendReviewExportStreams(streamPaths.jsonl_path, streamPaths.markdown_path, batchId, rows);
+  return { batch_id: batchId, markdown_path: streamPaths.markdown_path, jsonl_path: streamPaths.jsonl_path, count: rows.length, skipped_unchanged: false };
 }
 
 function renderReviewMarkdown(batchId, rows) {

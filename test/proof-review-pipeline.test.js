@@ -61,6 +61,12 @@ async function main() {
   assert.equal(fs.existsSync(exported.jsonl_path), true);
   assert.match(fs.readFileSync(exported.markdown_path, 'utf8'), /Do not invent missing Oracle text/);
   assert.match(fs.readFileSync(exported.jsonl_path, 'utf8'), /proof_id/);
+  assert.equal(path.basename(exported.jsonl_path), 'review-batches.jsonl', 'review exports should append to one JSONL stream');
+  assert.equal(path.basename(exported.markdown_path), 'review-batches.md', 'review markdown should append to one Markdown stream');
+  assert.deepEqual(fs.readdirSync(tmpDir).filter(name => /^review_batch_.*\.(jsonl|md)$/.test(name)), [], 'review exports should not create per-loop batch files');
+  const exportedAgain = PIPELINE.exportReview(tmpDir, { limit: 2 });
+  assert.equal(exportedAgain.skipped_unchanged, true, 'unchanged review exports should reuse the previous batch');
+  assert.equal(exportedAgain.batch_id, exported.batch_id);
 
   const reviewTarget = attempts.find(attempt => attempt.status === PIPELINE.Status.NeedsReview);
   const reviewPath = path.join(tmpDir, 'reviewed.jsonl');

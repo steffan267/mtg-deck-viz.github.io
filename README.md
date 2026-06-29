@@ -132,6 +132,7 @@ Run the full local QA gate:
 ```bash
 npm run baseline:interaction:check
 npm run validate:interactions:check
+npm run validate:proofs:poc
 npm run hardening:interactions
 npm test
 npm run check
@@ -229,3 +230,11 @@ seed/prove bounded packages, add positive and negative fixtures, and keep graph,
 evaluator, review, and strict-proof evidence separate. Future deterministic
 validators should add explicit check results to proof-attempt records rather than
 allowing local LLM or manual review output to bypass the verifier.
+
+For a read-only POC sanity check of the proof-review artifacts, run:
+
+```bash
+npm run validate:proofs:poc
+```
+
+This validates JSONL shape, latest proof lifecycle states, deterministic-package backing for proven/promoted proofs, review-batch guardrails, LLM draft non-promotion, and golden fixture consistency. It is intentionally a lifecycle/artifact validator, not a second rules engine.
