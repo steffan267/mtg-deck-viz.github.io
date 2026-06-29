@@ -141,3 +141,91 @@ Interaction-engine maintainers should also read `src/INTERACTION_ENGINE.md`.
 It documents the ontology, combo-family contribution checklist, runtime vs
 audit-only boundaries, validation thresholds, proof-payload budgets, and known
 behavior notes for the rulesbuilder.
+
+## Local proof review pipeline
+
+This repo's interaction work is proof-first: the goal is not to retag Magic
+cards, but to explain why cards interact and to measure progress by proof
+coverage. The proof-review pipeline extends the existing deterministic Node
+engine (`src/interaction-*` and `src/combo-family-library.js`) instead of
+creating a parallel Python proof engine. Deterministic proof logic remains the
+authority; review confidence is routing metadata, not truth.
+
+The local review store lives under `analysis/proof-review/` as JSONL files:
+
+- `cards.jsonl`
+- `decks.jsonl`
+- `interaction-candidates.jsonl`
+- `proof-attempts.jsonl`
+- `proof-reviews.jsonl`
+- `proof-packages.jsonl`
+- `engine-runs.jsonl`
+- `golden-tests.jsonl`
+- `llm-drafts.jsonl`
+
+Run the local workflow with the Node CLI:
+
+```bash
+node ./bin/mtg-proofs.js sample
+node ./bin/mtg-proofs.js run
+node ./bin/mtg-proofs.js export-review --limit 20
+# Optional local-only LLM drafting for unresolved proofs:
+node ./bin/mtg-proofs.js draft-proofs --limit 10
+node ./bin/mtg-proofs.js import-review analysis/proof-review/reviewed.jsonl
+node ./bin/mtg-proofs.js promote-tests
+npm test
+```
+
+`sample` records a representative local sample deck using existing Scryfall data
+when available. `run` builds the existing deterministic graph/proof packages and
+persists proven packages plus graph interactions that still need proof coverage.
+Unexplained interactions become `NEEDS_REVIEW` records instead of being counted
+as proven.
+
+`export-review` writes compact Markdown and JSONL batches for manual ChatGPT
+review. This is intentionally export/import only: the review lifecycle does not call
+OpenAI, paid APIs, or cloud services. The optional `draft-proofs` command can
+call only your configured local Ollama server. The review prompt tells the
+reviewer to use only provided Oracle text and proof data, then return JSONL.
+`import-review`
+validates that JSONL shape before appending review records and updating local
+statuses; malformed rows are rejected and are never auto-promoted.
+
+`draft-proofs` is optional Phase 2 local assistance. It sends only local
+`NEEDS_REVIEW` proof data to an Ollama server you run on your machine, asks for
+strict JSON proof drafts, and stores results in `llm-drafts.jsonl`. Valid drafts
+are persisted as `GENERATED`; malformed or unavailable-model responses are
+persisted as `REJECTED` draft records with a failure reason. Drafting never
+changes a source proof to `ACCEPTED`, `DETERMINISTICALLY_PROVEN`, or
+`PROMOTED_TO_TEST`; deterministic proof logic and manual review remain the only
+routes toward accepted test fixtures.
+
+Ollama setup is intentionally optional:
+
+```bash
+# Install/start Ollama with your local package manager, then pull any models you want.
+ollama pull qwen3:14b
+ollama pull qwen3:32b
+ollama pull qwen3-coder:30b
+
+export MTG_OLLAMA_BASE_URL=http://127.0.0.1:11434
+export MTG_LLM_GENERATOR_MODEL=qwen3:14b
+export MTG_LLM_PROOF_MODEL=qwen3:32b
+export MTG_LLM_CRITIC_MODEL=qwen3-coder:30b
+```
+
+Recommended local model roles for an M3 Pro Mac with 36 GB RAM are `qwen3:14b`
+for fast candidate/draft work, `qwen3:32b` for deeper proof drafting when it
+fits your local memory budget, and `qwen3-coder:30b` or similar for
+structured/code-like JSON extraction. The CLI does not assume those models are
+installed; if Ollama is not reachable it prints a clear local setup error and no
+cloud alternate path is attempted.
+
+`promote-tests` converts `ACCEPTED` or `DETERMINISTICALLY_PROVEN` records into
+JSON fixtures under `test/fixtures/proof-review/` so future deterministic proof
+families can be promoted into the existing test style. Add new interaction
+families by following `src/INTERACTION_ENGINE.md`: add or refine typed facts,
+seed/prove bounded packages, add positive and negative fixtures, and keep graph,
+evaluator, review, and strict-proof evidence separate. Future deterministic
+validators should add explicit check results to proof-attempt records rather than
+allowing local LLM or manual review output to bypass the verifier.

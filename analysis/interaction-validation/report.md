@@ -26,7 +26,7 @@ Runtime is measured by the CLI and intentionally kept out of checked artifacts.
 - `known-combo-seeds` (known-combo-deck-seed, local-fixtures): 20 cases
 - `negative-near-misses` (negative-corpus, local-fixtures): 22 cases
 - `precon-sample-100` (precon-sample, checked-in-summary): 100 decks; 1 combo decks
-- `moxfield-bracket-464` (moxfield-bracket-sample, checked-in-summary): 461 decks; 0 failed decks
+- `moxfield-bracket-464` (moxfield-bracket-sample, checked-in-summary): 464 decks; 0 failed decks
 - `casual-synergy-audit-96` (casual-synergy-audit, checked-in-summary): 96 evaluations
 
 ## Cases

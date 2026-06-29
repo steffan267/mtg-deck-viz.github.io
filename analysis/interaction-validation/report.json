@@ -777,7 +777,7 @@
       "purpose": "Moxfield bracket calibration source for runtime/precision sampling across power bands.",
       "source": "analysis/bracket/moxfield-bracket-corpus.json",
       "sourceStatus": "ok",
-      "deckCount": 461,
+      "deckCount": 464,
       "failedDeckCount": 0,
       "complete": true,
       "brackets": [

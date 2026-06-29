@@ -26,6 +26,7 @@ analysis/bracket/*.json
 analysis/bracket/*.md
 analysis/**/out/
 analysis/**/*.tmp
+analysis/proof-review/
 
 # TypeScript incremental metadata
 *.tsbuildinfo
