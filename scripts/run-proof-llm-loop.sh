@@ -64,6 +64,98 @@ ensure_model() {
   fi
 }
 
+print_iteration_status() {
+  local iteration="$1"
+  local outcome="$2"
+  local duration_seconds="$3"
+
+  PROOF_LOOP_ITERATION="$iteration" \
+  PROOF_LOOP_OUTCOME="$outcome" \
+  PROOF_LOOP_DURATION_SECONDS="$duration_seconds" \
+  PROOF_LOOP_SLEEP_SECONDS="$SLEEP_SECONDS" \
+  node <<'NODE'
+const fs = require('fs');
+const path = require('path');
+
+const storeDir = path.resolve('analysis/proof-review');
+
+function readJsonl(file) {
+  const target = path.join(storeDir, file);
+  if (!fs.existsSync(target)) return [];
+  return fs.readFileSync(target, 'utf8')
+    .split(/\n/)
+    .filter(line => line.trim())
+    .map(line => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function latestById(rows, field) {
+  const latest = new Map();
+  for (const row of rows) {
+    if (row && row[field]) latest.set(row[field], row);
+  }
+  return [...latest.values()];
+}
+
+function countBy(rows, field) {
+  return rows.reduce((counts, row) => {
+    const key = row && row[field] ? row[field] : 'UNKNOWN';
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function latestCommandRun(command) {
+  return [...readJsonl('engine-runs.jsonl')].reverse().find(row => row.command === command);
+}
+
+function latestExportSummary() {
+  if (!fs.existsSync(storeDir)) return 'exports=none';
+  const batches = fs.readdirSync(storeDir)
+    .filter(name => /^review_batch_.*\.jsonl$/.test(name))
+    .map(name => {
+      const file = path.join(storeDir, name);
+      return { name, mtimeMs: fs.statSync(file).mtimeMs, count: readJsonl(name).length };
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+  if (!batches.length) return 'exports=none';
+  return `latest_export=${batches[0].name} (${batches[0].count} items)`;
+}
+
+const latestRun = latestCommandRun('run');
+const latestDraftRun = latestCommandRun('draft-proofs');
+const proofs = latestById(readJsonl('proof-attempts.jsonl'), 'proof_id');
+const drafts = readJsonl('llm-drafts.jsonl');
+const proofStatuses = countBy(proofs, 'status');
+const draftStatuses = countBy(drafts, 'status');
+
+const runSummary = latestRun && latestRun.summary
+  ? `run cards=${latestRun.summary.cards ?? '?'} edges=${latestRun.summary.graph_edges ?? '?'} packages=${latestRun.summary.proof_packages ?? '?'} needs_review=${latestRun.summary.needs_review ?? '?'}`
+  : 'run unavailable';
+const proofSummary = Object.entries(proofStatuses)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([status, count]) => `${status.toLowerCase()}=${count}`)
+  .join(' ') || 'proofs=none';
+const draftSummary = latestDraftRun && latestDraftRun.summary
+  ? `drafts last requested=${latestDraftRun.summary.requested ?? '?'} generated=${latestDraftRun.summary.generated ?? '?'} rejected=${latestDraftRun.summary.rejected ?? '?'}`
+  : `drafts total=${drafts.length}`;
+const draftStatusSummary = Object.entries(draftStatuses)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([status, count]) => `${status.toLowerCase()}=${count}`)
+  .join(' ');
+
+console.log(`[proof-loop] status iteration=${process.env.PROOF_LOOP_ITERATION} outcome=${process.env.PROOF_LOOP_OUTCOME} duration=${process.env.PROOF_LOOP_DURATION_SECONDS}s next_sleep=${process.env.PROOF_LOOP_SLEEP_SECONDS}s`);
+console.log(`[proof-loop] overview ${runSummary}; proofs ${proofSummary}`);
+console.log(`[proof-loop] overview ${draftSummary}${draftStatusSummary ? ` (${draftStatusSummary})` : ''}; ${latestExportSummary()}`);
+NODE
+}
+
 run_once() {
   local stamp
   stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -83,8 +175,18 @@ run_once() {
 start_ollama_if_needed
 ensure_model
 
+ITERATION=0
 while true; do
-  run_once || echo "[proof-loop] iteration failed; continuing after sleep" >&2
+  ITERATION=$((ITERATION + 1))
+  iteration_started_at=$(date +%s)
+  outcome="ok"
+  if ! run_once; then
+    outcome="failed"
+    echo "[proof-loop] iteration failed; continuing after sleep" >&2
+  fi
+  iteration_finished_at=$(date +%s)
+  print_iteration_status "$ITERATION" "$outcome" "$((iteration_finished_at - iteration_started_at))" || \
+    echo "[proof-loop] status overview unavailable; continuing to sleep" >&2
   echo "[proof-loop] sleeping ${SLEEP_SECONDS}s; Ctrl-C to stop"
   sleep "$SLEEP_SECONDS"
 done
