@@ -172,7 +172,8 @@ node ./bin/mtg-proofs.js run
 node ./bin/mtg-proofs.js export-review --limit 20
 # Optional local-only LLM drafting for unresolved proofs:
 node ./bin/mtg-proofs.js draft-proofs --limit 10
-node ./bin/mtg-proofs.js import-review analysis/proof-review/reviewed.jsonl
+node ./bin/mtg-proofs.js prepare-review-candidates --limit 100
+node ./bin/mtg-proofs.js import-review analysis/proof-review/reviewed.candidates.jsonl
 node ./bin/mtg-proofs.js promote-tests
 npm test
 ```
@@ -194,12 +195,21 @@ statuses; malformed rows are rejected and are never auto-promoted.
 
 `draft-proofs` is optional Phase 2 local assistance. It sends only local
 `NEEDS_REVIEW` proof data to an Ollama server you run on your machine, asks for
-strict JSON proof drafts, and stores results in `llm-drafts.jsonl`. Valid drafts
-are persisted as `GENERATED`; malformed or unavailable-model responses are
-persisted as `REJECTED` draft records with a failure reason. Drafting never
+strict JSON proof drafts, and stores results in `llm-drafts.jsonl`. Drafts that pass the local critic
+are persisted as `REVIEW_READY`; malformed or unavailable-model responses are
+persisted as `REJECTED` draft records with a failure reason, and critic failures
+are persisted as `CRITIC_REJECTED`. Drafting never
 changes a source proof to `ACCEPTED`, `DETERMINISTICALLY_PROVEN`, or
 `PROMOTED_TO_TEST`; deterministic proof logic and manual review remain the only
 routes toward accepted test fixtures.
+
+`prepare-review-candidates` reduces review formatting overhead after local LLM
+drafting. It reads latest `REVIEW_READY` drafts and writes import-compatible
+`analysis/proof-review/reviewed.candidates.jsonl` plus a Markdown summary grouped
+by risk bucket (`likely_accept`, `needs_human_rules_check`, `likely_reject`).
+These files are still untrusted local-LLM suggestions: inspect or edit them
+before running `import-review`. The command never imports, accepts, or promotes
+proofs by itself.
 
 Ollama setup is intentionally optional:
 

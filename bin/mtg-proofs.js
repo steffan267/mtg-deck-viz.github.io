@@ -17,6 +17,7 @@ Commands:
   import-review <review.jsonl>   Import manual review JSONL and update local statuses
   promote-tests                  Promote accepted/deterministic proofs into JSON fixtures
   draft-proofs [--limit n]       Ask local Ollama to draft untrusted JSON for NEEDS_REVIEW proofs
+  prepare-review-candidates      Build import-compatible local-LLM review candidate files
   combo-sweep [--limit n]        Route EDHREC combos through the deterministic engine (NEEDS_REVIEW only)
   coverage-report                Rank REVIEW_READY drafts by interaction family (read-only)
   migrate-store                  Shard+index legacy flat-file streams (idempotent)
@@ -24,7 +25,7 @@ Commands:
 Options:
   --store-dir <dir>              Override analysis/proof-review storage directory
   --deck <id>                    Deck id for run (default: sample)
-  --limit <n>                    export-review default: 20; draft-proofs default: 10; combo-sweep default: 50
+  --limit <n>                    export-review default: 20; draft-proofs default: 10; prepare-review-candidates default: 100; combo-sweep default: 50
   --combo-cache <path>           combo-sweep combo cache (default: analysis/edhrec-combos/edhrec-combo-cache.json)
   --out-dir <dir>                Export-review output directory
   --fixture-dir <dir>            promote-tests fixture directory
@@ -100,6 +101,15 @@ async function main(argv = process.argv.slice(2)) {
       exhausted: result.exhausted,
       failure_reasons: result.failure_reasons,
     }, null, 2) + '\n');
+    return;
+  }
+
+  if (command === 'prepare-review-candidates') {
+    const result = PIPELINE.prepareReviewCandidates(storeDir, {
+      limit: Number.isFinite(args.limit) ? args.limit : 100,
+      exportDir: args.outDir,
+    });
+    process.stdout.write(JSON.stringify({ command, storeDir, ...result }, null, 2) + '\n');
     return;
   }
 

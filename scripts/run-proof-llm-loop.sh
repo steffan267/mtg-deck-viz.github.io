@@ -22,8 +22,17 @@ fi
 
 export MTG_OLLAMA_BASE_URL="${MTG_OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
 export MTG_LLM_PROOF_MODEL="${MTG_LLM_PROOF_MODEL:-qwen3:14b}"
+# Generator and critic default to the single proof model so the loop loads ONE
+# model and never swaps per entry. Override these only with enough VRAM to keep
+# two models resident at once; otherwise distinct models force a per-entry
+# unload/reload that defeats the point of a continuous loop.
 export MTG_LLM_GENERATOR_MODEL="${MTG_LLM_GENERATOR_MODEL:-$MTG_LLM_PROOF_MODEL}"
 export MTG_LLM_CRITIC_MODEL="${MTG_LLM_CRITIC_MODEL:-$MTG_LLM_PROOF_MODEL}"
+# keep_alive is a rolling debounce: each request resets Ollama's unload timer,
+# so the model stays resident as long as entries arrive within this window and
+# frees VRAM once the loop goes idle. '5m' matches Ollama's default; use -1 to
+# pin the model forever.
+export MTG_OLLAMA_KEEP_ALIVE="${MTG_OLLAMA_KEEP_ALIVE:-5m}"
 export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-1}"
 export OLLAMA_KV_CACHE_TYPE="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
 
@@ -65,6 +74,20 @@ ensure_model() {
   fi
 }
 
+warmup_model() {
+  # Pre-load the model into Ollama's memory (with the loop's keep_alive) so the
+  # first drafted entry isn't paying a cold model load. Best-effort: a failure
+  # here just means the first entry loads on demand.
+  echo "[proof-loop] Warming up model: $MTG_LLM_PROOF_MODEL"
+  node <<'NODE' || echo "[proof-loop] WARN warmup failed; first entry will cold-load the model" >&2
+const { LocalLlmClient } = require('./src/local-llm-client');
+const client = new LocalLlmClient();
+client.warmup()
+  .then(() => console.log('[proof-loop] Model resident: ' + client.proofModel))
+  .catch(error => { console.error('[proof-loop] warmup error: ' + (error.message || error)); process.exit(1); });
+NODE
+}
+
 print_iteration_status() {
   local iteration="$1"
   local outcome="$2"
@@ -77,6 +100,7 @@ print_iteration_status() {
   node <<'NODE'
 const fs = require('fs');
 const path = require('path');
+const STORE = require('./src/proof-review-store');
 
 const storeDir = path.resolve('analysis/proof-review');
 
@@ -96,6 +120,14 @@ function readJsonl(file) {
     .filter(Boolean);
 }
 
+function readStream(key) {
+  try {
+    return STORE.readRecords(storeDir, key, { skipMalformed: true });
+  } catch {
+    return [];
+  }
+}
+
 function latestById(rows, field) {
   const latest = new Map();
   for (const row of rows) {
@@ -113,7 +145,7 @@ function countBy(rows, field) {
 }
 
 function latestCommandRun(command) {
-  return [...readJsonl('engine-runs.jsonl')].reverse().find(row => row.command === command);
+  return [...readStream('engineRuns')].reverse().find(row => row.command === command);
 }
 
 function latestExportSummary() {
@@ -134,8 +166,8 @@ function latestExportSummary() {
 
 const latestRun = latestCommandRun('run');
 const latestDraftRun = latestCommandRun('draft-proofs');
-const proofs = latestById(readJsonl('proof-attempts.jsonl'), 'proof_id');
-const drafts = readJsonl('llm-drafts.jsonl');
+const proofs = latestById(readStream('proofAttempts'), 'proof_id');
+const drafts = readStream('llmDrafts');
 const proofStatuses = countBy(proofs, 'status');
 const draftStatuses = countBy(drafts, 'status');
 
@@ -156,7 +188,10 @@ const draftStatusSummary = Object.entries(draftStatuses)
 
 console.log(`[proof-loop] status iteration=${process.env.PROOF_LOOP_ITERATION} outcome=${process.env.PROOF_LOOP_OUTCOME} duration=${process.env.PROOF_LOOP_DURATION_SECONDS}s next_sleep=${process.env.PROOF_LOOP_SUCCESS_SLEEP_SECONDS}s`);
 console.log(`[proof-loop] overview ${runSummary}; proofs ${proofSummary}`);
-console.log(`[proof-loop] overview ${draftSummary}${draftStatusSummary ? ` (${draftStatusSummary})` : ''}; ${latestExportSummary()}`);
+const candidateFile = path.join(storeDir, 'reviewed.candidates.jsonl');
+const candidateRows = readJsonl('reviewed.candidates.jsonl');
+const candidateSummary = fs.existsSync(candidateFile) ? `candidates=${candidateRows.length} path=${candidateFile}` : 'candidates=none';
+console.log(`[proof-loop] overview ${draftSummary}${draftStatusSummary ? ` (${draftStatusSummary})` : ''}; ${latestExportSummary()}; ${candidateSummary}`);
 NODE
 }
 
@@ -183,6 +218,7 @@ run_once() {
   fi
 
   node ./bin/mtg-proofs.js export-review --limit "$EXPORT_LIMIT"
+  node ./bin/mtg-proofs.js prepare-review-candidates --limit "$EXPORT_LIMIT"
   node ./scripts/validate-proof-poc.js --store-dir analysis/proof-review --check
 
   echo "[proof-loop] iteration complete; review exports are under analysis/proof-review/"
@@ -225,6 +261,7 @@ should_run_sample() {
 
 start_ollama_if_needed
 ensure_model
+warmup_model
 mkdir -p analysis/proof-review
 
 ITERATION=0

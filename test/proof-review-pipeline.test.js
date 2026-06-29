@@ -259,6 +259,65 @@ async function main() {
     }
   }
 
+  // Case: local LLM review-assist creates import-compatible candidate files without importing/promoting.
+  {
+    const dir = await seedAttempts(3);
+    const client = makeClient({ generator: () => ({ ...validDraft, confidence: 0.86 }), critic: () => ({ verdict: 'PASS', issues: [], confidence: 0.9 }) });
+    await PIPELINE.draftProofs(dir, { client, limit: 2 });
+    const beforeStatuses = new Map(STORE.latestById(STORE.readRecords(dir, 'proofAttempts'), 'proof_id').map(row => [row.proof_id, row.status]));
+    const prepared = PIPELINE.prepareReviewCandidates(dir, { limit: 10 });
+    assert.equal(prepared.count, 2);
+    assert.equal(prepared.buckets.likely_accept, 2);
+    assert.equal(path.basename(prepared.jsonl_path), 'reviewed.candidates.jsonl');
+    assert.equal(path.basename(prepared.markdown_path), 'reviewed.candidates.md');
+    assert.equal(fs.existsSync(prepared.jsonl_path), true);
+    assert.equal(fs.existsSync(prepared.markdown_path), true);
+    assert.match(fs.readFileSync(prepared.markdown_path, 'utf8'), /Human confirmation is required|not trusted proof/);
+
+    const candidateRows = STORE.readJsonl(prepared.jsonl_path).map(PIPELINE.validateReviewRow);
+    assert.equal(candidateRows.length, 2);
+    assert.ok(candidateRows.every(row => row.verdict === 'ACCEPTED'), 'high-confidence PASS drafts become likely_accept candidates');
+    assert.ok(candidateRows.every(row => row.review_assist.requires_human_confirmation === true));
+    assert.ok(candidateRows.every(row => row.corrected_proof.source === 'local-llm-review-assist'));
+
+    const afterStatuses = new Map(STORE.latestById(STORE.readRecords(dir, 'proofAttempts'), 'proof_id').map(row => [row.proof_id, row.status]));
+    assert.deepEqual(afterStatuses, beforeStatuses, 'prepareReviewCandidates must not import, accept, or promote source proofs');
+    assert.equal(STORE.readRecords(dir, 'proofReviews').length, 0, 'prepareReviewCandidates must not append review records');
+    assert.equal(STORE.readRecords(dir, 'goldenTests').length, 0, 'prepareReviewCandidates must not promote tests');
+  }
+
+  // Case: lower-confidence review-ready drafts are import-compatible NEEDS_CORRECTION candidates.
+  {
+    const dir = await seedAttempts(1);
+    const client = makeClient({ generator: () => ({ ...validDraft, confidence: 0.4 }), critic: () => ({ verdict: 'PASS', issues: [], confidence: 0.55 }) });
+    await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    const prepared = PIPELINE.prepareReviewCandidates(dir, { limit: 10 });
+    assert.equal(prepared.count, 1);
+    assert.equal(prepared.buckets.needs_human_rules_check, 1);
+    const row = STORE.readJsonl(prepared.jsonl_path).map(PIPELINE.validateReviewRow)[0];
+    assert.equal(row.verdict, 'NEEDS_CORRECTION');
+    assert.match(row.issues.join(' '), /needs_human_rules_check/);
+  }
+
+  // CLI wiring for prepare-review-candidates.
+  {
+    const dir = await seedAttempts(1);
+    const client = makeClient({ generator: () => ({ ...validDraft, confidence: 0.9 }), critic: () => ({ verdict: 'PASS', issues: [], confidence: 0.9 }) });
+    await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    const originalWrite = process.stdout.write;
+    let output = '';
+    process.stdout.write = (chunk, ...rest) => { output += String(chunk); return true; };
+    try {
+      await cliMain(['prepare-review-candidates', '--store-dir', dir, '--limit', '5']);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+    const parsed = JSON.parse(output);
+    assert.equal(parsed.command, 'prepare-review-candidates');
+    assert.equal(parsed.count, 1);
+    assert.equal(fs.existsSync(path.join(dir, 'reviewed.candidates.jsonl')), true);
+  }
+
   const fixtureDir = path.join(tmpDir, 'fixtures');
   const promoted = PIPELINE.promoteTests(tmpDir, { fixtureDir });
   assert.equal(promoted.promoted > 0, true);

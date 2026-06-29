@@ -7,16 +7,27 @@
  */
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
-const DEFAULT_GENERATOR_MODEL = 'qwen3:14b';
-const DEFAULT_PROOF_MODEL = 'qwen3:32b';
-const DEFAULT_CRITIC_MODEL = 'qwen3-coder:30b';
+// Single default model for the whole loop. Generator and critic both fall back
+// to it so a stock pipeline run loads ONE model and never swaps per entry —
+// each generate→critique pair stays on the resident model. Override the
+// generator/critic env vars only if you have the VRAM to keep two models
+// resident at once; otherwise distinct models force an unload/reload per entry.
+const DEFAULT_PROOF_MODEL = 'qwen3:14b';
+// keep_alive acts as a rolling debounce: Ollama resets the unload timer on every
+// request, so as long as entries arrive within this window the model stays
+// resident, and it frees VRAM only after a genuine idle period (e.g. once the
+// loop stops). '5m' matches Ollama's own default window. Use -1 to pin forever.
+const DEFAULT_KEEP_ALIVE = '5m';
 
 class LocalLlmClient {
   constructor(options = {}) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl || process.env.MTG_OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL);
-    this.generatorModel = options.generatorModel || process.env.MTG_LLM_GENERATOR_MODEL || DEFAULT_GENERATOR_MODEL;
     this.proofModel = options.proofModel || process.env.MTG_LLM_PROOF_MODEL || DEFAULT_PROOF_MODEL;
-    this.criticModel = options.criticModel || process.env.MTG_LLM_CRITIC_MODEL || DEFAULT_CRITIC_MODEL;
+    // Generator and critic default to the proof model (one resident model, no
+    // per-entry swap). They are still independently overridable.
+    this.generatorModel = options.generatorModel || process.env.MTG_LLM_GENERATOR_MODEL || this.proofModel;
+    this.criticModel = options.criticModel || process.env.MTG_LLM_CRITIC_MODEL || this.proofModel;
+    this.keepAlive = options.keepAlive ?? process.env.MTG_OLLAMA_KEEP_ALIVE ?? DEFAULT_KEEP_ALIVE;
     this.fetchImpl = options.fetchImpl || globalThis.fetch;
   }
 
@@ -49,14 +60,25 @@ class LocalLlmClient {
     }
   }
 
+  // Pre-load a model into Ollama's memory without generating output. Call once
+  // before a drafting loop so the first entry isn't paying a cold model load.
+  async warmup(model = this.proofModel) {
+    const response = await this.postGenerate({ model, prompt: '', stream: false });
+    return { model, loaded: true, response };
+  }
+
   async postGenerate(body) {
     if (typeof this.fetchImpl !== 'function') throw unavailableError('global fetch is unavailable in this Node runtime');
+    // Pin the loaded model in memory (default keep_alive: -1) so it stays
+    // resident across entries instead of idle-unloading between calls. Callers
+    // can still override per request by setting keep_alive on the body.
+    const payload = 'keep_alive' in body ? body : Object.assign({ keep_alive: this.keepAlive }, body);
     let response;
     try {
       response = await this.fetchImpl(this.baseUrl + '/api/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
     } catch (error) {
       throw unavailableError(error.message, error);
@@ -107,9 +129,8 @@ function unavailableError(reason, cause) {
 
 module.exports = {
   DEFAULT_OLLAMA_BASE_URL,
-  DEFAULT_GENERATOR_MODEL,
   DEFAULT_PROOF_MODEL,
-  DEFAULT_CRITIC_MODEL,
+  DEFAULT_KEEP_ALIVE,
   LocalLlmClient,
   unavailableError,
 };
