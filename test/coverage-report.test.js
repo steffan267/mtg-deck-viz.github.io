@@ -8,6 +8,13 @@ const { buildCoverageReport, DISCLAIMER } = require('../scripts/coverage-report'
 
 const created_at = '2026-06-29T00:00:00.000Z';
 
+function streamSnapshot(dir) {
+  if (!fs.existsSync(dir)) return {};
+  const out = {};
+  for (const name of fs.readdirSync(dir).sort()) out[name] = fs.readFileSync(path.join(dir, name), 'utf8');
+  return out;
+}
+
 function seedAttempt(dir, proof_id, family, cards) {
   STORE.appendRecord(dir, 'proofAttempts', {
     schemaVersion: PIPELINE.PROOF_REVIEW_SCHEMA_VERSION,
@@ -56,14 +63,14 @@ async function main() {
   seedDraft(dir, 'd3', 'p3', 'famB', ['B1', 'B2'], PIPELINE.Status.ReviewReady, 0.95);
   seedDraft(dir, 'd4', 'p4', 'famB', ['B3', 'B4'], PIPELINE.Status.CriticRejected, 0.2);
 
-  const draftFile = STORE.storePath(dir, 'llmDrafts');
-  const bytesBefore = fs.readFileSync(draftFile);
+  // Snapshot every file in the sharded llmDrafts stream dir to assert purity.
+  const draftDir = STORE.shardDir(dir, 'llmDrafts');
+  const snapshot = streamSnapshot(draftDir);
 
   const report = buildCoverageReport(dir);
 
-  // Purity: the JSONL file must be byte-identical after the call.
-  const bytesAfter = fs.readFileSync(draftFile);
-  assert.ok(bytesBefore.equals(bytesAfter), 'buildCoverageReport must not mutate the store');
+  // Purity: the stream files must be byte-identical after the call.
+  assert.deepEqual(streamSnapshot(draftDir), snapshot, 'buildCoverageReport must not mutate the store');
 
   assert.equal(report.ok, true);
   assert.equal(report.generatedAt, null, 'buildCoverageReport must stay timestamp-free for determinism');

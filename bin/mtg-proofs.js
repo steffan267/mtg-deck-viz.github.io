@@ -17,12 +17,15 @@ Commands:
   import-review <review.jsonl>   Import manual review JSONL and update local statuses
   promote-tests                  Promote accepted/deterministic proofs into JSON fixtures
   draft-proofs [--limit n]       Ask local Ollama to draft untrusted JSON for NEEDS_REVIEW proofs
+  combo-sweep [--limit n]        Route EDHREC combos through the deterministic engine (NEEDS_REVIEW only)
   coverage-report                Rank REVIEW_READY drafts by interaction family (read-only)
+  migrate-store                  Shard+index legacy flat-file streams (idempotent)
 
 Options:
   --store-dir <dir>              Override analysis/proof-review storage directory
   --deck <id>                    Deck id for run (default: sample)
-  --limit <n>                    export-review default: 20; draft-proofs default: 10
+  --limit <n>                    export-review default: 20; draft-proofs default: 10; combo-sweep default: 50
+  --combo-cache <path>           combo-sweep combo cache (default: analysis/edhrec-combos/edhrec-combo-cache.json)
   --out-dir <dir>                Export-review output directory
   --fixture-dir <dir>            promote-tests fixture directory
 `;
@@ -37,6 +40,7 @@ function parseArgs(argv) {
     else if (arg === '--limit') args.limit = Number(argv[++i]);
     else if (arg === '--out-dir') args.outDir = path.resolve(argv[++i]);
     else if (arg === '--fixture-dir') args.fixtureDir = path.resolve(argv[++i]);
+    else if (arg === '--combo-cache') args.comboCache = path.resolve(argv[++i]);
     else if (arg === '-h' || arg === '--help') args.help = true;
     else args._.push(arg);
   }
@@ -96,6 +100,34 @@ async function main(argv = process.argv.slice(2)) {
       exhausted: result.exhausted,
       failure_reasons: result.failure_reasons,
     }, null, 2) + '\n');
+    return;
+  }
+
+  if (command === 'combo-sweep') {
+    const result = PIPELINE.runComboSweep(storeDir, {
+      limit: Number.isFinite(args.limit) ? args.limit : 50,
+      comboCachePath: args.comboCache,
+    });
+    process.stdout.write(JSON.stringify({
+      command,
+      storeDir,
+      run_id: result.run_id,
+      summary: {
+        processed: result.processed,
+        skipped: result.skipped,
+        attempts_created: result.attempts_created,
+        remaining: result.remaining,
+        total_combos: result.total_combos,
+        exhausted: result.exhausted,
+      },
+      exhausted: result.exhausted,
+    }, null, 2) + '\n');
+    return;
+  }
+
+  if (command === 'migrate-store') {
+    const result = STORE.migrateStore(storeDir);
+    process.stdout.write(JSON.stringify({ command, storeDir, streams: result }, null, 2) + '\n');
     return;
   }
 

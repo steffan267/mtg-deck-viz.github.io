@@ -9,6 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { build, loadCards } = require('./build-deck-viz');
+const MODEL = require('./interaction-model.js');
+const FACE_CLASSIFICATION = require('./face-classification.js');
 const STORE = require('./proof-review-store');
 const { LocalLlmClient } = require('./local-llm-client');
 
@@ -101,6 +103,41 @@ const LLM_CRITIC_SCHEMA = Object.freeze({
     },
   },
   note: 'This is an untrusted critic verdict. It cannot accept, verify, promote, or replace deterministic proof output.',
+});
+
+const LLM_COMPLETENESS_SCHEMA_VERSION = 'proof-review-llm-completeness.v1';
+const COMPLETENESS_PROGRESS_SCHEMA_VERSION = 'completeness-progress.v1';
+const LLM_COMPLETENESS_REQUIRED = ['card', 'expected_interactions', 'confidence', 'reasoning'];
+const LLM_COMPLETENESS_SCHEMA = Object.freeze({
+  required: LLM_COMPLETENESS_REQUIRED,
+  // Real JSON Schema handed to Ollama's structured-output `format` so decoding is
+  // constrained to this shape instead of relying on the model to follow prose.
+  jsonSchema: {
+    type: 'object',
+    additionalProperties: true,
+    required: LLM_COMPLETENESS_REQUIRED,
+    properties: {
+      card: { type: 'string' },
+      expected_interactions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+          required: ['interaction_family', 'with_what', 'synergy_class', 'why'],
+          properties: {
+            interaction_family: { type: 'string' },
+            // An archetype/category description, NOT a specific invented card name.
+            with_what: { type: 'string' },
+            synergy_class: { type: 'string', enum: Object.values(SynergyClass) },
+            why: { type: 'string' },
+          },
+        },
+      },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      reasoning: { type: 'string' },
+    },
+  },
+  note: 'This is an untrusted completeness suggestion. It cannot accept, verify, promote, or replace deterministic proof/engine output. Proposed families become NEEDS_REVIEW routing records only.',
 });
 
 const DEFAULT_SAMPLE_NAMES = [
@@ -361,14 +398,31 @@ function runDeterministic(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = {
   const runId = options.runId || hashId('run', ['deterministic', created]);
   const deckId = options.deckId || 'sample';
   const idx = options.cardsByName || loadCards();
+  // Allow callers to skip per-card persistence. The combo sweep runs this tens
+  // of thousands of times; persisting a `cards` record per card node every call
+  // is ~110k redundant writes there. Defaults to true so the sample/real-deck
+  // path keeps recording card snapshots (export/promote rely on them).
+  const persistCards = options.persistCards !== false;
   let deck = options.deck || latestDeck(storeDir, deckId);
   if (!deck && deckId === 'sample') deck = createSample(storeDir, { cardsByName: idx, deckId }).deck;
   if (!deck) throw new Error('Deck not found: ' + deckId + '. Run sample first or pass a known deck id.');
-  const priorAttempts = new Map(latestAttempts(storeDir).map(attempt => [attempt.proof_id, attempt]));
+  // priorAttempts drives lifecycle preservation (don't regress ACCEPTED /
+  // REJECTED / PROMOTED_TO_TEST / NEEDS_CORRECTION on rerun). The single-deck
+  // path scans the whole proof-attempts stream once, which is fine for one
+  // deck. The combo sweep calls runDeterministic 54k+ times over a growing
+  // store, so a full scan per call is O(n^2) and never finishes. To preserve
+  // identical single-deck behavior while making the sweep linear, callers can:
+  //   - pass options.priorAttempts (a Map<proof_id, attempt>) to reuse a
+  //     caller-managed map, OR
+  //   - pass options.skipPriorAttempts:true for a fresh sweep where unrelated
+  //     decks' lifecycle is irrelevant (no reviewed attempts exist to clobber).
+  // When neither is given, behavior is unchanged: full latestAttempts() scan.
+  const priorAttempts = options.priorAttempts
+    || (options.skipPriorAttempts ? new Map() : new Map(latestAttempts(storeDir).map(attempt => [attempt.proof_id, attempt])));
   const decklist = options.decklist || loadDeckCards(deck);
   const graph = build(decklist, idx, { includeInteractionProofs: true });
   const cardNodes = (graph.nodes || []).filter(node => node.role !== 'zone');
-  for (const node of cardNodes) STORE.appendRecord(storeDir, 'cards', graphCardRecord(node, runId));
+  if (persistCards) for (const node of cardNodes) STORE.appendRecord(storeDir, 'cards', graphCardRecord(node, runId));
 
   const packages = graph.interactionProofs || [];
   const provenPackageKeys = new Set();
@@ -411,6 +465,168 @@ function runDeterministic(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = {
 
 function latestAttempts(storeDir) {
   return STORE.latestById(STORE.readRecords(storeDir, 'proofAttempts'), 'proof_id');
+}
+
+const COMBO_SWEEP_SCHEMA_VERSION = 'combo-sweep-progress.v1';
+const DEFAULT_COMBO_CACHE = path.resolve(__dirname, '..', 'analysis', 'edhrec-combos', 'edhrec-combo-cache.json');
+
+function loadComboCache(cachePath) {
+  const file = cachePath || DEFAULT_COMBO_CACHE;
+  if (!fs.existsSync(file)) throw new Error('Combo cache not found: ' + file);
+  const cache = JSON.parse(fs.readFileSync(file, 'utf8'));
+  // Mirror evaluate-edhrec-combos.js detailedCombos(): only combos with a real
+  // card list are runnable. Do not silently cap — every runnable combo flows
+  // through the resumable progress stream.
+  return (cache.combos || []).filter(combo => Array.isArray(combo.cards) && combo.cards.length);
+}
+
+function resolveComboCards(cards, idx) {
+  // Mirror createSample's resolution so unresolved names surface the same way.
+  const unresolved = [];
+  for (const name of cards || []) {
+    const key = normalizeName(name);
+    const card = idx[key] || Object.values(idx).find(candidate => normalizeName(candidate.name) === key || (candidate.aliases || []).includes(key));
+    if (!card) unresolved.push(name);
+  }
+  return unresolved;
+}
+
+function syntheticComboDeck(combo, created) {
+  // Shape that latestDeck/loadDeckCards expect: a deck object with deck_id and a
+  // cards array of {qty,name}. Passing this as options.deck satisfies the
+  // runDeterministic guard so no deck record needs to be persisted first.
+  return {
+    schemaVersion: PROOF_REVIEW_SCHEMA_VERSION,
+    deck_id: 'combo:' + combo.id,
+    name: 'edhrec-combo:' + combo.id,
+    source: 'analysis/edhrec-combos/edhrec-combo-cache.json',
+    cards: combo.cards.map(name => ({ qty: 1, name })),
+    created_at: created,
+    updated_at: created,
+  };
+}
+
+/*
+ * runComboSweep — run the existing deterministic proof/package router over the
+ * EDHREC combo corpus, one combo at a time, persisting only NEEDS_REVIEW
+ * routing attempts (via the unchanged runDeterministic path). It never accepts,
+ * promotes, or mutates combo-family-library.js — the trust wall holds.
+ *
+ * Resumable: each processed combo appends a comboSweepProgress record. On entry
+ * we read the progress index once (only that stream) to build the done set and
+ * skip it. O(n^2) avoidance: runDeterministic is called with skipPriorAttempts
+ * so it does not full-scan the whole proof-attempts stream per combo; a fresh
+ * sweep has no reviewed attempts to preserve.
+ */
+function runComboSweep(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = {}) {
+  STORE.initializeStore(storeDir);
+  const limit = Number.isFinite(options.limit) ? Number(options.limit) : 50;
+  const runId = options.runId || hashId('run', ['combo-sweep', now()]);
+  const idx = options.cardsByName || loadCards();
+  const combos = options.combos || loadComboCache(options.comboCachePath);
+
+  // Fast done set: read only the progress stream's sharded sidecar index
+  // (latest-line-wins entries keyed by combo_id) without scanning shard bodies.
+  const done = new Set(STORE.readIndex(storeDir, 'comboSweepProgress').map(entry => entry.id));
+
+  const pending = combos.filter(combo => !done.has(combo.id));
+  const batch = limit > 0 ? pending.slice(0, limit) : pending;
+
+  let attemptsCreated = 0;
+  let processed = 0;
+  let skipped = 0;
+  for (const combo of batch) {
+    const created = now();
+    const unresolved = resolveComboCards(combo.cards, idx);
+    if (unresolved.length) {
+      // Don't crash the sweep: record the skip and continue.
+      STORE.appendRecord(storeDir, 'comboSweepProgress', {
+        schemaVersion: COMBO_SWEEP_SCHEMA_VERSION,
+        combo_id: combo.id,
+        run_id: runId,
+        status: 'SKIPPED',
+        reason: 'unresolved_card_names',
+        unresolved_names: unresolved,
+        attempts_created: 0,
+        created_at: created,
+        updated_at: created,
+      });
+      skipped += 1;
+      continue;
+    }
+
+    let result;
+    try {
+      result = runDeterministic(storeDir, {
+        runId,
+        deckId: 'combo:' + combo.id,
+        decklist: combo.cards.map(name => ({ qty: 1, name })),
+        deck: syntheticComboDeck(combo, created),
+        cardsByName: idx,
+        // Linear sweep: don't full-scan attempts and don't write a card record
+        // per node on every combo.
+        skipPriorAttempts: true,
+        persistCards: false,
+      });
+    } catch (error) {
+      STORE.appendRecord(storeDir, 'comboSweepProgress', {
+        schemaVersion: COMBO_SWEEP_SCHEMA_VERSION,
+        combo_id: combo.id,
+        run_id: runId,
+        status: 'SKIPPED',
+        reason: 'engine_error',
+        error_message: error.message || String(error),
+        attempts_created: 0,
+        created_at: created,
+        updated_at: created,
+      });
+      skipped += 1;
+      continue;
+    }
+    // Attempts appended by runDeterministic == one per proof package + one per
+    // needs-review candidate. Derive from the run summary instead of re-reading
+    // the whole proof-attempts stream (which would reintroduce O(n^2)).
+    const summary = /** @type {Record<string, number>} */ ((result.run && result.run.summary) || {});
+    const created_attempts = (summary.proof_packages || 0) + (summary.needs_review || 0);
+    attemptsCreated += created_attempts;
+    processed += 1;
+    // Crash-safe: append progress AFTER the combo is fully processed so a
+    // re-run resumes from the next combo.
+    STORE.appendRecord(storeDir, 'comboSweepProgress', {
+      schemaVersion: COMBO_SWEEP_SCHEMA_VERSION,
+      combo_id: combo.id,
+      run_id: runId,
+      status: 'PROCESSED',
+      attempts_created: created_attempts,
+      needs_review: (result.run && result.run.summary && result.run.summary.needs_review) || 0,
+      proof_packages: (result.run && result.run.summary && result.run.summary.proof_packages) || 0,
+      created_at: created,
+      updated_at: created,
+    });
+  }
+
+  const remaining = pending.length - batch.length;
+  const exhausted = remaining <= 0;
+  STORE.appendRecord(storeDir, 'engineRuns', {
+    schemaVersion: PROOF_REVIEW_SCHEMA_VERSION,
+    run_id: runId,
+    command: 'combo-sweep',
+    status: Status.Generated,
+    generated_by: 'mtg-proofs combo-sweep',
+    summary: { total_combos: combos.length, processed, skipped, attempts_created: attemptsCreated, remaining, exhausted },
+    created_at: now(),
+    updated_at: now(),
+  });
+
+  return {
+    run_id: runId,
+    processed,
+    skipped,
+    attempts_created: attemptsCreated,
+    remaining,
+    total_combos: combos.length,
+    exhausted,
+  };
 }
 
 function shouldPreserveLifecycle(attempt) {
@@ -712,9 +928,14 @@ async function draftProofs(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = 
   const criticModel = client.criticModel;
   const cardsByName = latestCardsByName(storeDir);
 
-  // Phase B: resumability — skip source_proof_ids whose latest draft disposition is terminal.
-  const priorDrafts = STORE.readRecords(storeDir, 'llmDrafts', { skipMalformed: true });
-  const latestDraftBySource = STORE.latestById(priorDrafts, 'source_proof_id');
+  // Phase B: resumability — skip source_proof_ids whose latest draft disposition is
+  // terminal. Prefer the llmDrafts by-source sidecar index (latest-line-wins, single
+  // append-ordered file) so "latest status per source" is well-defined under sharding;
+  // fall back to scanning records for legacy (un-sharded) stores.
+  const bySourceIndex = STORE.readBySourceIndex(storeDir, 'llmDrafts', { skipMalformed: true });
+  const latestDraftBySource = bySourceIndex.length
+    ? bySourceIndex
+    : STORE.latestById(STORE.readRecords(storeDir, 'llmDrafts', { skipMalformed: true }), 'source_proof_id');
   const skip = new Set();
   for (const draft of latestDraftBySource) {
     if (DRAFT_SKIP_STATUSES.has(draft.status)) skip.add(draft.source_proof_id);
@@ -806,7 +1027,7 @@ async function draftProofs(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = 
     drafts.push(record);
   }
 
-  const generated = drafts.filter(item => item.status === Status.Generated).length;
+  const generated = drafts.filter(item => /** @type {any} */ (item).status === Status.Generated).length;
   const reviewReady = drafts.filter(item => item.status === Status.ReviewReady).length;
   const criticRejected = drafts.filter(item => item.status === Status.CriticRejected).length;
   const rejected = drafts.filter(item => item.status === Status.Rejected).length;
@@ -883,6 +1104,8 @@ module.exports = {
   importReview,
   promoteTests,
   reviewInstructions,
+  runComboSweep,
+  DEFAULT_COMBO_CACHE,
   runDeterministic,
   validateLlmProofDraft,
   validateLlmCritique,

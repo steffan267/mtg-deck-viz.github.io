@@ -240,12 +240,14 @@ async function main() {
     const client = makeClient({ generator: () => ({ ...validDraft }), critic: () => ({ verdict: 'PASS', issues: [], confidence: 0.7 }) });
     const first = await PIPELINE.draftProofs(dir, { client, limit: 1 });
     assert.equal(first.drafted, 1);
-    const firstId = STORE.readRecords(dir, 'llmDrafts')[0].source_proof_id;
+    const firstId = first.drafts[0].source_proof_id;
     const second = await PIPELINE.draftProofs(dir, { client, limit: 1 });
     assert.equal(second.drafted, 1);
-    const allDrafts = STORE.readRecords(dir, 'llmDrafts');
-    const secondId = allDrafts[allDrafts.length - 1].source_proof_id;
+    const secondId = second.drafts[0].source_proof_id;
     assert.notEqual(secondId, firstId, 'second draft must target a different proof');
+    // Both seeded sources should now be covered exactly once (no double-draft).
+    const draftedSources = new Set(STORE.readRecords(dir, 'llmDrafts').map(row => row.source_proof_id));
+    assert.deepEqual([...draftedSources].sort(), ['proof_draft_0', 'proof_draft_1']);
     const third = await PIPELINE.draftProofs(dir, { client, limit: 1 });
     assert.equal(third.drafted, 0);
     assert.equal(third.exhausted, true);
@@ -274,7 +276,8 @@ async function main() {
   } finally {
     process.stdout.write = originalWrite;
   }
-  assert.equal(fs.existsSync(path.join(cliDir, 'decks.jsonl')), true);
+  assert.equal(fs.existsSync(STORE.shardDir(cliDir, 'decks')), true);
+  assert.equal(STORE.readRecords(cliDir, 'decks').length >= 1, true);
   assert.match(cliOutput, /proof-review-sample/);
 
   process.stdout.write('Proof review pipeline tests passed\n');
