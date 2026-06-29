@@ -24,6 +24,8 @@ const Status = Object.freeze({
   Accepted: 'ACCEPTED',
   Rejected: 'REJECTED',
   PromotedToTest: 'PROMOTED_TO_TEST',
+  CriticRejected: 'CRITIC_REJECTED',
+  ReviewReady: 'REVIEW_READY',
 });
 
 const SynergyClass = Object.freeze({
@@ -61,6 +63,12 @@ const LLM_PROOF_DRAFT_SCHEMA = Object.freeze({
     'why_this_is_not_stronger_classification',
   ],
   note: 'This is an untrusted draft. It cannot accept, verify, promote, or replace deterministic proof output.',
+});
+
+const LLM_CRITIC_SCHEMA = Object.freeze({
+  required: ['verdict', 'issues', 'confidence'],
+  verdict_values: ['PASS', 'FAIL'],
+  note: 'This is an untrusted critic verdict. It cannot accept, verify, promote, or replace deterministic proof output.',
 });
 
 const DEFAULT_SAMPLE_NAMES = [
@@ -628,12 +636,64 @@ function validateLlmProofDraft(row) {
   return row;
 }
 
+function llmCriticPrompt(attempt, draft, cardsByName) {
+  const oracle = Object.fromEntries((attempt.involved_cards || []).map(name => [name, cardsByName.get(name)?.oracle_text || '']));
+  return [
+    'You are an adversarial critic reviewing a Magic: The Gathering interaction proof draft for local triage.',
+    'Use only the provided Oracle text and the draft. Do not invent missing Oracle text. Do not claim deterministic correctness.',
+    'Check timing, zones, object identity, costs, replacement effects, triggered abilities, activated abilities, mana abilities, state-based actions, priority, loop validity, and whether the synergy class is overstated.',
+    'Return strict JSON only with: verdict (must be "PASS" or "FAIL"), issues (an array of short strings describing problems; empty if PASS), confidence (a number from 0 to 1).',
+    'This verdict is untrusted and will be routed through deterministic/manual review later. It cannot accept or promote anything.',
+    '',
+    'Required fields: ' + LLM_CRITIC_SCHEMA.required.join(', '),
+    '',
+    'Current proof-review record:',
+    JSON.stringify(attempt, null, 2),
+    '',
+    'Generated draft to critique:',
+    JSON.stringify(draft, null, 2),
+    '',
+    'Oracle text:',
+    JSON.stringify(oracle, null, 2),
+  ].join('\n');
+}
+
+function validateLlmCritique(row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('LLM critique must be an object');
+  for (const field of LLM_CRITIC_SCHEMA.required) {
+    if (!(field in row)) throw new Error('LLM critique missing required field: ' + field);
+  }
+  if (!LLM_CRITIC_SCHEMA.verdict_values.includes(row.verdict)) throw new Error('LLM critique verdict must be PASS or FAIL');
+  if (!Array.isArray(row.issues) || row.issues.some(item => typeof item !== 'string')) throw new Error('LLM critique issues must be an array of strings');
+  if (!Number.isFinite(row.confidence) || row.confidence < 0 || row.confidence > 1) throw new Error('LLM critique confidence must be a number from 0 to 1');
+  return row;
+}
+
+const DRAFT_SKIP_STATUSES = new Set([Status.Generated, Status.ReviewReady, Status.CriticRejected]);
+
 async function draftProofs(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = {}) {
   STORE.initializeStore(storeDir);
   const limit = Number(options.limit || 10);
+  const retryRejected = options.retryRejected === true;
   const client = options.client || new LocalLlmClient(options.llm || {});
+  const generatorModel = client.generatorModel;
+  const criticModel = client.criticModel;
   const cardsByName = latestCardsByName(storeDir);
-  const attempts = latestAttempts(storeDir).filter(attempt => attempt.status === Status.NeedsReview).slice(0, limit);
+
+  // Phase B: resumability — skip source_proof_ids whose latest draft disposition is terminal.
+  const priorDrafts = STORE.readRecords(storeDir, 'llmDrafts', { skipMalformed: true });
+  const latestDraftBySource = STORE.latestById(priorDrafts, 'source_proof_id');
+  const skip = new Set();
+  for (const draft of latestDraftBySource) {
+    if (DRAFT_SKIP_STATUSES.has(draft.status)) skip.add(draft.source_proof_id);
+    else if (draft.status === Status.Rejected && !retryRejected) skip.add(draft.source_proof_id);
+  }
+
+  const attempts = latestAttempts(storeDir)
+    .filter(attempt => attempt.status === Status.NeedsReview)
+    .filter(attempt => !skip.has(attempt.proof_id))
+    .slice(0, limit);
+  const exhausted = attempts.length === 0;
   const drafts = [];
   for (const attempt of attempts) {
     const created = now();
@@ -646,46 +706,94 @@ async function draftProofs(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = 
       involved_cards: attempt.involved_cards || [],
       interaction_family: attempt.interaction_family,
       generated_by: 'ollama-local-draft',
+      generator_model: generatorModel,
+      critic_model: criticModel,
       reviewed_by: null,
       deterministic_check_results: { deterministic_validation_bypassed: false, accepted_or_promoted: false },
       created_at: created,
       updated_at: created,
     };
+
+    // GENERATE
+    let draft;
     try {
-      const draft = validateLlmProofDraft(await client.generateJson(llmDraftPrompt(attempt, cardsByName), LLM_PROOF_DRAFT_SCHEMA, { model: options.model }));
-      const record = Object.assign({}, base, {
-        status: Status.Generated,
-        draft,
-        confidence_or_routing_score: draft.confidence,
-        failure_reason: null,
-      });
-      STORE.appendRecord(storeDir, 'llmDrafts', record);
-      drafts.push(record);
+      draft = validateLlmProofDraft(await client.generateJson(llmDraftPrompt(attempt, cardsByName), LLM_PROOF_DRAFT_SCHEMA, { model: generatorModel }));
     } catch (error) {
       const record = Object.assign({}, base, {
         status: Status.Rejected,
         draft: null,
         raw_output: error && error.rawResponse ? error.rawResponse : null,
         failure_reason: error.message || String(error),
+        critic_verdict: null,
+        critic_issues: null,
+        critic_confidence: null,
       });
       STORE.appendRecord(storeDir, 'llmDrafts', record);
       drafts.push(record);
+      continue;
     }
+
+    // CRITIQUE (fail-closed)
+    let critique;
+    try {
+      critique = validateLlmCritique(await client.generateJson(llmCriticPrompt(attempt, draft, cardsByName), LLM_CRITIC_SCHEMA, { model: criticModel }));
+    } catch (error) {
+      const record = Object.assign({}, base, {
+        status: Status.CriticRejected,
+        draft,
+        confidence_or_routing_score: draft.confidence,
+        failure_reason: null,
+        critic_verdict: 'FAIL',
+        critic_issues: ['critic_error: ' + (error.message || String(error))],
+        critic_confidence: 0,
+      });
+      STORE.appendRecord(storeDir, 'llmDrafts', record);
+      drafts.push(record);
+      continue;
+    }
+
+    const passed = critique.verdict === 'PASS';
+    const record = Object.assign({}, base, {
+      status: passed ? Status.ReviewReady : Status.CriticRejected,
+      draft,
+      confidence_or_routing_score: draft.confidence,
+      failure_reason: null,
+      critic_verdict: critique.verdict,
+      critic_issues: critique.issues,
+      critic_confidence: critique.confidence,
+    });
+    STORE.appendRecord(storeDir, 'llmDrafts', record);
+    drafts.push(record);
   }
+
+  const generated = drafts.filter(item => item.status === Status.Generated).length;
+  const reviewReady = drafts.filter(item => item.status === Status.ReviewReady).length;
+  const criticRejected = drafts.filter(item => item.status === Status.CriticRejected).length;
+  const rejected = drafts.filter(item => item.status === Status.Rejected).length;
   STORE.appendRecord(storeDir, 'engineRuns', {
     schemaVersion: PROOF_REVIEW_SCHEMA_VERSION,
     run_id: hashId('run', ['draft-proofs', now(), attempts.map(item => item.proof_id)]),
     command: 'draft-proofs',
     status: Status.Generated,
     generated_by: 'mtg-proofs draft-proofs',
-    summary: { requested: attempts.length, generated: drafts.filter(item => item.status === Status.Generated).length, rejected: drafts.filter(item => item.status === Status.Rejected).length },
+    summary: {
+      requested: attempts.length,
+      generated,
+      review_ready: reviewReady,
+      critic_rejected: criticRejected,
+      rejected,
+      exhausted,
+    },
     created_at: now(),
     updated_at: now(),
   });
   return {
     drafted: drafts.length,
-    generated: drafts.filter(item => item.status === Status.Generated).length,
-    rejected: drafts.filter(item => item.status === Status.Rejected).length,
+    generated,
+    review_ready: reviewReady,
+    critic_rejected: criticRejected,
+    rejected,
+    exhausted,
     failure_reasons: drafts.filter(item => item.status === Status.Rejected).map(item => item.failure_reason),
     drafts,
   };
@@ -726,6 +834,7 @@ module.exports = {
   REVIEW_EXPORT_SCHEMA_VERSION,
   LLM_DRAFT_SCHEMA_VERSION,
   LLM_PROOF_DRAFT_SCHEMA,
+  LLM_CRITIC_SCHEMA,
   Status,
   SynergyClass,
   createSample,
@@ -736,5 +845,6 @@ module.exports = {
   reviewInstructions,
   runDeterministic,
   validateLlmProofDraft,
+  validateLlmCritique,
   validateReviewRow,
 };

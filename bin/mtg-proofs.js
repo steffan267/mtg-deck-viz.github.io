@@ -5,6 +5,7 @@
 const path = require('path');
 const PIPELINE = require('../src/proof-review-pipeline');
 const STORE = require('../src/proof-review-store');
+const { buildCoverageReport } = require('../scripts/coverage-report');
 
 function usage() {
   return `Usage: node ./bin/mtg-proofs.js <command> [options]
@@ -16,6 +17,7 @@ Commands:
   import-review <review.jsonl>   Import manual review JSONL and update local statuses
   promote-tests                  Promote accepted/deterministic proofs into JSON fixtures
   draft-proofs [--limit n]       Ask local Ollama to draft untrusted JSON for NEEDS_REVIEW proofs
+  coverage-report                Rank REVIEW_READY drafts by interaction family (read-only)
 
 Options:
   --store-dir <dir>              Override analysis/proof-review storage directory
@@ -83,7 +85,23 @@ async function main(argv = process.argv.slice(2)) {
 
   if (command === 'draft-proofs') {
     const result = await PIPELINE.draftProofs(storeDir, { limit: args.limit || 10 });
-    process.stdout.write(JSON.stringify({ command, storeDir, drafted: result.drafted, generated: result.generated, rejected: result.rejected, failure_reasons: result.failure_reasons }, null, 2) + '\n');
+    process.stdout.write(JSON.stringify({
+      command,
+      storeDir,
+      drafted: result.drafted,
+      generated: result.generated,
+      review_ready: result.review_ready,
+      critic_rejected: result.critic_rejected,
+      rejected: result.rejected,
+      exhausted: result.exhausted,
+      failure_reasons: result.failure_reasons,
+    }, null, 2) + '\n');
+    return;
+  }
+
+  if (command === 'coverage-report') {
+    const result = Object.assign({}, buildCoverageReport(storeDir), { generatedAt: new Date().toISOString() });
+    process.stdout.write(JSON.stringify({ command, storeDir, ...result }, null, 2) + '\n');
     return;
   }
 

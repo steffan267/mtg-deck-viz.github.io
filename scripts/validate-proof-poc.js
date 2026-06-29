@@ -12,7 +12,12 @@ const STORE = require('../src/proof-review-store');
 const PIPELINE = require('../src/proof-review-pipeline');
 
 const VALID_ATTEMPT_STATUSES = new Set(Object.values(PIPELINE.Status));
-const VALID_DRAFT_STATUSES = new Set([PIPELINE.Status.Generated, PIPELINE.Status.Rejected]);
+const VALID_DRAFT_STATUSES = new Set([
+  PIPELINE.Status.Generated,
+  PIPELINE.Status.Rejected,
+  PIPELINE.Status.CriticRejected,
+  PIPELINE.Status.ReviewReady,
+]);
 const PROVEN_STATUSES = new Set([
   PIPELINE.Status.DeterministicallyProven,
   PIPELINE.Status.PromotedToTest,
@@ -128,12 +133,18 @@ function validateProofPoc(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR) {
     if (!VALID_DRAFT_STATUSES.has(draft.status)) addFailure('draft.status', draft.draft_id || draft.source_proof_id, 'Invalid draft status: ' + draft.status);
     const check = draft.deterministic_check_results || {};
     if (check.accepted_or_promoted !== false) addFailure('draft.noPromotion', draft.draft_id || draft.source_proof_id, 'LLM draft must explicitly avoid accepting or promoting proofs.');
-    if (draft.status === PIPELINE.Status.Generated) {
+    if (draft.status === PIPELINE.Status.Generated || draft.status === PIPELINE.Status.ReviewReady) {
       try {
         PIPELINE.validateLlmProofDraft(draft.draft);
       } catch (error) {
         addFailure('draft.schema', draft.draft_id || draft.source_proof_id, error.message);
       }
+    }
+    if (draft.status === PIPELINE.Status.ReviewReady && draft.critic_verdict !== 'PASS') {
+      addFailure('draft.reviewReadyVerdict', draft.draft_id || draft.source_proof_id, 'REVIEW_READY draft must have critic_verdict PASS.');
+    }
+    if (draft.status === PIPELINE.Status.CriticRejected && (!Array.isArray(draft.critic_issues) || !draft.critic_issues.length)) {
+      addFailure('draft.criticIssues', draft.draft_id || draft.source_proof_id, 'CRITIC_REJECTED draft must have a non-empty critic_issues array.');
     }
     if (draft.status === PIPELINE.Status.Rejected && !draft.failure_reason) addWarning('draft.failureReason', draft.draft_id || draft.source_proof_id, 'Rejected draft has no failure reason.');
   }
