@@ -120,38 +120,142 @@ async function main() {
   const preservedCorrection = STORE.latestById(STORE.readRecords(tmpDir, 'proofAttempts'), 'proof_id').find(attempt => attempt.proof_id === correctionTarget.proof_id);
   assert.equal(preservedCorrection.review_verdict, 'NEEDS_CORRECTION', 'deterministic reruns should preserve correction metadata');
 
-  let draftCalls = 0;
-  const mockDraftClient = {
-    async generateJson() {
-      draftCalls += 1;
-      if (draftCalls === 2) throw new Error('mock malformed draft');
-      return {
-        cards: ['Kiki-Jiki, Mirror Breaker', 'Zealous Conscripts'],
-        interaction_family: 'copy→trigger',
-        synergy_class: 'ONE_WAY_ENABLEMENT',
-        action_sequence: [{ step_number: 1, action: 'draft only' }],
-        game_objects: [],
-        rules_concepts: ['UNKNOWN'],
-        resulting_advantage: ['UNKNOWN'],
-        assumptions: ['LLM draft requires deterministic verification.'],
-        failure_modes: ['Draft may overstate timing or object identity.'],
-        confidence: 0.42,
-        explanation: 'Untrusted local draft for reviewer triage.',
-        why_this_is_not_stronger_classification: 'No deterministic proof package supports this family yet.',
-      };
-    },
+  // Generator -> critic drafting. Build a self-contained store with NEEDS_REVIEW attempts.
+  const validDraft = {
+    cards: ['Kiki-Jiki, Mirror Breaker', 'Zealous Conscripts'],
+    interaction_family: 'copy→trigger',
+    synergy_class: 'ONE_WAY_ENABLEMENT',
+    action_sequence: [{ step_number: 1, action: 'draft only' }],
+    game_objects: [],
+    rules_concepts: ['UNKNOWN'],
+    resulting_advantage: ['UNKNOWN'],
+    assumptions: ['LLM draft requires deterministic verification.'],
+    failure_modes: ['Draft may overstate timing or object identity.'],
+    confidence: 0.42,
+    explanation: 'Untrusted local draft for reviewer triage.',
+    why_this_is_not_stronger_classification: 'No deterministic proof package supports this family yet.',
   };
-  const drafted = await PIPELINE.draftProofs(tmpDir, { client: mockDraftClient, limit: 2 });
-  assert.equal(drafted.drafted, 2);
-  assert.equal(drafted.generated, 1);
-  assert.equal(drafted.rejected, 1);
-  const draftRecords = STORE.readRecords(tmpDir, 'llmDrafts');
-  assert.equal(draftRecords.length, 2);
-  assert.equal(draftRecords.some(record => record.status === PIPELINE.Status.Generated), true, 'valid LLM drafts should persist as GENERATED drafts');
-  assert.equal(draftRecords.some(record => record.status === PIPELINE.Status.Rejected && /mock malformed draft/.test(record.failure_reason)), true, 'malformed LLM drafts should persist as rejected drafts');
-  const afterDraftStatuses = STORE.latestById(STORE.readRecords(tmpDir, 'proofAttempts'), 'proof_id').map(attempt => attempt.status);
-  assert.equal(afterDraftStatuses.includes(PIPELINE.Status.PromotedToTest), false, 'drafting must not promote proofs');
-  assert.equal(afterDraftStatuses.filter(status => status === PIPELINE.Status.Accepted).length, 1, 'drafting must not accept additional proofs');
+
+  function seedDraftStore() {
+    return seedAttempts(2);
+  }
+
+  async function seedAttempts(count) {
+    const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mtg-proof-draft-'));
+    STORE.initializeStore(dir);
+    for (let i = 0; i < count; i++) {
+      STORE.appendRecord(dir, 'proofAttempts', {
+        schemaVersion: PIPELINE.PROOF_REVIEW_SCHEMA_VERSION,
+        proof_id: 'proof_draft_' + i,
+        run_id: 'run_draft',
+        involved_cards: ['Card A' + i, 'Card B' + i],
+        interaction_family: 'fam_' + (i % 2),
+        synergy_class: PIPELINE.SynergyClass.OneWayEnablement,
+        status: PIPELINE.Status.NeedsReview,
+        rejection_reasons: ['needs review'],
+        deterministic_check_results: { graph_edge_present: true, deterministic_proof_package_present: false },
+        created_at: '2026-06-29T00:00:00.000Z',
+        updated_at: '2026-06-29T00:00:00.000Z',
+      });
+    }
+    return dir;
+  }
+
+  function makeClient(handler) {
+    return {
+      generatorModel: 'gen-model',
+      criticModel: 'crit-model',
+      calls: { generator: 0, critic: 0 },
+      async generateJson(prompt, schema, options) {
+        if (options.model === this.generatorModel) {
+          this.calls.generator += 1;
+          return handler.generator();
+        }
+        if (options.model === this.criticModel) {
+          this.calls.critic += 1;
+          return handler.critic();
+        }
+        throw new Error('unexpected model: ' + options.model);
+      },
+    };
+  }
+
+  // Case: generator valid + critic PASS -> REVIEW_READY.
+  {
+    const dir = await seedDraftStore();
+    const client = makeClient({ generator: () => ({ ...validDraft }), critic: () => ({ verdict: 'PASS', issues: [], confidence: 0.8 }) });
+    const result = await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    assert.equal(result.drafted, 1);
+    assert.equal(result.review_ready, 1);
+    assert.equal(result.exhausted, false);
+    const rows = STORE.readRecords(dir, 'llmDrafts');
+    assert.equal(rows[0].status, PIPELINE.Status.ReviewReady);
+    assert.equal(rows[0].critic_verdict, 'PASS');
+    assert.equal(rows[0].critic_confidence, 0.8);
+    assert.equal(rows[0].generator_model, 'gen-model');
+    assert.equal(rows[0].critic_model, 'crit-model');
+    assert.equal(rows[0].deterministic_check_results.accepted_or_promoted, false);
+  }
+
+  // Case: generator valid + critic FAIL -> CRITIC_REJECTED.
+  {
+    const dir = await seedDraftStore();
+    const client = makeClient({ generator: () => ({ ...validDraft }), critic: () => ({ verdict: 'FAIL', issues: ['bad timing'], confidence: 0.9 }) });
+    const result = await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    assert.equal(result.critic_rejected, 1);
+    const rows = STORE.readRecords(dir, 'llmDrafts');
+    assert.equal(rows[0].status, PIPELINE.Status.CriticRejected);
+    assert.deepEqual(rows[0].critic_issues, ['bad timing']);
+  }
+
+  // Case: generator throws -> REJECTED, critic NOT called.
+  {
+    const dir = await seedDraftStore();
+    const client = makeClient({ generator: () => { throw new Error('mock malformed draft'); }, critic: () => ({ verdict: 'PASS', issues: [], confidence: 1 }) });
+    const result = await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    assert.equal(result.rejected, 1);
+    assert.equal(client.calls.critic, 0, 'critic must not be called when generation fails');
+    const rows = STORE.readRecords(dir, 'llmDrafts');
+    assert.equal(rows[0].status, PIPELINE.Status.Rejected);
+    assert.match(rows[0].failure_reason, /mock malformed draft/);
+  }
+
+  // Case: critic throws -> CRITIC_REJECTED fail-closed with non-empty issues.
+  {
+    const dir = await seedDraftStore();
+    const client = makeClient({ generator: () => ({ ...validDraft }), critic: () => { throw new Error('critic offline'); } });
+    const result = await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    assert.equal(result.critic_rejected, 1);
+    const rows = STORE.readRecords(dir, 'llmDrafts');
+    assert.equal(rows[0].status, PIPELINE.Status.CriticRejected);
+    assert.equal(rows[0].critic_verdict, 'FAIL');
+    assert.equal(rows[0].critic_confidence, 0);
+    assert.ok(Array.isArray(rows[0].critic_issues) && rows[0].critic_issues.length > 0);
+    assert.match(rows[0].critic_issues[0], /critic_error/);
+  }
+
+  // Case: resumability — limit:1 drafts #1 then #2, then exhausted.
+  {
+    const dir = await seedAttempts(2);
+    const client = makeClient({ generator: () => ({ ...validDraft }), critic: () => ({ verdict: 'PASS', issues: [], confidence: 0.7 }) });
+    const first = await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    assert.equal(first.drafted, 1);
+    const firstId = STORE.readRecords(dir, 'llmDrafts')[0].source_proof_id;
+    const second = await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    assert.equal(second.drafted, 1);
+    const allDrafts = STORE.readRecords(dir, 'llmDrafts');
+    const secondId = allDrafts[allDrafts.length - 1].source_proof_id;
+    assert.notEqual(secondId, firstId, 'second draft must target a different proof');
+    const third = await PIPELINE.draftProofs(dir, { client, limit: 1 });
+    assert.equal(third.drafted, 0);
+    assert.equal(third.exhausted, true);
+    // INVARIANT: no draft record ever accepts/promotes.
+    for (const row of STORE.readRecords(dir, 'llmDrafts')) {
+      assert.notEqual(row.status, PIPELINE.Status.Accepted);
+      assert.notEqual(row.status, PIPELINE.Status.PromotedToTest);
+      assert.equal(row.deterministic_check_results.accepted_or_promoted, false);
+    }
+  }
 
   const fixtureDir = path.join(tmpDir, 'fixtures');
   const promoted = PIPELINE.promoteTests(tmpDir, { fixtureDir });

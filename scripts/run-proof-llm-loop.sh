@@ -160,18 +160,30 @@ console.log(`[proof-loop] overview ${draftSummary}${draftStatusSummary ? ` (${dr
 NODE
 }
 
+LOOP_CAUGHT_UP=0
+
 run_once() {
   local stamp
   stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "[proof-loop] === iteration $stamp ==="
+
+  LOOP_CAUGHT_UP=0
 
   if should_run_sample; then
     node ./bin/mtg-proofs.js sample
   fi
 
   node ./bin/mtg-proofs.js run
-  node ./bin/mtg-proofs.js draft-proofs --limit "$DRAFT_LIMIT"
+
+  local draft_out
+  draft_out="$(node ./bin/mtg-proofs.js draft-proofs --limit "$DRAFT_LIMIT")"
+  echo "$draft_out"
+  if echo "$draft_out" | grep -q '"exhausted": true'; then
+    LOOP_CAUGHT_UP=1
+  fi
+
   node ./bin/mtg-proofs.js export-review --limit "$EXPORT_LIMIT"
+  node ./scripts/validate-proof-poc.js --store-dir analysis/proof-review --check
 
   echo "[proof-loop] iteration complete; review exports are under analysis/proof-review/"
 }
@@ -233,6 +245,10 @@ while true; do
   if ! print_iteration_status "$ITERATION" "ok" "$((iteration_finished_at - iteration_started_at))"; then
     echo "[proof-loop] ERROR status overview unavailable; stopping" | tee -a "$ERROR_LOG" >&2
     exit 1
+  fi
+  if [[ "$LOOP_CAUGHT_UP" -eq 1 ]]; then
+    echo "[proof-loop] caught up: no new NEEDS_REVIEW cards to draft"
+    exit 0
   fi
   echo "[proof-loop] sleeping ${SUCCESS_SLEEP_SECONDS}s before next iteration; Ctrl-C to stop"
   sleep "$SUCCESS_SLEEP_SECONDS"
