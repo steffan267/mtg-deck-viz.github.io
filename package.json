@@ -6,7 +6,8 @@
   "bin": {
     "mtg-commander-search": "./bin/mtg-commander-search.js",
     "mtg-deck-context": "./bin/mtg-deck-context.js",
-    "mtg-proofs": "./bin/mtg-proofs.js"
+    "mtg-proofs": "./bin/mtg-proofs.js",
+    "mtg-proof-loop": "./scripts/run-proof-llm-loop.sh"
   },
   "scripts": {
     "build-data": "node ./bin/mtg-commander-search.js",
@@ -42,7 +43,9 @@
     "no-hardcode:interactions": "node ./scripts/check-no-combo-name-hardcoding.js",
     "typecheck:combo-detection": "tsc -p tsconfig.combo-detection.json --noEmit",
     "test:combo-detection": "node ./test/run-combo-detection-strategy-contracts.js && node ./test/combo-detection-strategy-benchmark.test.js",
-    "typecheck:project-js": "tsc -p tsconfig.project-js.json --noEmit"
+    "typecheck:project-js": "tsc -p tsconfig.project-js.json --noEmit",
+    "proofs:llm-loop": "./scripts/run-proof-llm-loop.sh",
+    "setup:global": "./scripts/setup-global.sh"
   },
   "engines": {
     "node": ">=20.19"

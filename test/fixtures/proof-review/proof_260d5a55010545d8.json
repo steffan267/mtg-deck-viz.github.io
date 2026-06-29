@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "proof-review-golden.v1",
+  "proof_id": "proof_260d5a55010545d8",
+  "cards": [
+    "Kiki-Jiki, Mirror Breaker",
+    "Zealous Conscripts"
+  ],
+  "oracle_text_snapshot": {
+    "Kiki-Jiki, Mirror Breaker": "Haste {T}: Create a token that's a copy of target nonlegendary creature you control, except it has haste. Sacrifice it at the beginning of the next end step.",
+    "Zealous Conscripts": "Haste When this creature enters, gain control of target permanent until end of turn. Untap that permanent. It gains haste until end of turn."
+  },
+  "expected_interaction_family": "hasty-copy→etb-untap-loop",
+  "expected_synergy_class": "INFINITE_COMBO",
+  "expected_rules_concepts": [
+    "ETB",
+    "TRIGGERED_ABILITY",
+    "TOKEN_CREATION",
+    "COPYING_PERMANENT",
+    "LOOP"
+  ],
+  "expected_resulting_advantage": [
+    "TOKENS"
+  ],
+  "expected_minimal_action_sequence": [
+    {
+      "index": 1,
+      "card": "Kiki-Jiki, Mirror Breaker",
+      "action": "creates a hasty token copy of the ETB untapper"
+    },
+    {
+      "index": 2,
+      "card": "Zealous Conscripts",
+      "action": "token copy enters and untaps the repeatable copier"
+    },
+    {
+      "index": 3,
+      "action": "the hasty copy engine is restored and can repeat"
+    }
+  ],
+  "source_status": "DETERMINISTICALLY_PROVEN"
+}
