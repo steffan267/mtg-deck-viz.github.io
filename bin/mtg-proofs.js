@@ -13,7 +13,10 @@ function usage() {
 Commands:
   sample                         Create/reference the built-in proof-review sample deck
   run                            Run deterministic proof/package logic and persist review records
-  export-review [--limit n]      Export NEEDS_REVIEW proofs to Markdown and JSONL
+  export-review [--limit n] [--compact] [--force]
+                                 Export NEEDS_REVIEW proofs to Markdown and JSONL
+                                 (default v1; --compact = token-lean v2 batch;
+                                 --force = re-export even if an identical batch exists)
   import-review <review.jsonl>   Import manual review JSONL and update local statuses
   promote-tests                  Promote accepted/deterministic proofs into JSON fixtures
   draft-proofs [--limit n]       Ask local Ollama to draft untrusted JSON for NEEDS_REVIEW proofs
@@ -42,6 +45,8 @@ function parseArgs(argv) {
     else if (arg === '--out-dir') args.outDir = path.resolve(argv[++i]);
     else if (arg === '--fixture-dir') args.fixtureDir = path.resolve(argv[++i]);
     else if (arg === '--combo-cache') args.comboCache = path.resolve(argv[++i]);
+    else if (arg === '--compact') args.compact = true;
+    else if (arg === '--force') args.force = true;
     else if (arg === '-h' || arg === '--help') args.help = true;
     else args._.push(arg);
   }
@@ -70,7 +75,7 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'export-review') {
-    const result = PIPELINE.exportReview(storeDir, { limit: args.limit || 20, exportDir: args.outDir });
+    const result = PIPELINE.exportReview(storeDir, { limit: args.limit || 20, exportDir: args.outDir, compact: args.compact === true, force: args.force === true });
     process.stdout.write(JSON.stringify({ command, storeDir, ...result }, null, 2) + '\n');
     return;
   }

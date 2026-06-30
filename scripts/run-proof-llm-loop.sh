@@ -155,6 +155,8 @@ function latestExportSummary() {
   const rows = readJsonl('review-batches.jsonl');
   const batches = new Map();
   for (const row of rows) {
+    // Skip v2 batch_header rows so they don't inflate per-batch item counts.
+    if (row.type === 'batch_header') continue;
     if (!row.batch_id) continue;
     if (!batches.has(row.batch_id)) batches.set(row.batch_id, 0);
     batches.set(row.batch_id, batches.get(row.batch_id) + 1);

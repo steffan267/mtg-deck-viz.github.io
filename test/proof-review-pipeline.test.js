@@ -68,6 +68,109 @@ async function main() {
   assert.equal(exportedAgain.skipped_unchanged, true, 'unchanged review exports should reuse the previous batch');
   assert.equal(exportedAgain.batch_id, exported.batch_id);
 
+  // Compact v2 export. Use a fresh store so the v1 review-batches stream above is
+  // not in play, and seed >=2 NEEDS_REVIEW proofs that share a card.
+  {
+    const compactDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mtg-proof-compact-'));
+    STORE.initializeStore(compactDir);
+    STORE.appendRecord(compactDir, 'cards', { name: 'Shared Card', oracle_text: 'Shared oracle text.', updated_at: '2026-06-29T00:00:00.000Z' });
+    STORE.appendRecord(compactDir, 'cards', { name: 'Unique A', oracle_text: 'Unique A text.', updated_at: '2026-06-29T00:00:00.000Z' });
+    STORE.appendRecord(compactDir, 'cards', { name: 'Unique B', oracle_text: 'Unique B text.', updated_at: '2026-06-29T00:00:00.000Z' });
+    for (const [i, partner] of [['0', 'Unique A'], ['1', 'Unique B']]) {
+      STORE.appendRecord(compactDir, 'proofAttempts', {
+        schemaVersion: PIPELINE.PROOF_REVIEW_SCHEMA_VERSION,
+        proof_id: 'proof_compact_' + i,
+        run_id: 'run_compact',
+        involved_cards: ['Shared Card', partner],
+        interaction_family: 'fam_compact_' + i,
+        synergy_class: PIPELINE.SynergyClass.OneWayEnablement,
+        action_sequence: [{ step_number: 1, action: 'compact step' }],
+        rules_concepts: ['UNKNOWN'],
+        resulting_advantage: ['UNKNOWN'],
+        assumptions: ['needs verification'],
+        limiting_clauses: [],
+        rejection_reasons: ['needs review reason'],
+        status: PIPELINE.Status.NeedsReview,
+        deterministic_check_results: { graph_edge_present: true, deterministic_proof_package_present: false },
+        created_at: '2026-06-29T00:00:00.000Z',
+        updated_at: '2026-06-29T00:00:00.000Z',
+      });
+    }
+    // Export v1 first for this proof set, then compact for the SAME set: the
+    // format-aware skip must NOT treat the compact run as unchanged.
+    const v1First = PIPELINE.exportReview(compactDir, { limit: 10 });
+    assert.equal(v1First.skipped_unchanged, false);
+    assert.notEqual(v1First.compact, true, 'default export is v1, not compact');
+    const v1Again = PIPELINE.exportReview(compactDir, { limit: 10 });
+    assert.equal(v1Again.skipped_unchanged, true, 'a repeated v1 export of the same proofs should still skip');
+
+    const compactExport = PIPELINE.exportReview(compactDir, { limit: 10, compact: true });
+    assert.equal(compactExport.skipped_unchanged, false, 'switching v1 -> compact on the same proofs must re-export, not skip');
+    assert.equal(compactExport.compact, true);
+    assert.equal(compactExport.count, 2, 'count reflects proofs, not the header row');
+    // A second compact export of the same set now DOES skip (same proofs, same format).
+    const compactAgain = PIPELINE.exportReview(compactDir, { limit: 10, compact: true });
+    assert.equal(compactAgain.skipped_unchanged, true, 'a repeated compact export of the same proofs should skip');
+    // The stream now holds the prior v1 batch plus this compact batch; scope the
+    // header/proof-row assertions to the compact batch we just wrote.
+    const compactRows = STORE.readJsonl(compactExport.jsonl_path, { skipMalformed: true })
+      .filter(row => row.batch_id === compactExport.batch_id);
+    const headerRows = compactRows.filter(row => row.type === 'batch_header');
+    const proofRows = compactRows.filter(row => row.type !== 'batch_header');
+    assert.equal(headerRows.length, 1, 'compact batch should have exactly one header row');
+    const header = headerRows[0];
+    assert.match(header.review_instructions, /Do not invent missing Oracle text/);
+    assert.ok(header.return_contract && header.return_contract.required_fields, 'header carries a return_contract');
+    assert.ok(header.oracle_text && header.oracle_text['Shared Card'], 'header carries a deduped oracle_text dict');
+    // The shared card appears once in the dict despite being in two proofs.
+    assert.equal(Object.keys(header.oracle_text).filter(name => name === 'Shared Card').length, 1);
+    assert.deepEqual(Object.keys(header.oracle_text).sort(), ['Shared Card', 'Unique A', 'Unique B']);
+    assert.equal(proofRows.length, 2);
+    for (const row of proofRows) {
+      assert.ok(row.proof_id, 'compact proof rows carry proof_id');
+      assert.equal(row.review_instructions, undefined, 'compact proof rows omit per-row review_instructions');
+      assert.equal(row.oracle_text, undefined, 'compact proof rows omit per-row oracle_text');
+      assert.equal(row.proof_package, undefined, 'compact proof rows do not embed the full proof_package');
+      assert.equal(row.proof, undefined, 'compact proof rows do not embed the full proof');
+      assert.ok(row.proof_package_ref, 'compact proof rows carry a proof_package_ref');
+      // Populated optional fields are kept; empty ones are omitted entirely
+      // (these test attempts have a non-empty action_sequence/assumptions but an
+      // empty limiting_clauses) so empty arrays never burn reviewer tokens.
+      assert.ok(Array.isArray(row.action_sequence) && row.action_sequence.length, 'populated action_sequence is kept');
+      assert.ok(Array.isArray(row.assumptions) && row.assumptions.length, 'populated assumptions is kept');
+      assert.equal(row.limiting_clauses, undefined, 'empty limiting_clauses is omitted');
+    }
+    assert.match(fs.readFileSync(compactExport.markdown_path, 'utf8'), /Do not invent missing Oracle text/);
+
+    // Oracle-text fallback: a proof can reference a card never persisted to the
+    // store `cards` stream (e.g. combo-sweep / EDHREC proofs). The export must
+    // resolve its Oracle text from the full card DB instead of emitting '' —
+    // without text an LLM reviewer has nothing to review.
+    STORE.appendRecord(compactDir, 'proofAttempts', {
+      schemaVersion: PIPELINE.PROOF_REVIEW_SCHEMA_VERSION,
+      proof_id: 'proof_compact_fallback',
+      run_id: 'run_compact',
+      involved_cards: ['Shared Card', 'Sol Ring'],
+      interaction_family: 'fam_compact_fallback',
+      synergy_class: PIPELINE.SynergyClass.OneWayEnablement,
+      action_sequence: [],
+      rules_concepts: ['UNKNOWN'],
+      resulting_advantage: ['UNKNOWN'],
+      assumptions: [],
+      limiting_clauses: [],
+      rejection_reasons: ['needs review reason'],
+      status: PIPELINE.Status.NeedsReview,
+      deterministic_check_results: { graph_edge_present: true, deterministic_proof_package_present: false },
+      created_at: '2026-06-29T00:00:00.000Z',
+      updated_at: '2026-06-29T00:00:00.000Z',
+    });
+    const fallbackExport = PIPELINE.exportReview(compactDir, { limit: 10, compact: true, force: true });
+    const fallbackHeader = STORE.readJsonl(fallbackExport.jsonl_path, { skipMalformed: true })
+      .filter(row => row.batch_id === fallbackExport.batch_id && row.type === 'batch_header')[0];
+    // 'Sol Ring' is not in the store cards stream but is in the full Scryfall DB.
+    assert.ok(fallbackHeader.oracle_text['Sol Ring'], 'oracle text resolves from the full card DB when absent from the store stream');
+  }
+
   const reviewTarget = attempts.find(attempt => attempt.status === PIPELINE.Status.NeedsReview);
   const reviewPath = path.join(tmpDir, 'reviewed.jsonl');
   fs.writeFileSync(reviewPath, JSON.stringify({

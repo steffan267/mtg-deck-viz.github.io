@@ -100,6 +100,113 @@ async function main() {
   assert.equal(passing.summary.latest_attempts, 1);
   assert.equal(passing.summary.golden_tests, 1);
 
+  // v2-only review-batches: a batch_header + a slim proof row whose proof_id resolves.
+  {
+    const v2dir = await tmpStore();
+    STORE.appendRecord(v2dir, 'cards', { name: cards[0], oracle_text: 'oracle a', updated_at: created_at });
+    STORE.appendRecord(v2dir, 'proofAttempts', {
+      schemaVersion: PIPELINE.PROOF_REVIEW_SCHEMA_VERSION,
+      proof_id,
+      run_id: 'run_poc',
+      involved_cards: cards,
+      interaction_family: proofPackage.family,
+      synergy_class: PIPELINE.SynergyClass.OneWayEnablement,
+      action_sequence: [],
+      game_objects: [],
+      rules_concepts: ['UNKNOWN'],
+      resulting_advantage: ['UNKNOWN'],
+      assumptions: [],
+      limiting_clauses: [],
+      rejection_reasons: ['needs review'],
+      deterministic_source: 'poc-test',
+      confidence_or_routing_score: 'needs-review',
+      status: PIPELINE.Status.NeedsReview,
+      deterministic_check_results: { graph_edge_present: true, deterministic_proof_package_present: false },
+      created_at,
+      updated_at: created_at,
+    });
+    writeJsonl(path.join(v2dir, 'review-batches.jsonl'), [
+      {
+        type: 'batch_header',
+        schemaVersion: PIPELINE.REVIEW_EXPORT_SCHEMA_VERSION_V2,
+        batch_id: 'batch_v2',
+        review_instructions: PIPELINE.reviewInstructions(),
+        return_contract: { format: 'JSONL' },
+        oracle_text: Object.fromEntries(cards.map(card => [card, card + ' oracle text'])),
+      },
+      {
+        schemaVersion: PIPELINE.REVIEW_EXPORT_SCHEMA_VERSION_V2,
+        batch_id: 'batch_v2',
+        proof_id,
+        cards,
+        interaction_family: proofPackage.family,
+        synergy_class: PIPELINE.SynergyClass.OneWayEnablement,
+        deterministic_summary: { status: 'NEEDS_REVIEW', package_id: null },
+        proof_package_ref: { stream: 'proofPackages', package_id: null },
+      },
+    ]);
+    const v2result = validateProofPoc(v2dir);
+    assert.equal(v2result.ok, true, JSON.stringify(v2result.failures, null, 2));
+  }
+
+  // MIXED review-batches: a v1 row + a v2 header + a v2 proof row coexist (append-only).
+  {
+    const mixedDir = await tmpStore();
+    STORE.appendRecord(mixedDir, 'cards', { name: cards[0], oracle_text: 'oracle a', updated_at: created_at });
+    STORE.appendRecord(mixedDir, 'proofAttempts', {
+      schemaVersion: PIPELINE.PROOF_REVIEW_SCHEMA_VERSION,
+      proof_id,
+      run_id: 'run_poc',
+      involved_cards: cards,
+      interaction_family: proofPackage.family,
+      synergy_class: PIPELINE.SynergyClass.OneWayEnablement,
+      action_sequence: [],
+      game_objects: [],
+      rules_concepts: ['UNKNOWN'],
+      resulting_advantage: ['UNKNOWN'],
+      assumptions: [],
+      limiting_clauses: [],
+      rejection_reasons: ['needs review'],
+      deterministic_source: 'poc-test',
+      confidence_or_routing_score: 'needs-review',
+      status: PIPELINE.Status.NeedsReview,
+      deterministic_check_results: { graph_edge_present: true, deterministic_proof_package_present: false },
+      created_at,
+      updated_at: created_at,
+    });
+    writeJsonl(path.join(mixedDir, 'review-batches.jsonl'), [
+      {
+        batch_id: 'batch_v1',
+        schemaVersion: PIPELINE.REVIEW_EXPORT_SCHEMA_VERSION,
+        proof_id,
+        cards,
+        oracle_text: Object.fromEntries(cards.map(card => [card, card + ' oracle text'])),
+        proof: { proof_id },
+        review_instructions: PIPELINE.reviewInstructions(),
+      },
+      {
+        type: 'batch_header',
+        schemaVersion: PIPELINE.REVIEW_EXPORT_SCHEMA_VERSION_V2,
+        batch_id: 'batch_v2',
+        review_instructions: PIPELINE.reviewInstructions(),
+        return_contract: { format: 'JSONL' },
+        oracle_text: Object.fromEntries(cards.map(card => [card, card + ' oracle text'])),
+      },
+      {
+        schemaVersion: PIPELINE.REVIEW_EXPORT_SCHEMA_VERSION_V2,
+        batch_id: 'batch_v2',
+        proof_id,
+        cards,
+        interaction_family: proofPackage.family,
+        synergy_class: PIPELINE.SynergyClass.OneWayEnablement,
+        deterministic_summary: { status: 'NEEDS_REVIEW', package_id: null },
+        proof_package_ref: { stream: 'proofPackages', package_id: null },
+      },
+    ]);
+    const mixedResult = validateProofPoc(mixedDir);
+    assert.equal(mixedResult.ok, true, JSON.stringify(mixedResult.failures, null, 2));
+  }
+
   STORE.appendRecord(dir, 'proofAttempts', {
     proof_id,
     involved_cards: cards,

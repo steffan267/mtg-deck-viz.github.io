@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { build, loadCards } = require('./build-deck-viz');
+const CARD_FACES = require('./card-faces.js');
 const MODEL = require('./interaction-model.js');
 const FACE_CLASSIFICATION = require('./face-classification.js');
 const STORE = require('./proof-review-store');
@@ -16,6 +17,7 @@ const { LocalLlmClient } = require('./local-llm-client');
 
 const PROOF_REVIEW_SCHEMA_VERSION = 'proof-review.v1';
 const REVIEW_EXPORT_SCHEMA_VERSION = 'proof-review-export.v1';
+const REVIEW_EXPORT_SCHEMA_VERSION_V2 = 'proof-review-export.v2';
 
 const Status = Object.freeze({
   New: 'NEW',
@@ -658,10 +660,30 @@ function appendGeneratedAttempt(storeDir, generatedAttempt, priorAttempts) {
   return preserved;
 }
 
+// Lazily-loaded full Scryfall DB index (keyed by normalized card name), shared
+// across calls so the ~39k-card load happens at most once per process.
+let _fullCardIndex = null;
+function fullCardIndex() {
+  if (!_fullCardIndex) _fullCardIndex = loadCards();
+  return _fullCardIndex;
+}
+
+// Resolve oracle text / card data for review export. The store `cards` stream
+// only holds cards explicitly persisted by a run (e.g. the sample deck), so
+// combo-sweep / EDHREC proofs reference cards absent from it. We fall back to
+// the full Scryfall DB (normalized-name keyed) so exported proofs always carry
+// Oracle text — without it an LLM reviewer has nothing to review.
 function latestCardsByName(storeDir) {
   const map = new Map();
   for (const card of STORE.readRecords(storeDir, 'cards')) map.set(card.name, card);
-  return map;
+  return {
+    get(name) {
+      const stored = map.get(name);
+      if (stored && (stored.oracle_text || stored.text)) return stored;
+      const fallback = fullCardIndex()[CARD_FACES.normalizeCardNameKey(name)];
+      return stored || fallback || undefined;
+    },
+  };
 }
 
 function reviewInstructions() {
@@ -670,6 +692,85 @@ function reviewInstructions() {
     + 'Use only the provided Oracle text and proof data.\n'
     + 'Check timing, zones, object identity, costs, replacement effects, triggered abilities, activated abilities, mana abilities, state-based actions, priority, loop validity, and whether the synergy class is overstated.\n\n'
     + 'Return JSONL only. Each line must include: proof_id, verdict (ACCEPTED, REJECTED, or NEEDS_CORRECTION), corrected_confidence, corrected_synergy_class, issues, corrected_proof, test_case_recommendation.';
+}
+
+// Single shared discriminator: a v2 batch_header row carries no proof_id and
+// must never be treated as a per-proof row by the grouping / signature-compare
+// logic below. Every per-proof row (v1 or v2) has a proof_id and is not a header.
+function isProofExportRow(row) {
+  return row && row.type !== 'batch_header' && !!row.proof_id;
+}
+
+// Informational return contract mirrored from validateReviewRow's accepted
+// values. Lives in the v2 header so the reviewing LLM sees the exact shape it
+// must emit. It is NOT a second validator — validateReviewRow remains the only
+// gate on import.
+function reviewReturnContract() {
+  return {
+    format: 'JSONL, one object per line',
+    required_fields: {
+      proof_id: 'string (echo the proof_id from the proof row)',
+      verdict: { type: 'string', allowed: [...REVIEW_VERDICTS] },
+      corrected_confidence: { type: 'number', min: 0, max: 1 },
+      corrected_synergy_class: { type: 'string', allowed: [...SYNERGY_CLASSES] },
+      issues: 'string[]',
+      corrected_proof: 'object',
+      test_case_recommendation: 'string',
+    },
+  };
+}
+
+// Slim per-proof row for the v2 compact batch. Sources every field defensively
+// from the attempt (and its proof_package when present) so absent fields are
+// omitted rather than emitted as undefined. NEEDS_REVIEW attempts have no
+// proof_package; deterministically-proven ones do.
+function compactProofRow(attempt, batchId) {
+  const pkg = attempt.proof_package || {};
+  const check = attempt.deterministic_check_results || {};
+  const row = {
+    schemaVersion: REVIEW_EXPORT_SCHEMA_VERSION_V2,
+    batch_id: batchId,
+    proof_id: attempt.proof_id,
+    cards: attempt.involved_cards || [],
+    interaction_family: attempt.interaction_family,
+    synergy_class: attempt.synergy_class,
+    deterministic_summary: {
+      status: check.deterministic_package_status || attempt.status || null,
+      package_id: check.package_id || pkg.id || null,
+    },
+    proof_package_ref: { stream: 'proofPackages', package_id: check.package_id || pkg.id || null },
+  };
+  // Optional list fields are omitted entirely when empty: on deterministic
+  // run/combo-sweep proofs they are usually unpopulated, and shipping empty
+  // arrays only burns reviewer tokens. They populate on LLM-drafted proofs.
+  for (const field of ['rules_concepts', 'resulting_advantage', 'assumptions', 'limiting_clauses', 'rejection_reasons', 'action_sequence']) {
+    const value = attempt[field];
+    if (Array.isArray(value) && value.length) row[field] = value;
+  }
+  return row;
+}
+
+// buildCompactBatch — token-lean v2 export. Returns JSONL rows: one batch_header
+// (instructions + return contract + a deduped cardName->oracle_text dict shared
+// across all proofs in the batch) followed by slim per-proof rows. The header
+// holds the shared, repeated material once; per-proof rows never embed the full
+// proof_package, per-row instructions, or per-row oracle text.
+function buildCompactBatch(attempts, cards, batchId) {
+  const oracleText = {};
+  for (const attempt of attempts) {
+    for (const name of attempt.involved_cards || []) {
+      if (!(name in oracleText)) oracleText[name] = cards.get(name)?.oracle_text || '';
+    }
+  }
+  const header = {
+    type: 'batch_header',
+    schemaVersion: REVIEW_EXPORT_SCHEMA_VERSION_V2,
+    batch_id: batchId,
+    review_instructions: reviewInstructions(),
+    return_contract: reviewReturnContract(),
+    oracle_text: oracleText,
+  };
+  return [header, ...attempts.map(attempt => compactProofRow(attempt, batchId))];
 }
 
 const REVIEW_EXPORT_JSONL_STREAM = 'review-batches.jsonl';
@@ -701,7 +802,7 @@ function closeOpenFiles(openFiles, originalError) {
   if (!originalError && firstCloseError) throw firstCloseError;
 }
 
-function appendReviewExportStreams(jsonlPath, markdownPath, batchId, rows) {
+function appendReviewExportStreams(jsonlPath, markdownPath, batchId, rows, options = {}) {
   const openFiles = [
     { path: markdownPath, fd: undefined },
     { path: jsonlPath, fd: undefined },
@@ -711,7 +812,8 @@ function appendReviewExportStreams(jsonlPath, markdownPath, batchId, rows) {
     openFiles[0].fd = fs.openSync(markdownPath, 'a');
     const rowsWithBatch = rows.map(row => Object.assign({ batch_id: batchId }, row));
     fs.writeSync(openFiles[1].fd, rowsWithBatch.map(row => JSON.stringify(row)).join('\n') + (rowsWithBatch.length ? '\n' : ''));
-    fs.writeSync(openFiles[0].fd, renderReviewMarkdown(batchId, rows) + '\n\n');
+    const markdown = options.compact ? renderCompactReviewMarkdown(batchId, rows) : renderReviewMarkdown(batchId, rows);
+    fs.writeSync(openFiles[0].fd, markdown + '\n\n');
   } catch (error) {
     closeOpenFiles(openFiles, error);
     throw error;
@@ -729,6 +831,10 @@ function reviewExportFiles(exportDir) {
     const rows = STORE.readJsonl(streamPaths.jsonl_path, { skipMalformed: true });
     const batches = new Map();
     for (const row of rows) {
+      // Skip v2 batch_header rows: they carry no proof_id and would otherwise
+      // inject an undefined proof_id into the per-batch row list, breaking the
+      // unchanged-skip signature comparison below.
+      if (!isProofExportRow(row)) continue;
       if (!row.batch_id) continue;
       if (!batches.has(row.batch_id)) batches.set(row.batch_id, []);
       batches.get(row.batch_id).push(row);
@@ -746,12 +852,26 @@ function reviewExportFiles(exportDir) {
   return files.sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
 
-function latestReviewExportForProofIds(exportDir, proofIds) {
+// A v1 proof row carries either no schemaVersion or REVIEW_EXPORT_SCHEMA_VERSION;
+// a v2/compact proof row carries REVIEW_EXPORT_SCHEMA_VERSION_V2. Normalize to the
+// requested-format vocabulary so the skip-unchanged check is format-aware.
+function exportRowFormat(row) {
+  return row.schemaVersion === REVIEW_EXPORT_SCHEMA_VERSION_V2
+    ? REVIEW_EXPORT_SCHEMA_VERSION_V2
+    : REVIEW_EXPORT_SCHEMA_VERSION;
+}
+
+// A prior export only counts as "unchanged" when it covers the SAME proof_ids AND
+// was written in the SAME format (v1 vs v2/compact). Otherwise switching format on
+// an identical proof set must force a fresh export rather than silently no-op.
+function latestReviewExportForProofIds(exportDir, proofIds, requestedSchemaVersion = REVIEW_EXPORT_SCHEMA_VERSION) {
   const signature = JSON.stringify(proofIds);
   for (const file of reviewExportFiles(exportDir)) {
-    const rows = file.rows || STORE.readJsonl(file.jsonl_path, { skipMalformed: true });
+    const rows = (file.rows || STORE.readJsonl(file.jsonl_path, { skipMalformed: true })).filter(isProofExportRow);
     const rowProofIds = rows.map(row => row.proof_id);
-    if (JSON.stringify(rowProofIds) === signature) return Object.assign({}, file, { rows: undefined, count: rows.length });
+    if (JSON.stringify(rowProofIds) !== signature) continue;
+    if (rows.some(row => exportRowFormat(row) !== requestedSchemaVersion)) continue;
+    return Object.assign({}, file, { rows: undefined, count: rows.length });
   }
   return null;
 }
@@ -764,21 +884,30 @@ function exportReview(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR, options = {}) {
   const attempts = latestAttempts(storeDir).filter(attempt => attempt.status === Status.NeedsReview).slice(0, limit);
   const cards = latestCardsByName(storeDir);
   const streamPaths = reviewExportPaths(exportDir);
+  // compact = token-lean v2 batch (hoisted instructions, deduped oracle dict,
+  // slim rows). Default stays v1 byte-identical.
+  const compact = options.compact === true;
+  const requestedSchemaVersion = compact ? REVIEW_EXPORT_SCHEMA_VERSION_V2 : REVIEW_EXPORT_SCHEMA_VERSION;
   if (!options.force) {
-    const unchanged = latestReviewExportForProofIds(exportDir, attempts.map(attempt => attempt.proof_id));
+    // Format-aware skip: only reuse a prior batch with the SAME proof_ids AND the
+    // SAME format, so e.g. `--compact` on a set already exported as v1 re-exports.
+    const unchanged = latestReviewExportForProofIds(exportDir, attempts.map(attempt => attempt.proof_id), requestedSchemaVersion);
     if (unchanged) return Object.assign({ skipped_unchanged: true }, unchanged);
   }
   const batchId = options.batchId || hashId('review_batch', [now(), attempts.map(item => item.proof_id)]);
-  const rows = attempts.map(attempt => ({
-    schemaVersion: REVIEW_EXPORT_SCHEMA_VERSION,
-    proof_id: attempt.proof_id,
-    cards: attempt.involved_cards,
-    oracle_text: Object.fromEntries((attempt.involved_cards || []).map(name => [name, cards.get(name)?.oracle_text || ''])),
-    proof: attempt,
-    review_instructions: reviewInstructions(),
-  }));
-  appendReviewExportStreams(streamPaths.jsonl_path, streamPaths.markdown_path, batchId, rows);
-  return { batch_id: batchId, markdown_path: streamPaths.markdown_path, jsonl_path: streamPaths.jsonl_path, count: rows.length, skipped_unchanged: false };
+  const rows = compact
+    ? buildCompactBatch(attempts, cards, batchId)
+    : attempts.map(attempt => ({
+      schemaVersion: REVIEW_EXPORT_SCHEMA_VERSION,
+      proof_id: attempt.proof_id,
+      cards: attempt.involved_cards,
+      oracle_text: Object.fromEntries((attempt.involved_cards || []).map(name => [name, cards.get(name)?.oracle_text || ''])),
+      proof: attempt,
+      review_instructions: reviewInstructions(),
+    }));
+  appendReviewExportStreams(streamPaths.jsonl_path, streamPaths.markdown_path, batchId, rows, { compact });
+  // count reflects reviewable proofs, not the header row.
+  return { batch_id: batchId, markdown_path: streamPaths.markdown_path, jsonl_path: streamPaths.jsonl_path, count: attempts.length, skipped_unchanged: false, compact };
 }
 
 function renderReviewMarkdown(batchId, rows) {
@@ -789,6 +918,40 @@ function renderReviewMarkdown(batchId, rows) {
     parts.push('Oracle text:');
     for (const [name, text] of Object.entries(row.oracle_text)) parts.push('- **' + name + '**: ' + (text || '(missing)'));
     parts.push('', 'Current deterministic proof/package output:', '```json', JSON.stringify(row.proof, null, 2), '```', '');
+  }
+  parts.push('Return JSONL only.');
+  return parts.join('\n');
+}
+
+// v2 markdown: emit instructions + return contract + a single deduped Oracle-text
+// section once, then one compact block per proof. No full proof_package dump.
+// MUST keep the literal "Do not invent missing Oracle text" sentence (carried by
+// reviewInstructions) — a test and the POC validator regex depend on it.
+function renderCompactReviewMarkdown(batchId, rows) {
+  const header = rows.find(row => row.type === 'batch_header') || {};
+  const proofRows = rows.filter(isProofExportRow);
+  const oracle = header.oracle_text || {};
+  const parts = ['# MTG proof review batch ' + batchId + ' (compact v2)', ''];
+  parts.push(header.review_instructions || reviewInstructions(), '');
+  parts.push('## Return contract', '', '```json', JSON.stringify(header.return_contract || reviewReturnContract(), null, 2), '```', '');
+  parts.push('## Card Oracle text', '');
+  for (const [name, text] of Object.entries(oracle)) parts.push('- **' + name + '**: ' + (text || '(missing)'));
+  parts.push('');
+  for (const row of proofRows) {
+    parts.push('## Proof ' + row.proof_id, '');
+    parts.push('Cards: ' + (row.cards || []).join(', '), '');
+    parts.push('Family: ' + (row.interaction_family || '(unknown)') + ' | Synergy class: ' + (row.synergy_class || '(unknown)'), '');
+    if (Array.isArray(row.action_sequence) && row.action_sequence.length) {
+      parts.push('Action sequence:');
+      for (const step of row.action_sequence) parts.push('- ' + (typeof step === 'string' ? step : JSON.stringify(step)));
+      parts.push('');
+    }
+    if (Array.isArray(row.rejection_reasons) && row.rejection_reasons.length) {
+      parts.push('Why not stronger / rejection reasons:');
+      for (const reason of row.rejection_reasons) parts.push('- ' + reason);
+      parts.push('');
+    }
+    parts.push('Deterministic summary: ' + JSON.stringify(row.deterministic_summary || {}), '');
   }
   parts.push('Return JSONL only.');
   return parts.join('\n');
@@ -1243,11 +1406,13 @@ module.exports = {
   DEFAULT_SAMPLE_NAMES,
   PROOF_REVIEW_SCHEMA_VERSION,
   REVIEW_EXPORT_SCHEMA_VERSION,
+  REVIEW_EXPORT_SCHEMA_VERSION_V2,
   LLM_DRAFT_SCHEMA_VERSION,
   LLM_PROOF_DRAFT_SCHEMA,
   LLM_CRITIC_SCHEMA,
   Status,
   SynergyClass,
+  buildCompactBatch,
   createSample,
   draftProofs,
   exportReview,

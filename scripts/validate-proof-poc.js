@@ -173,9 +173,31 @@ function validateProofPoc(storeDir = STORE.DEFAULT_PROOF_REVIEW_DIR) {
   } catch (error) {
     addFailure('reviewBatch.parse', 'review-batches.jsonl', error.message);
   }
+  // Schema-aware review-batches check. The stream is append-only and may MIX v1
+  // rows (per-row review_instructions + oracle_text + full proof) with v2 rows (a
+  // batch_header carrying shared instructions/oracle dict + slim per-proof rows
+  // that omit per-row instructions). Key on row type/schemaVersion, not field
+  // presence, so each variant is validated against its own contract.
   for (const row of reviewBatchRows) {
+    if (row.type === 'batch_header') {
+      // v2 batch_header: shared instructions + oracle dict live here.
+      if (!row.batch_id) addFailure('reviewBatch.batchId', '(header)', 'Review batch header lacks batch_id.');
+      if (!row.review_instructions || !/Do not invent missing Oracle text/.test(row.review_instructions)) {
+        addFailure('reviewBatch.instructions', '(header)', 'Review batch header lacks the proof review guardrail instructions.');
+      }
+      if (!row.oracle_text || typeof row.oracle_text !== 'object' || Array.isArray(row.oracle_text)) {
+        addFailure('reviewBatch.headerOracle', '(header)', 'Review batch header lacks an oracle_text dictionary.');
+      }
+      continue;
+    }
     if (!row.batch_id) addFailure('reviewBatch.batchId', row.proof_id || '(missing)', 'Review batch row lacks batch_id.');
     if (!row.proof_id || !attemptById.has(row.proof_id)) addFailure('reviewBatch.knownProof', row.proof_id || '(missing)', 'Review batch references an unknown latest proof id.');
+    if (row.schemaVersion === PIPELINE.REVIEW_EXPORT_SCHEMA_VERSION_V2) {
+      // v2 proof row: instructions live in the header, not per row. proof_id
+      // resolution is already checked above; nothing further required here.
+      continue;
+    }
+    // v1 row (no schemaVersion, or the v1 schemaVersion): per-row instructions required.
     if (!row.review_instructions || !/Do not invent missing Oracle text/.test(row.review_instructions)) {
       addFailure('reviewBatch.instructions', row.proof_id || '(missing)', 'Review batch row lacks the proof review guardrail instructions.');
     }
